@@ -20,20 +20,20 @@ from utils import calculate_level, format_hours
 from audio_manager import play_sound
 
 # ── Theme ──────────────────────────────────────────────────────────────────────
-ctk.set_appearance_mode("dark")
+ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-BG      = "#0d0d1a"
-PANEL   = "#14142a"
-CARD    = "#1c1c38"
-BORDER  = "#2a2a50"
-ACCENT  = "#7c6ff7"
-ACCENT2 = "#4cc9f0"
-TEXT    = "#e8e8f0"
-MUTED   = "#6b6b8a"
-SUCCESS = "#06d6a0"
-WARNING = "#ffd166"
-DANGER  = "#ef476f"
+BG      = "#f7f7f7"
+PANEL   = "#ffffff"
+CARD    = "#f0f0f0"
+BORDER  = "#e0e0e0"
+ACCENT  = "#f7c90f"
+ACCENT2 = "#e6b800"
+TEXT    = "#1a1a1a"
+MUTED   = "#888888"
+SUCCESS = "#2d9e6b"
+WARNING = "#f7c90f"
+DANGER  = "#e53935"
 
 
 # ── Circular Timer Canvas ──────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ class RingTimer(tk.Canvas):
         w   = 20
 
         # Track
-        self._arc(pad, w, BORDER, 359.99)
+        self._arc(pad, w, "#e8e8e8", 359.99)
         # Progress
         if fraction > 0.001:
             self._arc(pad, w, ACCENT, fraction * 359.99)
@@ -101,13 +101,13 @@ def mk_label(parent, text, size=13, weight="normal", color=TEXT, **kw) -> ctk.CT
 def mk_btn(parent, text, command, width=120, height=40,
            accent=False, danger=False, warn=False, **kw) -> ctk.CTkButton:
     if accent:
-        fg, hover, tc = ACCENT, "#6a5ee6", TEXT
+        fg, hover, tc = ACCENT, "#e6b800", TEXT
     elif danger:
-        fg, hover, tc = "#2a1020", "#3a1828", DANGER
+        fg, hover, tc = "#fff0f0", "#fde0e0", DANGER
     elif warn:
-        fg, hover, tc = WARNING, "#e6bd5c", "#0d0d1a"
+        fg, hover, tc = ACCENT, "#e6b800", TEXT
     else:
-        fg, hover, tc = CARD, "#222248", MUTED
+        fg, hover, tc = CARD, "#e8e8e8", MUTED
     return ctk.CTkButton(
         parent, text=text, command=command,
         width=width, height=height, corner_radius=12,
@@ -270,8 +270,8 @@ class App(ctk.CTk):
         self.mode_seg = ctk.CTkSegmentedButton(
             hdr, values=["Pomodoro", "Open Timer"],
             command=self._on_mode_change,
-            selected_color=ACCENT, selected_hover_color="#6a5ee6",
-            unselected_color=CARD, unselected_hover_color="#222248",
+            selected_color=ACCENT, selected_hover_color="#e6b800",
+            unselected_color=CARD, unselected_hover_color="#e8e8e8",
             text_color=TEXT, font=ctk.CTkFont(size=13),
         )
         self.mode_seg.set("Pomodoro")
@@ -304,7 +304,7 @@ class App(ctk.CTk):
         for m in (15, 25, 45, 60):
             ctk.CTkButton(
                 pre, text=f"{m}m", width=52, height=28, corner_radius=8,
-                fg_color=CARD, hover_color="#222248", text_color=MUTED,
+                fg_color=CARD, hover_color="#e8e8e8", text_color=MUTED,
                 border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                 command=lambda v=m: self._set_dur(v),
             ).pack(side="left", padx=3)
@@ -315,7 +315,7 @@ class App(ctk.CTk):
 
         self.start_btn = ctk.CTkButton(
             brow, text="▶  Start", width=120, height=46, corner_radius=14,
-            fg_color=ACCENT, hover_color="#6a5ee6", text_color=TEXT,
+            fg_color=ACCENT, hover_color="#e6b800", text_color=TEXT,
             border_width=0, font=ctk.CTkFont(size=15, weight="bold"),
             command=self._on_start,
         )
@@ -345,7 +345,7 @@ class App(ctk.CTk):
             emoji = SKILL_EMOJIS.get(sk, "")
             b = ctk.CTkButton(
                 g, text=f"{emoji} {sk}", width=82, height=32, corner_radius=8,
-                fg_color=CARD, hover_color="#222248", text_color=MUTED,
+                fg_color=CARD, hover_color="#e8e8e8", text_color=MUTED,
                 border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                 command=lambda s=sk: self._pick_skill(s),
             )
@@ -484,12 +484,14 @@ class App(ctk.CTk):
         self.after(1000, self._tick_open)
 
     def _btns_running(self):
-        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=MUTED)
+        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=MUTED,
+                                  border_color=BORDER)
         self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸  Pause")
         self.stop_btn.configure(state="normal")
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=ACCENT, text_color=TEXT)
+        self.start_btn.configure(state="normal", fg_color=ACCENT, text_color=TEXT,
+                                  border_color=ACCENT)
         self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸  Pause")
         self.stop_btn.configure(state="disabled")
 
@@ -542,7 +544,7 @@ class App(ctk.CTk):
         res.bind("<Return>", lambda _: save())
         ctk.CTkButton(
             dlg, text="Speichern", height=44, corner_radius=12,
-            fg_color=ACCENT, hover_color="#6a5ee6", text_color=TEXT,
+            fg_color=ACCENT, hover_color="#e6b800", text_color=TEXT,
             font=ctk.CTkFont(size=14, weight="bold"), command=save,
         ).pack(fill="x", padx=24, pady=(4, 28))
 
@@ -780,8 +782,8 @@ class App(ctk.CTk):
             values=["Today", "This Week", "This Month", "This Year", "All Time"],
             variable=self._lb_period,
             command=lambda _: self._refresh_leaderboard(),
-            selected_color=ACCENT, selected_hover_color="#6a5ee6",
-            unselected_color=CARD, unselected_hover_color="#222248",
+            selected_color=ACCENT, selected_hover_color="#e6b800",
+            unselected_color=CARD, unselected_hover_color="#e8e8e8",
             text_color=TEXT, font=ctk.CTkFont(size=12),
         ).pack(side="left")
 
@@ -849,7 +851,7 @@ class App(ctk.CTk):
             row = ctk.CTkFrame(c, fg_color="transparent")
             row.pack(fill="x", padx=16, pady=12)
 
-            rank_s = medals[i]  if i < 3 else f"#{i + 1}"
+            rank_s = medals[i]  if i < 3 else f"# {i + 1}"
             rank_c = mcolors[i] if i < 3 else MUTED
             mk_label(row, rank_s, size=17, color=rank_c, width=34).pack(side="left")
             mk_label(row, f"{dur:.0f} min", size=16, weight="bold",
@@ -860,7 +862,7 @@ class App(ctk.CTk):
             mk_label(det, intention, size=12, color=MUTED).pack(anchor="w")
             mk_label(det,
                      f"{dt.strftime('%d.%m.%Y %H:%M')}  ·  {skill}",
-                     size=11, color=BORDER).pack(anchor="w")
+                     size=11, color=MUTED).pack(anchor="w")
 
         if not filtered:
             mk_label(self._lb_scroll,
