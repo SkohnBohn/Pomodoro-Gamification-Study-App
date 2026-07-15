@@ -5,6 +5,7 @@ import customtkinter as ctk
 import tkinter as tk
 import sqlite3
 import threading
+import math
 import os
 import platform
 import subprocess
@@ -53,7 +54,6 @@ class RingTimer(tk.Canvas):
         self._draw(fraction, time_str, sub)
 
     def _draw(self, fraction: float, time_str: str, sub: str):
-        import math
         self.delete("all")
         cx = cy = self.SIZE // 2
         pad, w = 14, 20
@@ -122,11 +122,12 @@ def sec_title(parent, text):
 
 
 def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButton:
+    # selected_color=BORDER (deep gold) so TEXT (near-black) is readable on both states
     return ctk.CTkSegmentedButton(
         parent, values=values, variable=variable, command=command,
-        selected_color=DARK, selected_hover_color=DARK2,
+        selected_color=BORDER, selected_hover_color=DARK,
         unselected_color=CARD, unselected_hover_color=BORDER,
-        text_color=BG,                 # yellow text on dark selected
+        text_color=TEXT,
         text_color_disabled=MUTED,
         font=ctk.CTkFont(size=12),
     )
@@ -223,7 +224,7 @@ class App(ctk.CTk):
     def _nav(self, key: str):
         for k, b in self._nav_btns.items():
             if k == key:
-                b.configure(fg_color=DARK, text_color=BG)
+                b.configure(fg_color=BORDER, text_color=TEXT)
             else:
                 b.configure(fg_color="transparent", text_color=MUTED)
 
@@ -455,6 +456,7 @@ class App(ctk.CTk):
             if self.timer_mode == "Pomodoro"
             else self.elapsed_secs / 60
         )
+        self._btns_idle()
         if elapsed >= 0.5:
             self._result_dialog(elapsed)
         else:
@@ -573,10 +575,10 @@ class App(ctk.CTk):
         if not os.path.exists(DB_FILE):
             return
         try:
-            sys = platform.system()
-            if sys == "Darwin":
+            plat = platform.system()
+            if plat == "Darwin":
                 subprocess.call(("open", DB_FILE))
-            elif sys == "Windows":
+            elif plat == "Windows":
                 os.startfile(DB_FILE)
             else:
                 subprocess.call(("xdg-open", DB_FILE))
@@ -607,19 +609,19 @@ class App(ctk.CTk):
         last      = None
         try:
             conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute(
+            cur = conn.cursor()
+            cur.execute(
                 "SELECT skill, SUM(duration) FROM pomodoro_session GROUP BY skill")
-            for sk, mins in c.fetchall():
+            for sk, mins in cur.fetchall():
                 if sk in skill_hours and mins:
                     skill_hours[sk] = mins / 60.0
-            c.execute("SELECT SUM(duration) FROM pomodoro_session")
-            r = c.fetchone()[0] or 0
+            cur.execute("SELECT SUM(duration) FROM pomodoro_session")
+            r = cur.fetchone()[0] or 0
             total_all = r / 60.0
-            c.execute(
+            cur.execute(
                 "SELECT duration, skill "
                 "FROM pomodoro_session ORDER BY sessions DESC LIMIT 1")
-            last = c.fetchone()
+            last = cur.fetchone()
             conn.close()
         except Exception:
             pass
@@ -811,18 +813,29 @@ class App(ctk.CTk):
             w.destroy()
 
         period = self._lb_period.get() if hasattr(self, "_lb_period") else "All Time"
+        now = datetime.now()
+
+        # Build a SQL date filter so we don't load the full table for small periods
+        if period == "Today":
+            date_filter = f"AND date = '{now.strftime('%Y-%m-%d')}'"
+        elif period == "This Month":
+            date_filter = f"AND date LIKE '{now.strftime('%Y-%m')}%'"
+        elif period == "This Year":
+            date_filter = f"AND date LIKE '{now.strftime('%Y')}%'"
+        else:
+            date_filter = ""  # This Week and All Time handled below
+
         try:
             conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute(
-                "SELECT duration, date, time, skill, intention "
-                "FROM pomodoro_session")
-            rows = c.fetchall()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT duration, date, time, skill, intention "
+                f"FROM pomodoro_session {date_filter}")
+            rows = cur.fetchall()
             conn.close()
         except Exception:
             rows = []
 
-        now      = datetime.now()
         filtered = []
         for dur, date_s, time_s, skill, intention in rows:
             try:
@@ -830,18 +843,11 @@ class App(ctk.CTk):
                 dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
             except Exception:
                 continue
-            iso = dt.isocalendar()
-            inc = (
-                period == "All Time"
-                or (period == "Today"      and dt.date() == now.date())
-                or (period == "This Week"  and iso[1] == now.isocalendar()[1]
-                    and dt.year == now.year)
-                or (period == "This Month" and dt.month == now.month
-                    and dt.year == now.year)
-                or (period == "This Year"  and dt.year == now.year)
-            )
-            if inc:
-                filtered.append((dur, dt, skill or "", intention or ""))
+            if period == "This Week":
+                iso = dt.isocalendar()
+                if not (iso[1] == now.isocalendar()[1] and dt.year == now.year):
+                    continue
+            filtered.append((dur, dt, skill or "", intention or ""))
 
         total = sum(d for d, *_ in filtered)
         self._lb_sum.configure(
