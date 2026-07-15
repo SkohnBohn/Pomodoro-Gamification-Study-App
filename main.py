@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pomodoro Gamification App — Modern UI (CustomTkinter)"""
+"""Pomodoro Gamification App — Yellow Mode (CustomTkinter)"""
 
 import customtkinter as ctk
 import tkinter as tk
@@ -19,21 +19,23 @@ from data_manager import calculate_total_time, save_session, initialize_db
 from utils import calculate_level, format_hours
 from audio_manager import play_sound
 
-# ── Theme ──────────────────────────────────────────────────────────────────────
+# ── Palette ────────────────────────────────────────────────────────────────────
+# Gelb ist die Basis – alles klassische Weiß/Hell wird durch Gelbtöne ersetzt.
+# Dunkle Grautöne/Schwarz geben Kontrast.
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-BG      = "#f7f7f7"
-PANEL   = "#ffffff"
-CARD    = "#f0f0f0"
-BORDER  = "#e0e0e0"
-ACCENT  = "#f7c90f"
-ACCENT2 = "#e6b800"
-TEXT    = "#1a1a1a"
-MUTED   = "#888888"
-SUCCESS = "#2d9e6b"
-WARNING = "#f7c90f"
-DANGER  = "#e53935"
+BG      = "#f7c90f"   # main background — the yellow
+PANEL   = "#f9d340"   # panels (minimal lighter lift)
+CARD    = "#fce380"   # input fields / inner surfaces (lighter tint)
+BORDER  = "#ddb800"   # borders / separators (darker yellow)
+DARK    = "#1a1200"   # near-black — replaces any "accent blue"
+DARK2   = "#3d3000"   # dark hover state
+MUTED   = "#5c4300"   # secondary text (dark golden)
+DIM     = "#7a5f00"   # very muted / disabled text
+TEXT    = "#1a1200"   # primary text
+SUCCESS = "#14532d"   # dark green
+DANGER  = "#991b1b"   # dark red
 
 
 # ── Circular Timer Canvas ──────────────────────────────────────────────────────
@@ -54,14 +56,13 @@ class RingTimer(tk.Canvas):
         import math
         self.delete("all")
         cx = cy = self.SIZE // 2
-        pad = 14
-        w   = 20
+        pad, w = 14, 20
 
-        # Track
-        self._arc(pad, w, "#e8e8e8", 359.99)
-        # Progress
+        # Track (darker yellow)
+        self._arc(pad, w, BORDER, 359.99)
+        # Progress (near-black)
         if fraction > 0.001:
-            self._arc(pad, w, ACCENT, fraction * 359.99)
+            self._arc(pad, w, DARK, fraction * 359.99)
         # End-dot
         if 0.001 < fraction < 0.999:
             angle = math.radians(90 - fraction * 360)
@@ -70,7 +71,7 @@ class RingTimer(tk.Canvas):
             dy = cy - r * math.sin(angle)
             self.create_oval(dx - w // 2, dy - w // 2,
                              dx + w // 2, dy + w // 2,
-                             fill=ACCENT2, outline="")
+                             fill=DARK2, outline="")
 
         self.create_text(cx, cy - (14 if sub else 0),
                          text=time_str, fill=TEXT,
@@ -99,15 +100,13 @@ def mk_label(parent, text, size=13, weight="normal", color=TEXT, **kw) -> ctk.CT
 
 
 def mk_btn(parent, text, command, width=120, height=40,
-           accent=False, danger=False, warn=False, **kw) -> ctk.CTkButton:
-    if accent:
-        fg, hover, tc = ACCENT, "#e6b800", TEXT
+           primary=False, danger=False, **kw) -> ctk.CTkButton:
+    if primary:
+        fg, hover, tc = DARK, DARK2, BG          # dark btn, yellow text
     elif danger:
-        fg, hover, tc = "#fff0f0", "#fde0e0", DANGER
-    elif warn:
-        fg, hover, tc = ACCENT, "#e6b800", TEXT
+        fg, hover, tc = CARD, CARD, DANGER        # yellow-light bg, red text
     else:
-        fg, hover, tc = CARD, "#e8e8e8", MUTED
+        fg, hover, tc = CARD, BORDER, MUTED       # default muted
     return ctk.CTkButton(
         parent, text=text, command=command,
         width=width, height=height, corner_radius=12,
@@ -122,6 +121,22 @@ def sec_title(parent, text):
         anchor="w", padx=16, pady=(14, 6))
 
 
+def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButton:
+    return ctk.CTkSegmentedButton(
+        parent, values=values, variable=variable, command=command,
+        selected_color=DARK, selected_hover_color=DARK2,
+        unselected_color=CARD, unselected_hover_color=BORDER,
+        text_color=BG,                 # yellow text on dark selected
+        text_color_disabled=MUTED,
+        font=ctk.CTkFont(size=12),
+    )
+
+
+def progress_bar(parent, color=DARK) -> ctk.CTkProgressBar:
+    return ctk.CTkProgressBar(parent, height=6, corner_radius=3,
+                               progress_color=color, fg_color=BORDER)
+
+
 # ── Main Application ───────────────────────────────────────────────────────────
 class App(ctk.CTk):
     def __init__(self):
@@ -134,7 +149,6 @@ class App(ctk.CTk):
 
         initialize_db()
 
-        # Timer state
         self.running        = False
         self.paused         = False
         self.seconds_left   = 0
@@ -160,7 +174,7 @@ class App(ctk.CTk):
         self.sidebar.pack_propagate(False)
 
         mk_label(self.sidebar, "🍅  Pomodoro", size=18, weight="bold",
-                 color=ACCENT).pack(pady=(28, 30), padx=20, anchor="w")
+                 color=DARK).pack(pady=(28, 30), padx=20, anchor="w")
 
         self._nav_btns: dict = {}
         for icon, text, key in [
@@ -172,7 +186,7 @@ class App(ctk.CTk):
             b = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {text}", anchor="w",
                 height=42, corner_radius=10,
-                fg_color="transparent", hover_color=CARD,
+                fg_color="transparent", hover_color=BORDER,
                 text_color=MUTED, border_width=0,
                 font=ctk.CTkFont(size=14),
                 command=lambda k=key: self._nav(k),
@@ -189,14 +203,13 @@ class App(ctk.CTk):
         self._badge_lbl = ctk.CTkLabel(footer, text="")
         self._badge_lbl.pack()
 
-        self._level_lbl = mk_label(footer, "LVL 0", size=15, weight="bold", color=ACCENT)
+        self._level_lbl = mk_label(footer, "LVL 0", size=15, weight="bold", color=DARK)
         self._level_lbl.pack(pady=(6, 2))
 
         self._next_lbl = mk_label(footer, "", size=11, color=MUTED)
         self._next_lbl.pack()
 
-        self._lvl_bar = ctk.CTkProgressBar(footer, height=5, corner_radius=3,
-                                            progress_color=ACCENT, fg_color=BORDER)
+        self._lvl_bar = progress_bar(footer)
         self._lvl_bar.pack(fill="x", pady=(8, 12))
         self._lvl_bar.set(0)
 
@@ -210,7 +223,7 @@ class App(ctk.CTk):
     def _nav(self, key: str):
         for k, b in self._nav_btns.items():
             if k == key:
-                b.configure(fg_color=CARD, text_color=TEXT)
+                b.configure(fg_color=DARK, text_color=BG)
             else:
                 b.configure(fg_color="transparent", text_color=MUTED)
 
@@ -263,21 +276,15 @@ class App(ctk.CTk):
     def _build_timer_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
-        # Header
         hdr = ctk.CTkFrame(view, fg_color="transparent")
         hdr.pack(fill="x", padx=28, pady=(22, 0))
-        mk_label(hdr, "Timer", size=22, weight="bold").pack(side="left")
-        self.mode_seg = ctk.CTkSegmentedButton(
-            hdr, values=["Pomodoro", "Open Timer"],
-            command=self._on_mode_change,
-            selected_color=ACCENT, selected_hover_color="#e6b800",
-            unselected_color=CARD, unselected_hover_color="#e8e8e8",
-            text_color=TEXT, font=ctk.CTkFont(size=13),
-        )
+        mk_label(hdr, "Timer", size=22, weight="bold", color=DARK).pack(side="left")
+
+        self.mode_seg = seg_btn(hdr, ["Pomodoro", "Open Timer"],
+                                command=self._on_mode_change)
         self.mode_seg.set("Pomodoro")
         self.mode_seg.pack(side="right")
 
-        # Body
         body = ctk.CTkFrame(view, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=18)
 
@@ -288,34 +295,32 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(28, 8))
 
-        # Duration row (Pomodoro only)
         self._dur_row = ctk.CTkFrame(left, fg_color="transparent")
         self._dur_row.pack()
         mk_label(self._dur_row, "Minuten:", color=MUTED).pack(side="left", padx=(0, 8))
         self.dur_entry = ctk.CTkEntry(
             self._dur_row, width=72, height=36, placeholder_text="25",
-            corner_radius=10, fg_color=CARD, border_color=BORDER, text_color=TEXT,
+            corner_radius=10, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
         )
         self.dur_entry.pack(side="left")
 
-        # Presets
         pre = ctk.CTkFrame(left, fg_color="transparent")
         pre.pack(pady=(8, 16))
         for m in (15, 25, 45, 60):
             ctk.CTkButton(
                 pre, text=f"{m}m", width=52, height=28, corner_radius=8,
-                fg_color=CARD, hover_color="#e8e8e8", text_color=MUTED,
+                fg_color=CARD, hover_color=BORDER, text_color=MUTED,
                 border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                 command=lambda v=m: self._set_dur(v),
             ).pack(side="left", padx=3)
 
-        # Buttons
         brow = ctk.CTkFrame(left, fg_color="transparent")
         brow.pack(pady=(0, 28))
 
         self.start_btn = ctk.CTkButton(
             brow, text="▶  Start", width=120, height=46, corner_radius=14,
-            fg_color=ACCENT, hover_color="#e6b800", text_color=TEXT,
+            fg_color=DARK, hover_color=DARK2, text_color=BG,
             border_width=0, font=ctk.CTkFont(size=15, weight="bold"),
             command=self._on_start,
         )
@@ -329,7 +334,7 @@ class App(ctk.CTk):
                                width=100, height=46, danger=True, state="disabled")
         self.stop_btn.pack(side="left", padx=5)
 
-        # ── Right: skill / intention / notes ──────────────────────────────────
+        # ── Right ─────────────────────────────────────────────────────────────
         right = ctk.CTkFrame(body, fg_color="transparent", width=290)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
@@ -345,7 +350,7 @@ class App(ctk.CTk):
             emoji = SKILL_EMOJIS.get(sk, "")
             b = ctk.CTkButton(
                 g, text=f"{emoji} {sk}", width=82, height=32, corner_radius=8,
-                fg_color=CARD, hover_color="#e8e8e8", text_color=MUTED,
+                fg_color=CARD, hover_color=BORDER, text_color=MUTED,
                 border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                 command=lambda s=sk: self._pick_skill(s),
             )
@@ -360,7 +365,8 @@ class App(ctk.CTk):
         self.intention_entry = ctk.CTkEntry(
             int_card, height=38, placeholder_text="Was ist dein Ziel?",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
-            text_color=TEXT, font=ctk.CTkFont(size=13),
+            text_color=TEXT, placeholder_text_color=DIM,
+            font=ctk.CTkFont(size=13),
         )
         self.intention_entry.pack(fill="x", padx=12, pady=(0, 14))
 
@@ -384,7 +390,7 @@ class App(ctk.CTk):
         self.selected_skill = skill
         for sk, b in self._skill_btns.items():
             if sk == skill:
-                b.configure(fg_color=ACCENT, text_color=TEXT, border_color=ACCENT)
+                b.configure(fg_color=DARK, text_color=BG, border_color=DARK)
             else:
                 b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
 
@@ -458,8 +464,8 @@ class App(ctk.CTk):
         if not self.running or self.paused:
             return
         if self.seconds_left > 0:
-            m, s   = divmod(self.seconds_left, 60)
-            frac   = (self.total_seconds - self.seconds_left) / self.total_seconds
+            m, s  = divmod(self.seconds_left, 60)
+            frac  = (self.total_seconds - self.seconds_left) / self.total_seconds
             self.ring.update_ring(
                 frac, f"{m:02d}:{s:02d}",
                 f"{self.total_seconds // 60} min · {self.selected_skill}",
@@ -476,22 +482,22 @@ class App(ctk.CTk):
     def _tick_open(self):
         if not self.running or self.paused:
             return
-        m, s  = divmod(self.elapsed_secs, 60)
-        h, m  = divmod(m, 60)
-        ts    = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+        m, s = divmod(self.elapsed_secs, 60)
+        h, m = divmod(m, 60)
+        ts   = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
         self.ring.update_ring(0, ts, self.selected_skill)
         self.elapsed_secs += 1
         self.after(1000, self._tick_open)
 
     def _btns_running(self):
-        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=MUTED,
-                                  border_color=BORDER)
+        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=DIM,
+                                  border_color=BORDER, border_width=1)
         self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸  Pause")
         self.stop_btn.configure(state="normal")
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=ACCENT, text_color=TEXT,
-                                  border_color=ACCENT)
+        self.start_btn.configure(state="normal", fg_color=DARK, text_color=BG,
+                                  border_width=0)
         self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸  Pause")
         self.stop_btn.configure(state="disabled")
 
@@ -511,7 +517,7 @@ class App(ctk.CTk):
         dlg.lift()
 
         mk_label(dlg, "Session beendet 🎉", size=20, weight="bold",
-                 color=ACCENT).pack(pady=(28, 4))
+                 color=DARK).pack(pady=(28, 4))
         mk_label(dlg, f"{duration:.0f} min · {self.selected_skill}",
                  color=MUTED).pack()
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(fill="x", padx=24, pady=18)
@@ -519,7 +525,8 @@ class App(ctk.CTk):
 
         res = ctk.CTkEntry(
             dlg, height=40, placeholder_text="Ergebnis …",
-            corner_radius=10, fg_color=CARD, border_color=BORDER, text_color=TEXT,
+            corner_radius=10, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=14),
         )
         res.pack(fill="x", padx=24, pady=8)
@@ -544,7 +551,7 @@ class App(ctk.CTk):
         res.bind("<Return>", lambda _: save())
         ctk.CTkButton(
             dlg, text="Speichern", height=44, corner_radius=12,
-            fg_color=ACCENT, hover_color="#e6b800", text_color=TEXT,
+            fg_color=DARK, hover_color=DARK2, text_color=BG,
             font=ctk.CTkFont(size=14, weight="bold"), command=save,
         ).pack(fill="x", padx=24, pady=(4, 28))
 
@@ -555,11 +562,11 @@ class App(ctk.CTk):
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, "⬆  LEVEL UP!", size=28, weight="bold",
-                 color=WARNING).pack(pady=(36, 8))
+        mk_label(dlg, "⬆  LEVEL UP!", size=28, weight="bold", color=DARK).pack(
+            pady=(36, 8))
         mk_label(dlg, f"Du bist jetzt Level {level}!", size=16, color=TEXT).pack()
         mk_btn(dlg, "🎉  Weiter", dlg.destroy,
-               width=180, height=44, warn=True).pack(pady=28)
+               width=180, height=44, primary=True).pack(pady=28)
 
     # ── Open log ──────────────────────────────────────────────────────────────
     def _open_log(self):
@@ -579,12 +586,12 @@ class App(ctk.CTk):
     # ── Skills View ───────────────────────────────────────────────────────────
     def _build_skills_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "🌳  Skilltree", size=22, weight="bold").pack(
-            anchor="w", padx=28, pady=(24, 14))
+        mk_label(view, "🌳  Skilltree", size=22, weight="bold",
+                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._sk_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=ACCENT,
+            scrollbar_button_hover_color=DARK,
         )
         self._sk_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         return view
@@ -624,10 +631,11 @@ class App(ctk.CTk):
                     return i, (hours - lo) / (t - lo), t
             return len(SKILL_THRESHOLDS), 1.0, SKILL_THRESHOLDS[-1]
 
-        for skill, hours in sorted(skill_hours.items(), key=lambda x: x[1], reverse=True):
+        for skill, hours in sorted(skill_hours.items(),
+                                    key=lambda x: x[1], reverse=True):
             lvl, frac, next_t = lvl_prog(hours)
-            emoji   = SKILL_EMOJIS.get(skill, "")
-            at_cap  = lvl >= len(SKILL_THRESHOLDS)
+            emoji  = SKILL_EMOJIS.get(skill, "")
+            at_cap = lvl >= len(SKILL_THRESHOLDS)
 
             c = mk_card(self._sk_scroll)
             c.pack(fill="x", pady=5, padx=6)
@@ -636,14 +644,14 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, f"{emoji}  {skill}", size=15, weight="bold").pack(side="left")
-            lvl_color = WARNING if (frac >= 1.0 and not at_cap) else ACCENT
-            mk_label(top, "MAX ⭐" if at_cap else f"LVL {lvl}",
-                     size=14, weight="bold", color=lvl_color).pack(side="right")
+            mk_label(top, f"{emoji}  {skill}", size=15, weight="bold",
+                     color=TEXT).pack(side="left")
+            cap_label = "MAX ⭐" if at_cap else f"LVL {lvl}"
+            lvl_col   = MUTED if (frac < 1.0 or at_cap) else DARK
+            mk_label(top, cap_label, size=14, weight="bold",
+                     color=lvl_col).pack(side="right")
 
-            bar = ctk.CTkProgressBar(inner, height=6, corner_radius=3,
-                                      progress_color=ACCENT2 if at_cap else ACCENT,
-                                      fg_color=BORDER)
+            bar = progress_bar(inner, color=DARK if not at_cap else MUTED)
             bar.pack(fill="x", pady=(8, 4))
             bar.set(1.0 if at_cap else max(0.0, frac))
 
@@ -661,15 +669,16 @@ class App(ctk.CTk):
                     d.title("Level Up!")
                     d.configure(fg_color=PANEL)
                     d.grab_set()
-                    mk_label(d, f"⬆  {SKILL_EMOJIS.get(sk,'')} {sk} LEVEL UP!",
-                             size=19, weight="bold", color=WARNING).pack(pady=(32, 8))
-                    mk_label(d, f"LVL {lv} → LVL {lv + 1}", size=14,
-                             color=TEXT).pack()
+                    mk_label(d,
+                             f"⬆  {SKILL_EMOJIS.get(sk,'')} {sk} LEVEL UP!",
+                             size=19, weight="bold", color=DARK).pack(pady=(32, 8))
+                    mk_label(d, f"LVL {lv} → LVL {lv + 1}",
+                             size=14, color=TEXT).pack()
                     mk_btn(d, "💪  Let's go!", d.destroy,
-                           width=160, height=40, warn=True).pack(pady=20)
+                           width=160, height=40, primary=True).pack(pady=20)
 
                 mk_btn(inner, "🎉  Level Up!", _show_lvlup,
-                       width=120, height=30, warn=True).pack(anchor="e", pady=(6, 0))
+                       width=120, height=30, primary=True).pack(anchor="e", pady=(6, 0))
 
         ctk.CTkFrame(self._sk_scroll, height=1, fg_color=BORDER).pack(
             fill="x", padx=6, pady=14)
@@ -680,17 +689,17 @@ class App(ctk.CTk):
             emoji = SKILL_EMOJIS.get(sk, "")
             mk_label(self._sk_scroll,
                      f"Letzte Session: {emoji}  +{dur_min:.0f} min in {sk}",
-                     color=ACCENT, size=13).pack(pady=4)
+                     color=DARK, size=13).pack(pady=4)
 
     # ── Achievements View ──────────────────────────────────────────────────────
     def _build_achievements_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "🏆  Achievements", size=22, weight="bold").pack(
-            anchor="w", padx=28, pady=(24, 14))
+        mk_label(view, "🏆  Achievements", size=22, weight="bold",
+                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._ach_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=ACCENT,
+            scrollbar_button_hover_color=DARK,
         )
         self._ach_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         return view
@@ -717,13 +726,12 @@ class App(ctk.CTk):
         except Exception:
             total_min = sessions = over30 = over50 = 0
 
-        # Badge gallery
         lvl = calculate_level(total_h)
         if lvl > 0:
             bc = mk_card(self._ach_scroll)
             bc.pack(fill="x", pady=5, padx=6)
-            mk_label(bc, "🎖  Freigeschaltete Badges", size=14,
-                     weight="bold").pack(anchor="w", padx=16, pady=(14, 8))
+            mk_label(bc, "🎖  Freigeschaltete Badges", size=14, weight="bold",
+                     color=TEXT).pack(anchor="w", padx=16, pady=(14, 8))
             row = ctk.CTkFrame(bc, fg_color="transparent")
             row.pack(padx=14, pady=(0, 14), fill="x")
             self._ach_badge_imgs = []
@@ -755,7 +763,8 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, f"{emoji}  {name}", size=14, weight="bold").pack(side="left")
+            mk_label(top, f"{emoji}  {name}", size=14, weight="bold",
+                     color=TEXT).pack(side="left")
             if isinstance(val, float):
                 val_s = f"{val:.1f}" if val != int(val) else str(int(val))
             else:
@@ -763,29 +772,26 @@ class App(ctk.CTk):
             mk_label(top, f"{val_s}{unit} / {int(max_val)}{unit}",
                      color=MUTED, size=13).pack(side="right")
 
-            bar = ctk.CTkProgressBar(inner, height=6, corner_radius=3,
-                                      progress_color=SUCCESS, fg_color=BORDER)
+            bar = progress_bar(inner, color=SUCCESS)
             bar.pack(fill="x", pady=(8, 0))
             bar.set(frac)
 
     # ── Leaderboard View ──────────────────────────────────────────────────────
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "📊  Leaderboard", size=22, weight="bold").pack(
-            anchor="w", padx=28, pady=(24, 12))
+        mk_label(view, "📊  Leaderboard", size=22, weight="bold",
+                 color=DARK).pack(anchor="w", padx=28, pady=(24, 12))
 
         f = ctk.CTkFrame(view, fg_color="transparent")
         f.pack(padx=28, pady=(0, 8), fill="x")
         self._lb_period = ctk.StringVar(value="All Time")
-        ctk.CTkSegmentedButton(
+        sb = seg_btn(
             f,
-            values=["Today", "This Week", "This Month", "This Year", "All Time"],
+            ["Today", "This Week", "This Month", "This Year", "All Time"],
             variable=self._lb_period,
             command=lambda _: self._refresh_leaderboard(),
-            selected_color=ACCENT, selected_hover_color="#e6b800",
-            unselected_color=CARD, unselected_hover_color="#e8e8e8",
-            text_color=TEXT, font=ctk.CTkFont(size=12),
-        ).pack(side="left")
+        )
+        sb.pack(side="left")
 
         self._lb_sum = mk_label(view, "", color=MUTED, size=13)
         self._lb_sum.pack(anchor="w", padx=28, pady=(0, 6))
@@ -793,7 +799,7 @@ class App(ctk.CTk):
         self._lb_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=ACCENT,
+            scrollbar_button_hover_color=DARK,
         )
         self._lb_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         return view
@@ -843,7 +849,7 @@ class App(ctk.CTk):
 
         filtered.sort(key=lambda x: x[0], reverse=True)
         medals  = ["🥇", "🥈", "🥉"]
-        mcolors = [WARNING, "#aaaaaa", "#cd7f32"]
+        mcolors = ["#92700a", "#555555", "#7a4500"]   # golden/silver/bronze on yellow bg
 
         for i, (dur, dt, skill, intention) in enumerate(filtered[:10]):
             c = mk_card(self._lb_scroll)
@@ -851,8 +857,8 @@ class App(ctk.CTk):
             row = ctk.CTkFrame(c, fg_color="transparent")
             row.pack(fill="x", padx=16, pady=12)
 
-            rank_s = medals[i]  if i < 3 else f"# {i + 1}"
-            rank_c = mcolors[i] if i < 3 else MUTED
+            rank_s = medals[i]    if i < 3 else f"# {i + 1}"
+            rank_c = mcolors[i]   if i < 3 else MUTED
             mk_label(row, rank_s, size=17, color=rank_c, width=34).pack(side="left")
             mk_label(row, f"{dur:.0f} min", size=16, weight="bold",
                      color=rank_c if i < 3 else TEXT).pack(side="left", padx=(0, 14))
@@ -862,7 +868,7 @@ class App(ctk.CTk):
             mk_label(det, intention, size=12, color=MUTED).pack(anchor="w")
             mk_label(det,
                      f"{dt.strftime('%d.%m.%Y %H:%M')}  ·  {skill}",
-                     size=11, color=MUTED).pack(anchor="w")
+                     size=11, color=DIM).pack(anchor="w")
 
         if not filtered:
             mk_label(self._lb_scroll,
