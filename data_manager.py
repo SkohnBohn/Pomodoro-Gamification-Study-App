@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime
-
-DB_FILE = "/Users/sky/Desktop/Pomodoro/DB/pomodoro_sessions.db"
+from config import DB_FILE
 
 def initialize_db():
     """Erstellt die Tabelle, falls sie noch nicht existiert."""

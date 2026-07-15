@@ -1,14 +1,18 @@
 import os
 
-# SQL-Lite DB 
-DB_FILE = os.path.expanduser("~/Desktop/Pomodoro/DB/pomodoro_sessions.db")
-# nur DB heißt sessions, table heißt session 
+BASE_DIR    = os.path.expanduser("~/Desktop/Pomodoro/NEWUI")
+DB_FILE     = os.path.join(BASE_DIR, "DB", "pomodoro_sessions.db")
+BADGE_DIR   = os.path.expanduser("~/Desktop/Pomodoro/badges")
+ALARM_SOUND = os.path.join(BASE_DIR, "alarm.mp3")
 
-# Level-Grenzen (in Stunden)
-LEVEL_THRESHOLDS = [25, 30, 40, 55, 75, 100, 130, 165, 205, 250, 300, 355, 415, 480, 550, 630, 720, 820, 930, 1050] # 20 level
+LEVEL_THRESHOLDS = [
+    25, 30, 40, 55, 75, 100, 130, 165, 205, 250,
+    300, 355, 415, 480, 550, 630, 720, 820, 930, 1050,
+]
 
-# Pfad zu Badge-Bildern
-BADGE_DIR = os.path.expanduser("~/Desktop/Pomodoro/badges")
-
-# Sound-Datei
-ALARM_SOUND = "alarm.mp3"
+SKILLS = ["SOZ", "SUR", "MATH", "JOURNAL", "TECH", "UNI", "DESIGN"]
+SKILL_EMOJIS = {
+    "SOZ": "🧠", "SUR": "🎨", "MATH": "📐",
+    "JOURNAL": "📝", "TECH": "💻", "UNI": "🎓", "DESIGN": "✏️",
+}
+SKILL_THRESHOLDS = [5, 10, 20, 35, 55, 80, 110, 145, 185, 230, 280, 335]
