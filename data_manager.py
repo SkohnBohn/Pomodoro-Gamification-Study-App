@@ -39,6 +39,12 @@ def initialize_db():
             sort_order INTEGER DEFAULT 0
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS stat_confirmed_levels (
+            stat TEXT PRIMARY KEY,
+            confirmed_level INTEGER DEFAULT 0
+        )
+    ''')
     conn.commit()
     conn.close()
     _seed_user_skills()
@@ -223,6 +229,52 @@ def delete_user_skill(name: str):
     c.execute("UPDATE user_skills SET active=0 WHERE name=?", (name,))
     conn.commit()
     conn.close()
+
+
+# ── Stat level confirmation ────────────────────────────────────────────────────
+
+def get_stat_confirmed_levels() -> dict:
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    rows = c.execute(
+        "SELECT stat, confirmed_level FROM stat_confirmed_levels"
+    ).fetchall()
+    conn.close()
+    return {s: l for s, l in rows}
+
+
+def confirm_stat_level(stat: str, level: int):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO stat_confirmed_levels (stat, confirmed_level) VALUES (?, ?)
+           ON CONFLICT(stat) DO UPDATE SET confirmed_level = ?""",
+        (stat, level, level),
+    )
+    conn.commit()
+    conn.close()
+
+
+# ── Chart data ─────────────────────────────────────────────────────────────────
+
+def get_chart_data(skill: str = None) -> dict:
+    """Return {date_str: hours} for bar chart, optionally filtered by skill."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    if skill and skill != "Alle":
+        c.execute(
+            "SELECT date, SUM(duration)/60.0 FROM pomodoro_session "
+            "WHERE skill=? GROUP BY date ORDER BY date",
+            (skill,),
+        )
+    else:
+        c.execute(
+            "SELECT date, SUM(duration)/60.0 FROM pomodoro_session "
+            "GROUP BY date ORDER BY date"
+        )
+    rows = c.fetchall()
+    conn.close()
+    return {d: h for d, h in rows if d}
 
 
 # ── Heatmap data ───────────────────────────────────────────────────────────────

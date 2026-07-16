@@ -13,7 +13,7 @@ from datetime import datetime, date, timedelta
 from PIL import Image
 
 from config import (
-    DB_FILE, BADGE_DIR, LEVEL_THRESHOLDS, SKILL_THRESHOLDS,
+    DB_FILE, BADGE_DIR, LEVEL_THRESHOLDS, SKILL_THRESHOLDS, STAT_THRESHOLDS,
 )
 from data_manager import (
     calculate_total_time, save_session, initialize_db,
@@ -23,6 +23,7 @@ from data_manager import (
     get_badge_unlock_date,
     get_user_skills, add_user_skill, delete_user_skill,
     get_heatmap_data,
+    get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound
@@ -990,13 +991,13 @@ class App(ctk.CTk):
             sessions = cur.fetchone()[0] or 0
             cur.execute("SELECT COUNT(*) FROM pomodoro_session WHERE duration > 29.9")
             over30 = cur.fetchone()[0] or 0
-            cur.execute("SELECT COUNT(*) FROM pomodoro_session WHERE duration > 49.9")
-            over50 = cur.fetchone()[0] or 0
+            cur.execute("SELECT COUNT(*) FROM pomodoro_session WHERE duration > 59.9")
+            over60 = cur.fetchone()[0] or 0
             conn.close()
         except Exception:
-            total_min = sessions = over30 = over50 = 0
+            total_min = sessions = over30 = over60 = 0
 
-        collected_ach = get_achievements_collected()
+        stat_confirmed = get_stat_confirmed_levels()
         lvl = calculate_level(total_h)
 
         # ── Heatmap ───────────────────────────────────────────────────────────
@@ -1006,26 +1007,27 @@ class App(ctk.CTk):
                  color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
         self._draw_heatmap(hm_card)
 
+        # ── Bar chart ─────────────────────────────────────────────────────────
+        chart_card = mk_card(self._ach_scroll)
+        chart_card.pack(fill="x", pady=5, padx=6)
+        self._draw_bar_chart(chart_card)
+
         # ── Badges ────────────────────────────────────────────────────────────
         if lvl > 0:
             bc = mk_card(self._ach_scroll)
             bc.pack(fill="x", pady=5, padx=6)
             mk_label(bc, "Freigeschaltete Badges", size=13, weight="bold",
                      color=TEXT).pack(anchor="w", padx=16, pady=(14, 8))
-
             badge_frame = ctk.CTkFrame(bc, fg_color="transparent")
             badge_frame.pack(padx=14, pady=(0, 14), fill="x")
             self._ach_badge_imgs = []
-            col = 0
-            row_f = None
+            badge_btns = []
+
             for i in range(min(lvl + 1, 20)):
                 p = os.path.join(BADGE_DIR, f"p{i}.png")
                 if not os.path.exists(p):
                     continue
                 try:
-                    if col % 5 == 0:
-                        row_f = ctk.CTkFrame(badge_frame, fg_color="transparent")
-                        row_f.pack(fill="x", pady=2)
                     img = Image.open(p).resize((56, 56), Image.Resampling.LANCZOS)
                     ci  = ctk.CTkImage(img, size=(56, 56))
                     self._ach_badge_imgs.append(ci)
@@ -1046,27 +1048,46 @@ class App(ctk.CTk):
                         mk_btn(d, "Schließen", d.destroy,
                                width=130, height=36, primary=True).pack(pady=20)
 
-                    ctk.CTkButton(
-                        row_f, image=ci, text="", width=64, height=64,
+                    btn = ctk.CTkButton(
+                        badge_frame, image=ci, text="", width=64, height=64,
                         corner_radius=12, fg_color=CARD, hover_color=BORDER,
                         border_width=1, border_color=BORDER, command=_on_badge,
-                    ).pack(side="left", padx=4)
-                    col += 1
+                    )
+                    badge_btns.append(btn)
                 except Exception:
                     pass
 
-        # ── Stat bars ──────────────────────────────────────────────────────────
+            def _layout_badges(event=None):
+                w = badge_frame.winfo_width()
+                per_row = max(1, (w - 8) // 72) if w > 10 else 5
+                for j, b in enumerate(badge_btns):
+                    b.grid(row=j // per_row, column=j % per_row, padx=4, pady=4)
+
+            badge_frame.bind("<Configure>", _layout_badges)
+            badge_frame.after(100, _layout_badges)
+
+        # ── Stat level bars ───────────────────────────────────────────────────
+        def _lvl_prog_stat(val, thresholds):
+            for i, t in enumerate(thresholds):
+                if val < t:
+                    lo = 0 if i == 0 else thresholds[i - 1]
+                    return i, (val - lo) / (t - lo), t
+            return len(thresholds), 1.0, thresholds[-1]
+
         stats = [
-            ("Total Stunden",     "hours",    total_h,   500,   "h"),
-            ("Total Minuten",     "minutes",  total_min, 50000, " min"),
-            ("Sessions",          "sessions", sessions,  2000,  ""),
-            ("Sessions > 30 min", "over30",   over30,    1000,  ""),
-            ("Sessions > 50 min", "over50",   over50,    500,   ""),
+            ("Total Stunden",     "hours",    total_h,   STAT_THRESHOLDS["hours"],    "h"),
+            ("Total Minuten",     "minutes",  total_min, STAT_THRESHOLDS["minutes"],  " min"),
+            ("Sessions",          "sessions", sessions,  STAT_THRESHOLDS["sessions"], ""),
+            ("Sessions > 30 min", "over30",   over30,    STAT_THRESHOLDS["over30"],   ""),
+            ("Sessions > 60 min", "over60",   over60,    STAT_THRESHOLDS["over60"],   ""),
         ]
-        for name, key, val, max_val, unit in stats:
-            frac = min(val / max_val, 1.0) if max_val else 0
-            is_full = frac >= 1.0
-            already_done = key in collected_ach
+
+        for name, key, val, thresholds, unit in stats:
+            lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
+            at_cap          = lvl_s >= len(thresholds)
+            conf_lvl        = stat_confirmed.get(key, 0)
+            next_collect    = conf_lvl + 1
+            has_uncollected = lvl_s >= next_collect and not at_cap
 
             c = mk_card(self._ach_scroll)
             c.pack(fill="x", pady=5, padx=6)
@@ -1076,31 +1097,39 @@ class App(ctk.CTk):
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
             mk_label(top, name, size=14, weight="bold", color=TEXT).pack(side="left")
-            val_s = (f"{val:.1f}" if isinstance(val, float) and val != int(val)
-                     else str(int(val)))
-            mk_label(top, f"{val_s}{unit} / {int(max_val)}{unit}",
-                     color=MUTED, size=13).pack(side="right")
+            cap_label = "MAX ⭐" if at_cap else f"LVL {lvl_s}"
+            lvl_col   = DARK if has_uncollected else MUTED
+            mk_label(top, cap_label, size=14, weight="bold",
+                     color=lvl_col).pack(side="right")
 
             bar = progress_bar(inner, color=SUCCESS)
-            bar.pack(fill="x", pady=(8, 0))
-            bar.set(frac)
+            bar.pack(fill="x", pady=(8, 4))
+            bar.set(1.0 if at_cap else max(0.0, frac))
 
-            if is_full and not already_done:
-                def _collect_ach(k=key, card=c):
-                    mark_achievement_collected(k)
+            val_row = ctk.CTkFrame(inner, fg_color="transparent")
+            val_row.pack(fill="x")
+            val_s = (f"{val:.1f}" if isinstance(val, float) and val != int(val)
+                     else str(int(val)))
+            mk_label(val_row, f"{val_s}{unit}", color=MUTED, size=12).pack(side="left")
+            if not at_cap:
+                next_s = str(int(next_t)) if next_t == int(next_t) else f"{next_t:.0f}"
+                mk_label(val_row, f"→ {next_s}{unit} für LVL {lvl_s + 1}",
+                         color=MUTED, size=12).pack(side="right")
+
+            if has_uncollected:
+                def _collect_stat(k=key, lv=next_collect, n=name, card=c):
+                    confirm_stat_level(k, lv)
                     self._animate_collect(card)
                     self.after(600, self._refresh_achievements)
+                    self.after(650, lambda nn=n, ll=lv: self._stat_levelup_dialog(nn, ll))
 
                 ctk.CTkButton(
-                    inner, text="🏆  Einsammeln!",
-                    height=34, corner_radius=10,
+                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
+                    height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
-                    command=_collect_ach,
+                    command=_collect_stat,
                 ).pack(fill="x", pady=(10, 0))
-            elif is_full and already_done:
-                mk_label(inner, "✓ Eingesammelt", size=12,
-                         color=SUCCESS).pack(anchor="e", pady=(6, 0))
 
     # ── Heatmap ───────────────────────────────────────────────────────────────
     def _draw_heatmap(self, parent):
@@ -1200,6 +1229,138 @@ class App(ctk.CTk):
             c.pack(side="left", padx=1)
         mk_label(leg, "Viel", size=10, color=MUTED).pack(side="left", padx=(4, 0))
 
+    # ── Stat level-up dialog ─────────────────────────────────────────────────
+    def _stat_levelup_dialog(self, stat_name: str, level: int):
+        nature = ["🌸", "🌿", "🌱", "⭐", "🌟", "✨", "🍀", "🌈", "💫", "🌺"]
+        pick = nature[level % len(nature)]
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Level Up!")
+        dlg.geometry("340x230")
+        dlg.configure(fg_color=PANEL)
+        dlg.grab_set()
+        dlg.lift()
+        mk_label(dlg, f"{pick}  {pick}  {pick}", size=30, color=DARK).pack(pady=(26, 4))
+        mk_label(dlg, stat_name, size=16, weight="bold", color=DARK).pack()
+        mk_label(dlg, f"Level {level}!", size=14, color=MUTED).pack(pady=(2, 8))
+        mk_btn(dlg, f"{pick}  Super!", dlg.destroy,
+               width=160, height=40, primary=True).pack(pady=12)
+
+    # ── Bar chart ─────────────────────────────────────────────────────────────
+    def _draw_bar_chart(self, parent):
+        ctrl = ctk.CTkFrame(parent, fg_color="transparent")
+        ctrl.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(ctrl, "Verlauf (letzte 60 Tage)", size=13, weight="bold",
+                 color=TEXT).pack(side="left")
+
+        skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
+        chart_skill = ctk.StringVar(value="Alle")
+        opt = ctk.CTkOptionMenu(
+            ctrl, values=skills_list, variable=chart_skill,
+            width=130, height=28, corner_radius=8,
+            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
+            text_color=TEXT, dropdown_fg_color=CARD,
+            dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
+            font=ctk.CTkFont(size=12),
+        )
+        opt.pack(side="right")
+
+        canvas = tk.Canvas(parent, height=170, bg=PANEL, highlightthickness=0)
+        canvas.pack(fill="x", padx=16, pady=(0, 4))
+
+        tip = mk_label(parent, "", size=11, color=MUTED)
+        tip.pack(anchor="w", padx=16, pady=(0, 12))
+
+        def _redraw(*_):
+            w = canvas.winfo_width()
+            if w < 50:
+                return
+            self._draw_bars(canvas, chart_skill.get(), w, tip)
+
+        canvas.bind("<Configure>", lambda _: _redraw())
+        chart_skill.trace_add("write", lambda *_: _redraw())
+
+    def _draw_bars(self, canvas, skill: str, canvas_w: int, tip_lbl):
+        canvas.delete("all")
+        canvas_h = 170
+        LM, BM, TM, RM = 44, 32, 10, 10
+        draw_w = canvas_w - LM - RM
+        draw_h = canvas_h - TM - BM
+
+        data = get_chart_data(skill if skill != "Alle" else None)
+
+        today_d = date.today()
+        days    = [(today_d - timedelta(days=59 - i)) for i in range(60)]
+        values  = [data.get(d.strftime("%Y-%m-%d"), 0.0) for d in days]
+
+        max_h = max(values) if any(v > 0 for v in values) else 0.0
+        if max_h == 0:
+            canvas.create_text(canvas_w // 2, canvas_h // 2,
+                               text="Keine Daten", fill=MUTED,
+                               font=("Helvetica", 13))
+            return
+
+        # Nice Y-axis ceiling
+        if max_h <= 1:   nice_max = 1
+        elif max_h <= 2: nice_max = 2
+        elif max_h <= 5: nice_max = 5
+        elif max_h <= 10: nice_max = 10
+        else:            nice_max = math.ceil(max_h / 5) * 5
+
+        # Axes
+        canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
+        canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h,
+                          fill=BORDER, width=1)
+
+        # Y-axis ticks
+        for frac in [0.0, 0.5, 1.0]:
+            y = TM + draw_h - frac * draw_h
+            canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
+            label = f"{nice_max * frac:.0f}h"
+            canvas.create_text(LM - 5, y, text=label,
+                               anchor="e", fill=MUTED, font=("Helvetica", 8))
+
+        # Bars
+        bar_total_w = draw_w / 60
+        bar_w = max(2.0, bar_total_w * 0.75)
+
+        for i, (d, val) in enumerate(zip(days, values)):
+            if val <= 0:
+                continue
+            x_center = LM + (i + 0.5) * bar_total_w
+            bar_h = (val / nice_max) * draw_h
+            x0 = x_center - bar_w / 2
+            y1 = TM + draw_h
+            y0 = max(TM + 1.0, y1 - bar_h)
+            ratio = val / max_h
+            fill = DARK if ratio >= 0.75 else (DARK2 if ratio >= 0.4 else BORDER)
+            canvas.create_rectangle(x0, y0, x0 + bar_w, y1, fill=fill, outline="")
+
+        # X-axis date labels every 10 days
+        for i, d in enumerate(days):
+            if i % 10 == 0:
+                x = LM + (i + 0.5) * bar_total_w
+                canvas.create_text(x, TM + draw_h + 6, text=d.strftime("%d.%m"),
+                                  fill=MUTED, font=("Helvetica", 8), anchor="n")
+
+        # Hover
+        btw = bar_total_w
+
+        def _hover(event):
+            idx = int((event.x - LM) / btw)
+            if 0 <= idx < len(days):
+                d = days[idx]
+                val = values[idx]
+                ds = d.strftime("%Y-%m-%d")
+                tip_lbl.configure(
+                    text=f"{ds}  ·  {val:.2f}h" if val > 0
+                    else f"{ds}  ·  kein Eintrag"
+                )
+            else:
+                tip_lbl.configure(text="")
+
+        canvas.bind("<Motion>", _hover)
+        canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
+
     # ── Leaderboard View ──────────────────────────────────────────────────────
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
@@ -1237,11 +1398,11 @@ class App(ctk.CTk):
         now = datetime.now()
 
         if period == "Today":
-            date_filter = f"AND date = '{now.strftime('%Y-%m-%d')}'"
+            date_filter = f"WHERE date = '{now.strftime('%Y-%m-%d')}'"
         elif period == "This Month":
-            date_filter = f"AND date LIKE '{now.strftime('%Y-%m')}%'"
+            date_filter = f"WHERE date LIKE '{now.strftime('%Y-%m')}%'"
         elif period == "This Year":
-            date_filter = f"AND date LIKE '{now.strftime('%Y')}%'"
+            date_filter = f"WHERE date LIKE '{now.strftime('%Y')}%'"
         else:
             date_filter = ""
 
