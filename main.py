@@ -1643,7 +1643,7 @@ class App(ctk.CTk):
 
         total = sum(d for d, *_ in filtered)
         self._lb_sum.configure(
-            text=f"Σ {total:.0f} Minuten · {len(filtered)} Sessions")
+            text=f"Σ {total / 60:.1f} h · {len(filtered)} Sessions")
 
         filtered.sort(key=lambda x: x[0], reverse=True)
         medals  = ["🥇", "🥈", "🥉"]
