@@ -24,6 +24,7 @@ from data_manager import (
     get_user_skills, add_user_skill, delete_user_skill,
     get_heatmap_data,
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
+    get_first_session_date,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound
@@ -215,10 +216,11 @@ class App(ctk.CTk):
 
         self._nav_btns: dict = {}
         for text, key in [
-            ("Timer",        "timer"),
-            ("Skilltree",    "skills"),
-            ("Stats",        "achievements"),
-            ("Leaderboard",  "leaderboard"),
+            ("Timer",         "timer"),
+            ("Skilltree",     "skills"),
+            ("Achievements",  "achievements"),
+            ("Stats",         "stats"),
+            ("Leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
                 self.sidebar, text=text, anchor="w",
@@ -270,6 +272,7 @@ class App(ctk.CTk):
                 "timer":        self._build_timer_view,
                 "skills":       self._build_skills_view,
                 "achievements": self._build_achievements_view,
+                "stats":        self._build_stats_view,
                 "leaderboard":  self._build_leaderboard_view,
             }
             self._views[key] = builders[key]()
@@ -279,6 +282,7 @@ class App(ctk.CTk):
 
         if key == "skills":         self._refresh_skills()
         elif key == "achievements": self._refresh_achievements()
+        elif key == "stats":        self._refresh_stats()
         elif key == "leaderboard":  self._refresh_leaderboard()
 
     # ── Settings popup ────────────────────────────────────────────────────────
@@ -416,8 +420,14 @@ class App(ctk.CTk):
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
         note_btns.pack(fill="x", padx=12, pady=(0, 12))
-        icon_btn(note_btns, "💾", self._save_note, size=16).pack(side="left", padx=(0, 4))
-        icon_btn(note_btns, "📂", self._load_notes_dialog, size=16).pack(side="left")
+        for icon, cmd in [("💾", self._save_note), ("📂", self._load_notes_dialog)]:
+            ctk.CTkButton(
+                note_btns, text=icon, command=cmd,
+                width=34, height=26, corner_radius=7,
+                fg_color="#b8b4a8", hover_color="#a09c90",
+                text_color="#2a2820", border_width=0,
+                font=ctk.CTkFont(size=14),
+            ).pack(side="left", padx=(0, 4))
 
         return view
 
@@ -534,7 +544,7 @@ class App(ctk.CTk):
         if not content:
             return
         auto_title = (f"{self.selected_skill} · "
-                      f"{datetime.now().strftime('%d.%m.%Y %H:%M')}")
+                      f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("Notiz speichern")
@@ -630,8 +640,9 @@ class App(ctk.CTk):
             icon_btn(title_row, "🗑", _delete, size=12,
                      hover_color=CARD, text_color=DANGER).pack(side="right", padx=(0, 2))
 
-            preview = content[:90] + ("…" if len(content) > 90 else "")
-            mk_label(inner, preview, size=11, color=MUTED).pack(anchor="w", pady=(2, 0))
+            preview = content[:140] + ("…" if len(content) > 140 else "")
+            mk_label(inner, preview, size=12, color=DIM,
+                     wraplength=400).pack(anchor="w", pady=(4, 0))
 
             def _load(c=content):
                 self.notes_box.delete("1.0", "end")
@@ -753,32 +764,39 @@ class App(ctk.CTk):
     # ── Result dialog ─────────────────────────────────────────────────────────
     def _result_dialog(self, duration: float):
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Session beendet")
-        dlg.geometry("420x290")
+        dlg.title("")
+        dlg.geometry("360x200")
+        dlg.resizable(False, False)
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
 
-        mk_label(dlg, "Session beendet 🎉", size=20, weight="bold",
-                 color=DARK).pack(pady=(28, 4))
-        mk_label(dlg, f"{duration:.0f} min · {self.selected_skill}",
+        mk_label(dlg, f"{duration:.0f} min  ·  {self.selected_skill}",
+                 size=15, weight="bold", color=DARK).pack(pady=(22, 2))
+        mk_label(dlg, "Was hast du erreicht?", size=12,
                  color=MUTED).pack()
-        ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(fill="x", padx=24, pady=18)
-        mk_label(dlg, "Was hast du erreicht?", color=TEXT).pack(anchor="w", padx=24)
+
+        ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
+            fill="x", padx=22, pady=(12, 8))
 
         res = ctk.CTkEntry(
-            dlg, height=40, placeholder_text="Ergebnis …",
+            dlg, height=36, placeholder_text="Ergebnis …",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
-            font=ctk.CTkFont(size=14),
+            font=ctk.CTkFont(size=13),
         )
-        res.pack(fill="x", padx=24, pady=8)
+        res.pack(fill="x", padx=22, pady=(0, 14))
         res.focus()
 
-        def save():
+        def _discard():
+            dlg.destroy()
+            self._reset_timer()
+
+        def _save():
             result = res.get().strip()
             if not result:
                 res.configure(border_color=DANGER)
+                self.after(1400, lambda: res.configure(border_color=BORDER))
                 return
             old_lvl = calculate_level(calculate_total_time())
             save_session(duration, self.intention_text, result,
@@ -791,12 +809,27 @@ class App(ctk.CTk):
             if new_lvl > old_lvl:
                 self._levelup_dialog(new_lvl)
 
-        res.bind("<Return>", lambda _: save())
+        res.bind("<Return>", lambda _: _save())
+        dlg.bind("<Escape>", lambda _: _discard())
+
+        btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_row.pack(padx=22)
+
         ctk.CTkButton(
-            dlg, text="Speichern", height=44, corner_radius=12,
+            btn_row, text="✕", command=_discard,
+            width=56, height=48, corner_radius=12,
+            fg_color=CARD, hover_color=BORDER, text_color=MUTED,
+            border_width=1, border_color=BORDER,
+            font=ctk.CTkFont(size=20),
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            btn_row, text="✓", command=_save,
+            width=220, height=48, corner_radius=12,
             fg_color=DARK, hover_color=DARK2, text_color=BG,
-            font=ctk.CTkFont(size=14, weight="bold"), command=save,
-        ).pack(fill="x", padx=24, pady=(4, 28))
+            border_width=0,
+            font=ctk.CTkFont(size=22, weight="bold"),
+        ).pack(side="left")
 
     def _levelup_dialog(self, level: int):
         dlg = ctk.CTkToplevel(self)
@@ -965,7 +998,7 @@ class App(ctk.CTk):
     # ── Stats View (was Achievements) ─────────────────────────────────────────
     def _build_achievements_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Stats", size=22, weight="bold",
+        mk_label(view, "Achievements", size=22, weight="bold",
                  color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._ach_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -999,18 +1032,6 @@ class App(ctk.CTk):
 
         stat_confirmed = get_stat_confirmed_levels()
         lvl = calculate_level(total_h)
-
-        # ── Heatmap ───────────────────────────────────────────────────────────
-        hm_card = mk_card(self._ach_scroll)
-        hm_card.pack(fill="x", pady=5, padx=6)
-        mk_label(hm_card, "Aktivität", size=13, weight="bold",
-                 color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
-        self._draw_heatmap(hm_card)
-
-        # ── Bar chart ─────────────────────────────────────────────────────────
-        chart_card = mk_card(self._ach_scroll)
-        chart_card.pack(fill="x", pady=5, padx=6)
-        self._draw_bar_chart(chart_card)
 
         # ── Badges ────────────────────────────────────────────────────────────
         if lvl > 0:
@@ -1357,6 +1378,179 @@ class App(ctk.CTk):
                 )
             else:
                 tip_lbl.configure(text="")
+
+        canvas.bind("<Motion>", _hover)
+        canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
+
+    # ── Stats View ────────────────────────────────────────────────────────────
+    def _build_stats_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+        mk_label(view, "Stats", size=22, weight="bold",
+                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
+        self._stats_scroll = ctk.CTkScrollableFrame(
+            view, fg_color=BG,
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=DARK,
+        )
+        self._stats_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        return view
+
+    def _refresh_stats(self):
+        if not hasattr(self, "_stats_scroll"):
+            return
+        for w in self._stats_scroll.winfo_children():
+            w.destroy()
+
+        # ── Heatmap ───────────────────────────────────────────────────────────
+        hm_card = mk_card(self._stats_scroll)
+        hm_card.pack(fill="x", pady=5, padx=6)
+        mk_label(hm_card, "Aktivität", size=13, weight="bold",
+                 color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
+        self._draw_heatmap(hm_card)
+
+        # ── Bar chart (last 60 days) ───────────────────────────────────────────
+        bar_card = mk_card(self._stats_scroll)
+        bar_card.pack(fill="x", pady=5, padx=6)
+        self._draw_bar_chart(bar_card)
+
+        # ── Line graph (all time) ──────────────────────────────────────────────
+        line_card = mk_card(self._stats_scroll)
+        line_card.pack(fill="x", pady=5, padx=6)
+        self._draw_line_graph(line_card)
+
+    # ── Line graph ────────────────────────────────────────────────────────────
+    def _draw_line_graph(self, parent):
+        ctrl = ctk.CTkFrame(parent, fg_color="transparent")
+        ctrl.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(ctrl, "Verlauf (gesamt)", size=13, weight="bold",
+                 color=TEXT).pack(side="left")
+
+        skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
+        line_skill = ctk.StringVar(value="Alle")
+        opt = ctk.CTkOptionMenu(
+            ctrl, values=skills_list, variable=line_skill,
+            width=130, height=28, corner_radius=8,
+            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
+            text_color=TEXT, dropdown_fg_color=CARD,
+            dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
+            font=ctk.CTkFont(size=12),
+        )
+        opt.pack(side="right")
+
+        canvas = tk.Canvas(parent, height=180, bg=PANEL, highlightthickness=0)
+        canvas.pack(fill="x", padx=16, pady=(0, 4))
+
+        tip = mk_label(parent, "", size=11, color=MUTED)
+        tip.pack(anchor="w", padx=16, pady=(0, 12))
+
+        def _redraw(*_):
+            w = canvas.winfo_width()
+            if w < 50:
+                return
+            self._draw_lines(canvas, line_skill.get(), w, tip)
+
+        canvas.bind("<Configure>", lambda _: _redraw())
+        line_skill.trace_add("write", lambda *_: _redraw())
+
+    def _draw_lines(self, canvas, skill: str, canvas_w: int, tip_lbl):
+        canvas.delete("all")
+        canvas_h = 180
+        LM, BM, TM, RM = 44, 32, 10, 10
+        draw_w = canvas_w - LM - RM
+        draw_h = canvas_h - TM - BM
+
+        first = get_first_session_date()
+        if not first:
+            canvas.create_text(canvas_w // 2, canvas_h // 2,
+                               text="Keine Daten", fill=MUTED,
+                               font=("Helvetica", 13))
+            return
+
+        data = get_chart_data(skill if skill != "Alle" else None)
+
+        start_d = datetime.strptime(first, "%Y-%m-%d").date()
+        today_d = date.today()
+        num_days = (today_d - start_d).days + 1
+        if num_days < 1:
+            num_days = 1
+
+        days   = [start_d + timedelta(days=i) for i in range(num_days)]
+        values = [data.get(d.strftime("%Y-%m-%d"), 0.0) for d in days]
+
+        max_h = max(values) if any(v > 0 for v in values) else 0.0
+        if max_h == 0:
+            canvas.create_text(canvas_w // 2, canvas_h // 2,
+                               text="Keine Daten", fill=MUTED,
+                               font=("Helvetica", 13))
+            return
+
+        if max_h <= 1:    nice_max = 1
+        elif max_h <= 2:  nice_max = 2
+        elif max_h <= 5:  nice_max = 5
+        elif max_h <= 10: nice_max = 10
+        else:             nice_max = math.ceil(max_h / 5) * 5
+
+        # Axes
+        canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
+        canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h,
+                           fill=BORDER, width=1)
+
+        # Y-axis ticks
+        for frac in [0.0, 0.5, 1.0]:
+            y = TM + draw_h - frac * draw_h
+            canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
+            label = f"{nice_max * frac:.0f}h"
+            canvas.create_text(LM - 5, y, text=label,
+                               anchor="e", fill=MUTED, font=("Helvetica", 8))
+
+        # Map day index → pixel x
+        def _x(i):
+            if num_days == 1:
+                return LM + draw_w // 2
+            return LM + int(i * draw_w / (num_days - 1))
+
+        def _y(val):
+            return TM + draw_h - int((val / nice_max) * draw_h)
+
+        # Line segments and dots
+        pts = [(i, v) for i, v in enumerate(values) if v > 0]
+        if len(pts) >= 2:
+            for a, b in zip(pts, pts[1:]):
+                if b[0] - a[0] <= 30:  # connect nearby points only
+                    canvas.create_line(
+                        _x(a[0]), _y(a[1]),
+                        _x(b[0]), _y(b[1]),
+                        fill=DARK2, width=1.5,
+                    )
+        for i, v in pts:
+            x, y = _x(i), _y(v)
+            r = 3
+            canvas.create_oval(x - r, y - r, x + r, y + r,
+                               fill=DARK, outline="")
+
+        # X-axis month labels
+        prev_month = None
+        for i, d in enumerate(days):
+            m = d.strftime("%b %y")
+            if m != prev_month and d.day == 1:
+                x = _x(i)
+                canvas.create_text(x, TM + draw_h + 6, text=d.strftime("%b"),
+                                   fill=MUTED, font=("Helvetica", 8), anchor="n")
+                prev_month = m
+
+        # Hover (snap to nearest data point)
+        def _hover(event):
+            if num_days < 2:
+                return
+            frac = (event.x - LM) / draw_w
+            idx  = max(0, min(num_days - 1, int(frac * (num_days - 1) + 0.5)))
+            d    = days[idx]
+            val  = values[idx]
+            ds   = d.strftime("%Y-%m-%d")
+            tip_lbl.configure(
+                text=f"{ds}  ·  {val:.2f}h" if val > 0
+                else f"{ds}  ·  kein Eintrag"
+            )
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))

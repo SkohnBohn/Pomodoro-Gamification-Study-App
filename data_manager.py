@@ -20,6 +20,24 @@ def initialize_db():
             date TEXT, time TEXT, title TEXT, content TEXT
         )
     ''')
+    # Migrate old notes table if it was created without an id autoincrement column
+    note_cols = [r[1] for r in c.execute("PRAGMA table_info(notes)").fetchall()]
+    if note_cols and "id" not in note_cols:
+        c.execute("ALTER TABLE notes RENAME TO _notes_bak")
+        c.execute('''
+            CREATE TABLE notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT, time TEXT, title TEXT, content TEXT
+            )
+        ''')
+        try:
+            common = [col for col in ["date", "time", "title", "content"]
+                      if col in note_cols]
+            cols_s = ", ".join(common)
+            c.execute(f"INSERT INTO notes ({cols_s}) SELECT {cols_s} FROM _notes_bak")
+        except Exception:
+            pass
+        c.execute("DROP TABLE IF EXISTS _notes_bak")
     c.execute('''
         CREATE TABLE IF NOT EXISTS skill_confirmed_levels (
             skill TEXT PRIMARY KEY,
@@ -275,6 +293,16 @@ def get_chart_data(skill: str = None) -> dict:
     rows = c.fetchall()
     conn.close()
     return {d: h for d, h in rows if d}
+
+
+# ── First session date ─────────────────────────────────────────────────────────
+
+def get_first_session_date() -> str | None:
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    row = c.execute("SELECT MIN(date) FROM pomodoro_session").fetchone()
+    conn.close()
+    return row[0] if row else None
 
 
 # ── Heatmap data ───────────────────────────────────────────────────────────────
