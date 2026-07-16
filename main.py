@@ -172,6 +172,29 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
     )
 
 
+_ARROW_BG    = "#b0aca4"
+_ARROW_HOVER = "#9a9590"
+_ARROW_FG    = "#1e1c18"
+
+def _arrow_btn(parent, direction: str, command) -> tk.Canvas:
+    """Minimalist 2-stroke arrow button. direction: 'down'=save, 'up'=load."""
+    W, H = 32, 26
+    c = tk.Canvas(parent, width=W, height=H,
+                  bg=_ARROW_BG, highlightthickness=0, cursor="hand2")
+    cx, kw = W // 2, dict(fill=_ARROW_FG, width=2,
+                           capstyle="round", joinstyle="round")
+    if direction == "down":
+        c.create_line(cx, 5, cx, 16, **kw)                     # stem
+        c.create_line(cx - 6, 12, cx, 20, cx + 6, 12, **kw)   # chevron \/
+    else:
+        c.create_line(cx - 6, 14, cx, 6, cx + 6, 14, **kw)    # chevron /\
+        c.create_line(cx, 10, cx, 21, **kw)                    # stem
+    c.bind("<Enter>",    lambda _: c.configure(bg=_ARROW_HOVER))
+    c.bind("<Leave>",    lambda _: c.configure(bg=_ARROW_BG))
+    c.bind("<Button-1>", lambda _: command())
+    return c
+
+
 # ── Main Application ───────────────────────────────────────────────────────────
 class App(ctk.CTk):
     def __init__(self):
@@ -420,14 +443,8 @@ class App(ctk.CTk):
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
         note_btns.pack(fill="x", padx=12, pady=(0, 12))
-        for icon, cmd in [("💾", self._save_note), ("📂", self._load_notes_dialog)]:
-            ctk.CTkButton(
-                note_btns, text=icon, command=cmd,
-                width=34, height=26, corner_radius=7,
-                fg_color="#b8b4a8", hover_color="#a09c90",
-                text_color="#2a2820", border_width=0,
-                font=ctk.CTkFont(size=14),
-            ).pack(side="left", padx=(0, 4))
+        for direction, cmd in [("down", self._save_note), ("up", self._load_notes_dialog)]:
+            _arrow_btn(note_btns, direction, cmd).pack(side="left", padx=(0, 6))
 
         return view
 
