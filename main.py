@@ -172,15 +172,14 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
     )
 
 
-_ARROW_BG    = "#b0aca4"
-_ARROW_HOVER = "#9a9590"
-_ARROW_FG    = "#1e1c18"
+_ARROW_FG       = "#1e1c18"
+_ARROW_FG_HOVER = "#5c4300"
 
-def _arrow_btn(parent, direction: str, command) -> tk.Canvas:
+def _arrow_btn(parent, direction: str, command, bg: str = PANEL) -> tk.Canvas:
     """Minimalist 2-stroke arrow button. direction: 'down'=save, 'up'=load."""
     W, H = 32, 26
     c = tk.Canvas(parent, width=W, height=H,
-                  bg=_ARROW_BG, highlightthickness=0, cursor="hand2")
+                  bg=bg, highlightthickness=0, cursor="hand2")
     cx, kw = W // 2, dict(fill=_ARROW_FG, width=2,
                            capstyle="round", joinstyle="round")
     if direction == "down":
@@ -189,8 +188,12 @@ def _arrow_btn(parent, direction: str, command) -> tk.Canvas:
     else:
         c.create_line(cx - 6, 14, cx, 6, cx + 6, 14, **kw)    # chevron /\
         c.create_line(cx, 10, cx, 21, **kw)                    # stem
-    c.bind("<Enter>",    lambda _: c.configure(bg=_ARROW_HOVER))
-    c.bind("<Leave>",    lambda _: c.configure(bg=_ARROW_BG))
+
+    def _recolor(col):
+        c.itemconfigure("all", fill=col)
+
+    c.bind("<Enter>",    lambda _: _recolor(_ARROW_FG_HOVER))
+    c.bind("<Leave>",    lambda _: _recolor(_ARROW_FG))
     c.bind("<Button-1>", lambda _: command())
     return c
 
@@ -443,8 +446,8 @@ class App(ctk.CTk):
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
         note_btns.pack(fill="x", padx=12, pady=(0, 12))
-        for direction, cmd in [("down", self._save_note), ("up", self._load_notes_dialog)]:
-            _arrow_btn(note_btns, direction, cmd).pack(side="left", padx=(0, 6))
+        _arrow_btn(note_btns, "up",   self._load_notes_dialog, bg=PANEL).pack(side="left")
+        _arrow_btn(note_btns, "down", self._save_note,         bg=PANEL).pack(side="right")
 
         return view
 
