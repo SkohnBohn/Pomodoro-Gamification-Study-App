@@ -1491,21 +1491,27 @@ class App(ctk.CTk):
         if num_days < 1:
             num_days = 1
 
-        days   = [start_d + timedelta(days=i) for i in range(num_days)]
-        values = [data.get(d.strftime("%Y-%m-%d"), 0.0) for d in days]
+        days = [start_d + timedelta(days=i) for i in range(num_days)]
 
-        max_h = max(values) if any(v > 0 for v in values) else 0.0
-        if max_h == 0:
+        # Build cumulative hours
+        cumulative = []
+        running = 0.0
+        for d in days:
+            running += data.get(d.strftime("%Y-%m-%d"), 0.0)
+            cumulative.append(running)
+
+        total_h = cumulative[-1]
+        if total_h == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
                                text="Keine Daten", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
-        if max_h <= 1:    nice_max = 1
-        elif max_h <= 2:  nice_max = 2
-        elif max_h <= 5:  nice_max = 5
-        elif max_h <= 10: nice_max = 10
-        else:             nice_max = math.ceil(max_h / 5) * 5
+        if total_h <= 10:    nice_max = math.ceil(total_h)
+        elif total_h <= 50:  nice_max = math.ceil(total_h / 5) * 5
+        elif total_h <= 200: nice_max = math.ceil(total_h / 10) * 10
+        elif total_h <= 500: nice_max = math.ceil(total_h / 50) * 50
+        else:                nice_max = math.ceil(total_h / 100) * 100
 
         # Axes
         canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
@@ -1513,61 +1519,51 @@ class App(ctk.CTk):
                            fill=BORDER, width=1)
 
         # Y-axis ticks
-        for frac in [0.0, 0.5, 1.0]:
+        for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
             y = TM + draw_h - frac * draw_h
             canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
             label = f"{nice_max * frac:.0f}h"
             canvas.create_text(LM - 5, y, text=label,
                                anchor="e", fill=MUTED, font=("Helvetica", 8))
 
-        # Map day index → pixel x
         def _x(i):
             if num_days == 1:
                 return LM + draw_w // 2
-            return LM + int(i * draw_w / (num_days - 1))
+            return LM + i * draw_w / (num_days - 1)
 
         def _y(val):
-            return TM + draw_h - int((val / nice_max) * draw_h)
+            return TM + draw_h - (val / nice_max) * draw_h
 
-        # Line segments and dots
-        pts = [(i, v) for i, v in enumerate(values) if v > 0]
-        if len(pts) >= 2:
-            for a, b in zip(pts, pts[1:]):
-                if b[0] - a[0] <= 30:  # connect nearby points only
-                    canvas.create_line(
-                        _x(a[0]), _y(a[1]),
-                        _x(b[0]), _y(b[1]),
-                        fill=DARK2, width=1.5,
-                    )
-        for i, v in pts:
-            x, y = _x(i), _y(v)
-            r = 3
-            canvas.create_oval(x - r, y - r, x + r, y + r,
-                               fill=DARK, outline="")
+        # Continuous line across all days
+        coords = []
+        for i, v in enumerate(cumulative):
+            coords.append(_x(i))
+            coords.append(_y(v))
+        if len(coords) >= 4:
+            canvas.create_line(*coords, fill=DARK2, width=1.5, smooth=False)
 
         # X-axis month labels
         prev_month = None
         for i, d in enumerate(days):
-            m = d.strftime("%b %y")
-            if m != prev_month and d.day == 1:
-                x = _x(i)
-                canvas.create_text(x, TM + draw_h + 6, text=d.strftime("%b"),
-                                   fill=MUTED, font=("Helvetica", 8), anchor="n")
-                prev_month = m
+            if d.day == 1:
+                m = d.strftime("%b %y")
+                if m != prev_month:
+                    canvas.create_text(
+                        _x(i), TM + draw_h + 6,
+                        text=d.strftime("%b '%y") if d.month == 1 else d.strftime("%b"),
+                        fill=MUTED, font=("Helvetica", 8), anchor="n",
+                    )
+                    prev_month = m
 
-        # Hover (snap to nearest data point)
+        # Hover: show cumulative total at nearest day
         def _hover(event):
             if num_days < 2:
                 return
             frac = (event.x - LM) / draw_w
-            idx  = max(0, min(num_days - 1, int(frac * (num_days - 1) + 0.5)))
+            idx  = max(0, min(num_days - 1, round(frac * (num_days - 1))))
             d    = days[idx]
-            val  = values[idx]
-            ds   = d.strftime("%Y-%m-%d")
-            tip_lbl.configure(
-                text=f"{ds}  ·  {val:.2f}h" if val > 0
-                else f"{ds}  ·  kein Eintrag"
-            )
+            val  = cumulative[idx]
+            tip_lbl.configure(text=f"{d.strftime('%Y-%m-%d')}  ·  {val:.1f}h gesamt")
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
