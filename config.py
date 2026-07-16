@@ -10,9 +10,9 @@ LEVEL_THRESHOLDS = [
     300, 355, 415, 480, 550, 630, 720, 820, 930, 1050,
 ]
 
-SKILLS = ["SOZ", "SUR", "MATH", "JOURNAL", "TECH", "UNI", "DESIGN"]
+SKILLS = ["SOZ", "SUR", "MATH", "JOURNAL", "TECH", "UNI", "DESIGN", "ORGA"]
 SKILL_EMOJIS = {
     "SOZ": "🧠", "SUR": "🎨", "MATH": "📐",
-    "JOURNAL": "📝", "TECH": "💻", "UNI": "🎓", "DESIGN": "✏️",
+    "JOURNAL": "📝", "TECH": "💻", "UNI": "🎓", "DESIGN": "✏️", "ORGA": "📋",
 }
 SKILL_THRESHOLDS = [5, 10, 20, 35, 55, 80, 110, 145, 185, 230, 280, 335]
