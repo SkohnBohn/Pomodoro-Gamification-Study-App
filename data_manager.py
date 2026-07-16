@@ -118,10 +118,17 @@ def save_note(title: str, content: str):
     now = datetime.now()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO notes (date, time, title, content) VALUES (?, ?, ?, ?)",
-        (now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), title, content),
-    )
+    row = c.execute("SELECT id FROM notes WHERE title=?", (title,)).fetchone()
+    if row:
+        c.execute(
+            "UPDATE notes SET date=?, time=?, content=? WHERE id=?",
+            (now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), content, row[0]),
+        )
+    else:
+        c.execute(
+            "INSERT INTO notes (date, time, title, content) VALUES (?, ?, ?, ?)",
+            (now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), title, content),
+        )
     conn.commit()
     conn.close()
 
@@ -130,7 +137,8 @@ def get_notes(limit: int = 50):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute(
-        "SELECT id, date, time, title, content FROM notes ORDER BY id DESC LIMIT ?",
+        "SELECT id, date, time, title, content FROM notes"
+        " ORDER BY date DESC, time DESC LIMIT ?",
         (limit,),
     )
     rows = c.fetchall()

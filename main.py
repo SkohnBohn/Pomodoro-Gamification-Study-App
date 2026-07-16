@@ -562,26 +562,29 @@ class App(ctk.CTk):
     def _save_note(self):
         content = self.notes_box.get("1.0", "end").strip()
         if not content:
+            self.notes_box.configure(border_color=DANGER)
+            self.after(900, lambda: self.notes_box.configure(border_color=BORDER))
             return
-        auto_title = (f"{self.selected_skill} · "
-                      f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+
+        auto_title = datetime.now().strftime("%d.%m.%Y  %H:%M:%S")
 
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Notiz speichern")
-        dlg.geometry("360x150")
+        dlg.title("Speichern")
+        dlg.geometry("360x156")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
+        dlg.resizable(False, False)
 
-        mk_label(dlg, "Titel:", size=12, color=MUTED).pack(
-            padx=20, pady=(18, 4), anchor="w")
+        mk_label(dlg, "Titel", size=12, color=MUTED).pack(
+            padx=22, pady=(20, 4), anchor="w")
         entry = ctk.CTkEntry(
-            dlg, height=36, fg_color=CARD, border_color=BORDER,
+            dlg, height=38, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, font=ctk.CTkFont(size=13),
         )
         entry.insert(0, auto_title)
-        entry.pack(fill="x", padx=20, pady=(0, 10))
-        entry.focus()
+        entry.pack(fill="x", padx=22, pady=(0, 14))
+        entry.focus_set()
         entry.select_range(0, "end")
 
         def _do_save():
@@ -591,89 +594,101 @@ class App(ctk.CTk):
             self.notes_box.configure(border_color=SUCCESS)
             self.after(900, lambda: self.notes_box.configure(border_color=BORDER))
 
-        entry.bind("<Return>", lambda _: _do_save())
+        dlg.bind("<Return>", lambda _: _do_save())
+        dlg.bind("<Escape>", lambda _: dlg.destroy())
         mk_btn(dlg, "Speichern", _do_save, height=36, primary=True).pack(
-            fill="x", padx=20)
+            fill="x", padx=22)
 
     def _load_notes_dialog(self):
-        notes = get_notes()
-        if not notes:
-            return
-
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Gespeicherte Notizen")
-        dlg.geometry("500x460")
+        dlg.title("Notizen")
+        dlg.geometry("460x520")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
+        dlg.resizable(False, True)
+        dlg.bind("<Escape>", lambda _: dlg.destroy())
 
-        mk_label(dlg, "Gespeicherte Notizen", size=16, weight="bold",
-                 color=DARK).pack(padx=24, pady=(20, 10), anchor="w")
+        # Header
+        hdr = ctk.CTkFrame(dlg, fg_color="transparent")
+        hdr.pack(fill="x", padx=22, pady=(20, 6))
+        mk_label(hdr, "Notizen", size=17, weight="bold", color=DARK).pack(side="left")
 
-        scroll = ctk.CTkScrollableFrame(dlg, fg_color=BG,
-                                        scrollbar_button_color=BORDER,
-                                        scrollbar_button_hover_color=DARK)
-        scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        notes = get_notes(limit=200)
+        mk_label(hdr, str(len(notes)), size=12, color=MUTED).pack(
+            side="right", pady=(4, 0))
 
-        def _build_note_row(nid, title, content):
-            card = mk_card(scroll)
-            card.pack(fill="x", pady=4, padx=4)
-            inner = ctk.CTkFrame(card, fg_color="transparent")
-            inner.pack(fill="x", padx=14, pady=10)
+        if not notes:
+            mk_label(dlg, "Noch nichts gespeichert.", size=13,
+                     color=MUTED).pack(pady=60)
+            return
 
-            title_row = ctk.CTkFrame(inner, fg_color="transparent")
-            title_row.pack(fill="x")
+        scroll = ctk.CTkScrollableFrame(
+            dlg, fg_color="transparent",
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=DARK2,
+        )
+        scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
-            title_lbl = mk_label(title_row, title, size=12, weight="bold", color=TEXT)
-            title_lbl.pack(side="left", fill="x", expand=True)
+        def _build_card(nid, date_s, time_s, title, content):
+            card = ctk.CTkFrame(
+                scroll, fg_color=CARD, corner_radius=14,
+                border_width=1, border_color=BORDER,
+            )
+            card.pack(fill="x", pady=5, padx=4)
 
-            def _rename():
-                rd = ctk.CTkToplevel(dlg)
-                rd.title("Umbenennen")
-                rd.geometry("340x120")
-                rd.configure(fg_color=PANEL)
-                rd.grab_set()
-                rd.lift()
-                e = ctk.CTkEntry(rd, height=34, fg_color=CARD, border_color=BORDER,
-                                  text_color=TEXT, font=ctk.CTkFont(size=13))
-                e.insert(0, title_lbl.cget("text"))
-                e.pack(fill="x", padx=16, pady=(16, 8))
-                e.focus()
-                e.select_range(0, "end")
+            body = ctk.CTkFrame(card, fg_color="transparent")
+            body.pack(fill="x", padx=16, pady=13)
 
-                def _ok():
-                    t = e.get().strip()
-                    if t:
-                        rename_note(nid, t)
-                        title_lbl.configure(text=t)
-                    rd.destroy()
+            # ── Title + timestamp ────────────────────────────────────────────
+            top = ctk.CTkFrame(body, fg_color="transparent")
+            top.pack(fill="x")
+            mk_label(top, title, size=13, weight="bold", color=TEXT).pack(
+                side="left", fill="x", expand=True)
+            try:
+                dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
+                ts  = dt.strftime("%d.%m  %H:%M")
+            except Exception:
+                ts = date_s
+            mk_label(top, ts, size=10, color=MUTED).pack(
+                side="right", padx=(8, 0), pady=(2, 0))
 
-                e.bind("<Return>", lambda _: _ok())
-                e.bind("<Escape>", lambda _: rd.destroy())
-                mk_btn(rd, "✓", _ok, primary=True, height=30, width=60).pack(padx=16)
+            # ── Content preview ──────────────────────────────────────────────
+            preview = content[:110] + ("…" if len(content) > 110 else "")
+            mk_label(body, preview, size=12, color=DIM, wraplength=390).pack(
+                anchor="w", pady=(6, 10))
 
-            def _delete():
-                delete_note(nid)
-                card.destroy()
-
-            icon_btn(title_row, "✏", _rename, size=12).pack(side="right")
-            icon_btn(title_row, "🗑", _delete, size=12,
-                     hover_color=CARD, text_color=DANGER).pack(side="right", padx=(0, 2))
-
-            preview = content[:140] + ("…" if len(content) > 140 else "")
-            mk_label(inner, preview, size=12, color=DIM,
-                     wraplength=400).pack(anchor="w", pady=(4, 0))
+            # ── Actions ──────────────────────────────────────────────────────
+            act = ctk.CTkFrame(body, fg_color="transparent")
+            act.pack(fill="x")
 
             def _load(c=content):
                 self.notes_box.delete("1.0", "end")
                 self.notes_box.insert("1.0", c)
                 dlg.destroy()
 
-            mk_btn(inner, "Laden", _load, width=70, height=26).pack(
-                anchor="e", pady=(6, 0))
+            def _delete(card=card, note_id=nid):
+                delete_note(note_id)
+                card.destroy()
 
-        for nid, _d, _t, title, content in notes:
-            _build_note_row(nid, title, content)
+            mk_btn(act, "Laden", _load, width=80, height=28).pack(side="left")
+            ctk.CTkButton(
+                act, text="✕", command=_delete,
+                width=28, height=28, corner_radius=7,
+                fg_color="transparent", hover_color="#fee2e2",
+                text_color=DANGER, border_width=0,
+                font=ctk.CTkFont(size=12),
+            ).pack(side="right")
+
+            # ── Hover: lighten card ───────────────────────────────────────────
+            def _enter(_): card.configure(fg_color="#fef3c7")
+            def _leave(_): card.configure(fg_color=CARD)
+            for w in (card, body, top, act):
+                w.bind("<Enter>", _enter)
+                w.bind("<Leave>", _leave)
+
+        for nid, date_s, time_s, title, content in notes:
+            _build_card(nid, date_s, time_s, title, content)
 
     # ── Timer logic ───────────────────────────────────────────────────────────
     def _on_start(self):
