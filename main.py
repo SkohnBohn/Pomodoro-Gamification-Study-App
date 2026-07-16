@@ -9,19 +9,20 @@ import math
 import os
 import platform
 import subprocess
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from PIL import Image
 
 from config import (
-    DB_FILE, BADGE_DIR, LEVEL_THRESHOLDS,
-    SKILLS, SKILL_EMOJIS, SKILL_THRESHOLDS,
+    DB_FILE, BADGE_DIR, LEVEL_THRESHOLDS, SKILL_THRESHOLDS,
 )
 from data_manager import (
     calculate_total_time, save_session, initialize_db,
-    save_note, get_notes,
+    save_note, get_notes, delete_note, rename_note,
     get_skill_confirmed_levels, confirm_skill_level,
     get_achievements_collected, mark_achievement_collected,
     get_badge_unlock_date,
+    get_user_skills, add_user_skill, delete_user_skill,
+    get_heatmap_data,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound
@@ -42,13 +43,12 @@ TEXT    = "#1a1200"
 SUCCESS = "#14532d"
 DANGER  = "#991b1b"
 
-# Skill card colors keyed by level bracket
 _SKILL_CARD_PALETTE = [
-    (PANEL,     BORDER),      # LVL 0        — base yellow
-    ("#fef3c7", "#d97706"),   # LVL 1–2      — light amber
-    ("#fde68a", "#b45309"),   # LVL 3–5      — medium amber
-    ("#fbbf24", "#92400e"),   # LVL 6–9      — deep amber
-    ("#f59e0b", "#78350f"),   # LVL 10+      — rich amber
+    (PANEL,     BORDER),
+    ("#fef3c7", "#d97706"),
+    ("#fde68a", "#b45309"),
+    ("#fbbf24", "#92400e"),
+    ("#f59e0b", "#78350f"),
 ]
 
 
@@ -58,6 +58,14 @@ def _skill_card_color(lvl: int):
     if lvl <= 5: return _SKILL_CARD_PALETTE[2]
     if lvl <= 9: return _SKILL_CARD_PALETTE[3]
     return _SKILL_CARD_PALETTE[4]
+
+
+def _heatmap_color(minutes: float) -> str:
+    if minutes == 0:   return CARD
+    if minutes < 30:   return "#fbbf24"
+    if minutes < 60:   return "#d97706"
+    if minutes < 120:  return "#92400e"
+    return DARK
 
 
 # ── Circular Timer Canvas ──────────────────────────────────────────────────────
@@ -78,7 +86,6 @@ class RingTimer(tk.Canvas):
         self.delete("all")
         cx = cy = self.SIZE // 2
         pad, w = 14, 20
-
         self._arc(pad, w, BORDER, 359.99)
         if fraction > 0.001:
             self._arc(pad, w, DARK, fraction * 359.99)
@@ -90,7 +97,6 @@ class RingTimer(tk.Canvas):
             self.create_oval(dx - w // 2, dy - w // 2,
                              dx + w // 2, dy + w // 2,
                              fill=DARK2, outline="")
-
         self.create_text(cx, cy - (14 if sub else 0),
                          text=time_str, fill=TEXT,
                          font=("Helvetica", 42, "bold"))
@@ -140,13 +146,11 @@ def sec_title(parent, text):
 
 
 def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButton:
-    # selected_color=BORDER so TEXT (dark) stays readable on both states
     return ctk.CTkSegmentedButton(
         parent, values=values, variable=variable, command=command,
         selected_color=BORDER, selected_hover_color=DARK,
         unselected_color=CARD, unselected_hover_color=BORDER,
-        text_color=TEXT,
-        text_color_disabled=MUTED,
+        text_color=TEXT, text_color_disabled=MUTED,
         font=ctk.CTkFont(size=12),
     )
 
@@ -154,6 +158,16 @@ def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButt
 def progress_bar(parent, color=DARK) -> ctk.CTkProgressBar:
     return ctk.CTkProgressBar(parent, height=6, corner_radius=3,
                                progress_color=color, fg_color=BORDER)
+
+
+def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
+    return ctk.CTkButton(
+        parent, text=icon, command=command,
+        width=30, height=30, corner_radius=8,
+        fg_color="transparent", hover_color=BORDER,
+        text_color=MUTED, border_width=0,
+        font=ctk.CTkFont(size=size), **kw,
+    )
 
 
 # ── Main Application ───────────────────────────────────────────────────────────
@@ -176,6 +190,7 @@ class App(ctk.CTk):
         self.intention_text = ""
         self.selected_skill = "TECH"
         self.timer_mode     = "Pomodoro"
+        self._skill_edit_mode = False
 
         self._views: dict = {}
         self._active_view = ""
@@ -191,14 +206,17 @@ class App(ctk.CTk):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        mk_label(self.sidebar, "Pomodoro", size=18, weight="bold",
-                 color=DARK).pack(pady=(28, 30), padx=20, anchor="w")
+        # Header with settings gear
+        hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
+        icon_btn(hdr, "⚙", self._show_settings, size=15).pack(side="right")
 
         self._nav_btns: dict = {}
         for text, key in [
             ("Timer",        "timer"),
             ("Skilltree",    "skills"),
-            ("Achievements", "achievements"),
+            ("Stats",        "achievements"),
             ("Leaderboard",  "leaderboard"),
         ]:
             b = ctk.CTkButton(
@@ -233,9 +251,6 @@ class App(ctk.CTk):
         self._lvl_bar.pack(fill="x", pady=(8, 12))
         self._lvl_bar.set(0)
 
-        mk_btn(footer, "Log öffnen", self._open_log,
-               width=168, height=32).pack()
-
         self.content = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         self.content.pack(side="right", fill="both", expand=True)
 
@@ -264,6 +279,19 @@ class App(ctk.CTk):
         if key == "skills":         self._refresh_skills()
         elif key == "achievements": self._refresh_achievements()
         elif key == "leaderboard":  self._refresh_leaderboard()
+
+    # ── Settings popup ────────────────────────────────────────────────────────
+    def _show_settings(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Einstellungen")
+        dlg.geometry("260x130")
+        dlg.configure(fg_color=PANEL)
+        dlg.grab_set()
+        dlg.lift()
+        mk_label(dlg, "Einstellungen", size=14, weight="bold",
+                 color=DARK).pack(padx=20, pady=(18, 12), anchor="w")
+        mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
+               width=200, height=36).pack(padx=20)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
@@ -299,7 +327,6 @@ class App(ctk.CTk):
         hdr = ctk.CTkFrame(view, fg_color="transparent")
         hdr.pack(fill="x", padx=28, pady=(22, 0))
         mk_label(hdr, "Timer", size=22, weight="bold", color=DARK).pack(side="left")
-
         self.mode_seg = seg_btn(hdr, ["Pomodoro", "Open Timer"],
                                 command=self._on_mode_change)
         self.mode_seg.set("Pomodoro")
@@ -315,7 +342,6 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(28, 8))
 
-        # Duration row (Pomodoro only)
         self._dur_row = ctk.CTkFrame(left, fg_color="transparent")
         self._dur_row.pack()
         mk_label(self._dur_row, "Minuten:", color=MUTED).pack(side="left", padx=(0, 8))
@@ -326,19 +352,8 @@ class App(ctk.CTk):
         )
         self.dur_entry.pack(side="left")
 
-        # Preset buttons (Pomodoro only)
-        self._pre_row = ctk.CTkFrame(left, fg_color="transparent")
-        self._pre_row.pack(pady=(8, 16))
-        for m in (15, 25, 45, 60):
-            ctk.CTkButton(
-                self._pre_row, text=f"{m}m", width=52, height=28, corner_radius=8,
-                fg_color=CARD, hover_color=BORDER, text_color=MUTED,
-                border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
-                command=lambda v=m: self._set_dur(v),
-            ).pack(side="left", padx=3)
-
         self._brow = ctk.CTkFrame(left, fg_color="transparent")
-        self._brow.pack(pady=(0, 28))
+        self._brow.pack(pady=(16, 28))
 
         self.start_btn = ctk.CTkButton(
             self._brow, text="▶  Start", width=120, height=46, corner_radius=14,
@@ -361,26 +376,21 @@ class App(ctk.CTk):
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
-        sk_card = mk_card(right)
-        sk_card.pack(fill="x", pady=(0, 10))
-        sec_title(sk_card, "Skill")
+        # Skill section
+        self._sk_card = mk_card(right)
+        self._sk_card.pack(fill="x", pady=(0, 10))
 
-        g = ctk.CTkFrame(sk_card, fg_color="transparent")
-        g.pack(padx=12, pady=(0, 14), fill="x")
+        sk_hdr = ctk.CTkFrame(self._sk_card, fg_color="transparent")
+        sk_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(sk_hdr, "SKILL", size=10, color=MUTED).pack(side="left")
+        icon_btn(sk_hdr, "✏", self._toggle_skill_edit, size=13).pack(side="right")
+
+        self._sk_grid_frame = ctk.CTkFrame(self._sk_card, fg_color="transparent")
+        self._sk_grid_frame.pack(padx=12, pady=(0, 14), fill="x")
         self._skill_btns: dict = {}
-        for i, sk in enumerate(SKILLS):
-            emoji = SKILL_EMOJIS.get(sk, "")
-            b = ctk.CTkButton(
-                g, text=f"{emoji} {sk}", width=82, height=32, corner_radius=8,
-                fg_color=CARD, hover_color=BORDER, text_color=MUTED,
-                border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
-                command=lambda s=sk: self._pick_skill(s),
-            )
-            b.grid(row=i // 3, column=i % 3, padx=3, pady=3, sticky="ew")
-            g.columnconfigure(i % 3, weight=1)
-            self._skill_btns[sk] = b
-        self._pick_skill("TECH")
+        self._build_skill_grid()
 
+        # Intention
         int_card = mk_card(right)
         int_card.pack(fill="x", pady=(0, 10))
         sec_title(int_card, "Intention")
@@ -392,6 +402,7 @@ class App(ctk.CTk):
         )
         self.intention_entry.pack(fill="x", padx=12, pady=(0, 14))
 
+        # Notes
         notes_card = mk_card(right)
         notes_card.pack(fill="both", expand=True)
         sec_title(notes_card, "Notizen")
@@ -404,16 +415,99 @@ class App(ctk.CTk):
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
         note_btns.pack(fill="x", padx=12, pady=(0, 12))
-        mk_btn(note_btns, "Speichern", self._save_note,
-               width=90, height=28).pack(side="left", padx=(0, 6))
-        mk_btn(note_btns, "Laden", self._load_notes_dialog,
-               width=90, height=28).pack(side="left")
+        icon_btn(note_btns, "💾", self._save_note, size=16).pack(side="left", padx=(0, 4))
+        icon_btn(note_btns, "📂", self._load_notes_dialog, size=16).pack(side="left")
 
         return view
 
-    def _set_dur(self, m: int):
-        self.dur_entry.delete(0, "end")
-        self.dur_entry.insert(0, str(m))
+    # ── Skill grid (normal + edit mode) ──────────────────────────────────────
+    def _build_skill_grid(self):
+        for w in self._sk_grid_frame.winfo_children():
+            w.destroy()
+        self._skill_btns = {}
+
+        skills = get_user_skills()
+        if not skills:
+            return
+
+        if self._skill_edit_mode:
+            # Edit mode: list with × delete buttons + add button
+            for name, emoji in skills:
+                row = ctk.CTkFrame(self._sk_grid_frame, fg_color="transparent")
+                row.pack(fill="x", pady=2)
+                ctk.CTkButton(
+                    row, text=f"{emoji} {name}", height=30, corner_radius=8,
+                    fg_color=CARD, hover_color=BORDER, text_color=MUTED,
+                    border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
+                    command=lambda s=name: self._pick_skill(s),
+                ).pack(side="left", fill="x", expand=True)
+                ctk.CTkButton(
+                    row, text="×", width=30, height=30, corner_radius=8,
+                    fg_color="transparent", hover_color=CARD, text_color=DANGER,
+                    border_width=0, font=ctk.CTkFont(size=16),
+                    command=lambda n=name: self._remove_skill(n),
+                ).pack(side="right", padx=(4, 0))
+
+            # Add skill row
+            add_row = ctk.CTkFrame(self._sk_grid_frame, fg_color="transparent")
+            add_row.pack(fill="x", pady=(6, 0))
+            self._new_emoji = ctk.CTkEntry(
+                add_row, width=36, height=28, placeholder_text="📌",
+                corner_radius=8, fg_color=CARD, border_color=BORDER,
+                text_color=TEXT, placeholder_text_color=DIM,
+                font=ctk.CTkFont(size=13),
+            )
+            self._new_emoji.pack(side="left", padx=(0, 4))
+            self._new_name = ctk.CTkEntry(
+                add_row, height=28, placeholder_text="Skill name",
+                corner_radius=8, fg_color=CARD, border_color=BORDER,
+                text_color=TEXT, placeholder_text_color=DIM,
+                font=ctk.CTkFont(size=12),
+            )
+            self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 4))
+            ctk.CTkButton(
+                add_row, text="+", width=28, height=28, corner_radius=8,
+                fg_color=DARK, hover_color=DARK2, text_color=BG,
+                border_width=0, font=ctk.CTkFont(size=16, weight="bold"),
+                command=self._add_skill,
+            ).pack(side="right")
+        else:
+            # Normal mode: 3-col grid
+            for i, (name, emoji) in enumerate(skills):
+                b = ctk.CTkButton(
+                    self._sk_grid_frame,
+                    text=f"{emoji} {name}", width=82, height=32, corner_radius=8,
+                    fg_color=CARD, hover_color=BORDER, text_color=MUTED,
+                    border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
+                    command=lambda s=name: self._pick_skill(s),
+                )
+                b.grid(row=i // 3, column=i % 3, padx=3, pady=3, sticky="ew")
+                self._sk_grid_frame.columnconfigure(i % 3, weight=1)
+                self._skill_btns[name] = b
+
+            # Re-highlight selected skill
+            if self.selected_skill in self._skill_btns:
+                self._pick_skill(self.selected_skill)
+            elif skills:
+                self._pick_skill(skills[0][0])
+
+    def _toggle_skill_edit(self):
+        self._skill_edit_mode = not self._skill_edit_mode
+        self._build_skill_grid()
+
+    def _add_skill(self):
+        name  = self._new_name.get().strip()
+        emoji = self._new_emoji.get().strip()
+        if name:
+            add_user_skill(name, emoji or "📌")
+            self._build_skill_grid()
+
+    def _remove_skill(self, name: str):
+        delete_user_skill(name)
+        if self.selected_skill == name:
+            skills = get_user_skills()
+            self.selected_skill = skills[0][0] if skills else "TECH"
+        self._build_skill_grid()
 
     def _pick_skill(self, skill: str):
         self.selected_skill = skill
@@ -428,22 +522,47 @@ class App(ctk.CTk):
         self._reset_timer()
         if mode == "Pomodoro":
             self._dur_row.pack(after=self.ring)
-            self._pre_row.pack(after=self._dur_row, pady=(8, 16))
-            self._brow.pack_configure(pady=(0, 28))
+            self._brow.pack_configure(pady=(16, 28))
         else:
             self._dur_row.pack_forget()
-            self._pre_row.pack_forget()
-            self._brow.pack_configure(pady=(24, 28))
+            self._brow.pack_configure(pady=(28, 28))
 
     # ── Notes ─────────────────────────────────────────────────────────────────
     def _save_note(self):
         content = self.notes_box.get("1.0", "end").strip()
         if not content:
             return
-        title = f"{self.selected_skill} · {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-        save_note(title, content)
-        self.notes_box.configure(border_color=SUCCESS)
-        self.after(900, lambda: self.notes_box.configure(border_color=BORDER))
+        auto_title = (f"{self.selected_skill} · "
+                      f"{datetime.now().strftime('%d.%m.%Y %H:%M')}")
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Notiz speichern")
+        dlg.geometry("360x150")
+        dlg.configure(fg_color=PANEL)
+        dlg.grab_set()
+        dlg.lift()
+
+        mk_label(dlg, "Titel:", size=12, color=MUTED).pack(
+            padx=20, pady=(18, 4), anchor="w")
+        entry = ctk.CTkEntry(
+            dlg, height=36, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, font=ctk.CTkFont(size=13),
+        )
+        entry.insert(0, auto_title)
+        entry.pack(fill="x", padx=20, pady=(0, 10))
+        entry.focus()
+        entry.select_range(0, "end")
+
+        def _do_save():
+            title = entry.get().strip() or auto_title
+            save_note(title, content)
+            dlg.destroy()
+            self.notes_box.configure(border_color=SUCCESS)
+            self.after(900, lambda: self.notes_box.configure(border_color=BORDER))
+
+        entry.bind("<Return>", lambda _: _do_save())
+        mk_btn(dlg, "Speichern", _do_save, height=36, primary=True).pack(
+            fill="x", padx=20)
 
     def _load_notes_dialog(self):
         notes = get_notes()
@@ -452,7 +571,7 @@ class App(ctk.CTk):
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("Gespeicherte Notizen")
-        dlg.geometry("500x440")
+        dlg.geometry("500x460")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -465,22 +584,64 @@ class App(ctk.CTk):
                                         scrollbar_button_hover_color=DARK)
         scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
-        for _nid, _date, _time, title, content in notes:
-            row = mk_card(scroll)
-            row.pack(fill="x", pady=4, padx=4)
-            inner = ctk.CTkFrame(row, fg_color="transparent")
+        def _build_note_row(nid, title, content):
+            card = mk_card(scroll)
+            card.pack(fill="x", pady=4, padx=4)
+            inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="x", padx=14, pady=10)
-            mk_label(inner, title, size=12, weight="bold", color=TEXT).pack(anchor="w")
-            preview = content[:90] + ("…" if len(content) > 90 else "")
-            mk_label(inner, preview, size=11, color=MUTED).pack(anchor="w")
 
-            def _load(c=content, d=dlg):
+            title_row = ctk.CTkFrame(inner, fg_color="transparent")
+            title_row.pack(fill="x")
+
+            title_lbl = mk_label(title_row, title, size=12, weight="bold", color=TEXT)
+            title_lbl.pack(side="left", fill="x", expand=True)
+
+            def _rename():
+                rd = ctk.CTkToplevel(dlg)
+                rd.title("Umbenennen")
+                rd.geometry("340x120")
+                rd.configure(fg_color=PANEL)
+                rd.grab_set()
+                rd.lift()
+                e = ctk.CTkEntry(rd, height=34, fg_color=CARD, border_color=BORDER,
+                                  text_color=TEXT, font=ctk.CTkFont(size=13))
+                e.insert(0, title_lbl.cget("text"))
+                e.pack(fill="x", padx=16, pady=(16, 8))
+                e.focus()
+                e.select_range(0, "end")
+
+                def _ok():
+                    t = e.get().strip()
+                    if t:
+                        rename_note(nid, t)
+                        title_lbl.configure(text=t)
+                    rd.destroy()
+
+                e.bind("<Return>", lambda _: _ok())
+                e.bind("<Escape>", lambda _: rd.destroy())
+                mk_btn(rd, "✓", _ok, primary=True, height=30, width=60).pack(padx=16)
+
+            def _delete():
+                delete_note(nid)
+                card.destroy()
+
+            icon_btn(title_row, "✏", _rename, size=12).pack(side="right")
+            icon_btn(title_row, "🗑", _delete, size=12,
+                     hover_color=CARD, text_color=DANGER).pack(side="right", padx=(0, 2))
+
+            preview = content[:90] + ("…" if len(content) > 90 else "")
+            mk_label(inner, preview, size=11, color=MUTED).pack(anchor="w", pady=(2, 0))
+
+            def _load(c=content):
                 self.notes_box.delete("1.0", "end")
                 self.notes_box.insert("1.0", c)
-                d.destroy()
+                dlg.destroy()
 
             mk_btn(inner, "Laden", _load, width=70, height=26).pack(
                 anchor="e", pady=(6, 0))
+
+        for nid, _d, _t, title, content in notes:
+            _build_note_row(nid, title, content)
 
     # ── Timer logic ───────────────────────────────────────────────────────────
     def _on_start(self):
@@ -643,25 +804,29 @@ class App(ctk.CTk):
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, "⬆  LEVEL UP!", size=28, weight="bold", color=DARK).pack(
-            pady=(36, 8))
-        mk_label(dlg, f"Du bist jetzt Level {level}!", size=16, color=TEXT).pack()
-        mk_btn(dlg, "🎉  Weiter", dlg.destroy,
-               width=180, height=44, primary=True).pack(pady=28)
+        mk_label(dlg, "✨ ⭐ ✨", size=32, color=DARK).pack(pady=(30, 4))
+        mk_label(dlg, f"Level {level} erreicht!", size=18, weight="bold",
+                 color=DARK).pack()
+        mk_btn(dlg, "✨  Weiter", dlg.destroy,
+               width=180, height=44, primary=True).pack(pady=24)
 
     def _skill_levelup_dialog(self, skill: str, level: int):
-        emoji = SKILL_EMOJIS.get(skill, "")
+        nature = ["🌸", "🌿", "🌱", "⭐", "🌟", "✨", "🍀", "🌈", "💫", "🌺"]
+        pick = nature[level % len(nature)]
+        skills = {name: emoji for name, emoji in get_user_skills()}
+        emoji = skills.get(skill, "")
+
         dlg = ctk.CTkToplevel(self)
         dlg.title("Skill Level Up!")
-        dlg.geometry("360x230")
+        dlg.geometry("340x230")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, f"⬆  {emoji} {skill} LVL {level}!", size=22,
-                 weight="bold", color=DARK).pack(pady=(36, 8))
-        mk_label(dlg, "Skill aufgestiegen!", size=14, color=TEXT).pack()
-        mk_btn(dlg, "💪  Let's go!", dlg.destroy,
-               width=180, height=44, primary=True).pack(pady=28)
+        mk_label(dlg, f"{pick}  {pick}  {pick}", size=30, color=DARK).pack(pady=(26, 4))
+        mk_label(dlg, f"{emoji}  {skill}", size=18, weight="bold", color=DARK).pack()
+        mk_label(dlg, f"Level {level}!", size=14, color=MUTED).pack(pady=(2, 8))
+        mk_btn(dlg, f"{pick}  Super!", dlg.destroy,
+               width=160, height=40, primary=True).pack(pady=12)
 
     # ── Open log ──────────────────────────────────────────────────────────────
     def _open_log(self):
@@ -681,8 +846,7 @@ class App(ctk.CTk):
     # ── Collect animation ─────────────────────────────────────────────────────
     def _animate_collect(self, card: ctk.CTkFrame):
         orig = card.cget("fg_color")
-        flashes = [DARK, BORDER, DARK, BORDER, orig]
-        for i, col in enumerate(flashes):
+        for i, col in enumerate([DARK, BORDER, DARK, BORDER, orig]):
             self.after(i * 110, lambda c=col: card.configure(fg_color=c))
 
     # ── Skills View ───────────────────────────────────────────────────────────
@@ -704,7 +868,8 @@ class App(ctk.CTk):
         for w in self._sk_scroll.winfo_children():
             w.destroy()
 
-        skill_hours: dict = {s: 0.0 for s in SKILLS}
+        active = {name: emoji for name, emoji in get_user_skills()}
+        skill_hours: dict = {name: 0.0 for name in active}
         total_all = 0.0
         last      = None
         try:
@@ -738,12 +903,11 @@ class App(ctk.CTk):
         for skill, hours in sorted(skill_hours.items(),
                                     key=lambda x: x[1], reverse=True):
             lvl, frac, next_t = lvl_prog(hours)
-            emoji    = SKILL_EMOJIS.get(skill, "")
+            emoji    = active.get(skill, "")
             at_cap   = lvl >= len(SKILL_THRESHOLDS)
             conf_lvl = confirmed.get(skill, 0)
-            # Show collect button for the next uncollected level only
-            next_to_collect = conf_lvl + 1
-            has_uncollected = lvl >= next_to_collect and not at_cap
+            next_collect = conf_lvl + 1
+            has_uncollected = lvl >= next_collect and not at_cap
 
             card_bg, card_border = _skill_card_color(lvl)
             c = mk_card(self._sk_scroll, bg=card_bg, border=card_border)
@@ -772,15 +936,14 @@ class App(ctk.CTk):
                          color=MUTED, size=12).pack(side="right")
 
             if has_uncollected:
-                def _collect(sk=skill, lv=next_to_collect, card=c):
+                def _collect(sk=skill, lv=next_collect, card=c):
                     self._animate_collect(card)
                     confirm_skill_level(sk, lv)
                     self.after(600, self._refresh_skills)
                     self.after(650, lambda s=sk, l=lv: self._skill_levelup_dialog(s, l))
 
                 ctk.CTkButton(
-                    inner,
-                    text=f"⬆  LVL {next_to_collect} einsammeln!",
+                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
                     height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
@@ -793,15 +956,15 @@ class App(ctk.CTk):
                  color=MUTED, size=13).pack(pady=2)
         if last:
             dur_min, sk = last
-            emoji = SKILL_EMOJIS.get(sk, "")
+            emoji = active.get(sk, "")
             mk_label(self._sk_scroll,
                      f"Letzte Session: {emoji}  +{dur_min:.0f} min in {sk}",
                      color=DARK, size=13).pack(pady=4)
 
-    # ── Achievements View ──────────────────────────────────────────────────────
+    # ── Stats View (was Achievements) ─────────────────────────────────────────
     def _build_achievements_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Achievements", size=22, weight="bold",
+        mk_label(view, "Stats", size=22, weight="bold",
                  color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._ach_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -836,11 +999,18 @@ class App(ctk.CTk):
         collected_ach = get_achievements_collected()
         lvl = calculate_level(total_h)
 
-        # ── Badge gallery ──────────────────────────────────────────────────────
+        # ── Heatmap ───────────────────────────────────────────────────────────
+        hm_card = mk_card(self._ach_scroll)
+        hm_card.pack(fill="x", pady=5, padx=6)
+        mk_label(hm_card, "Aktivität", size=13, weight="bold",
+                 color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
+        self._draw_heatmap(hm_card)
+
+        # ── Badges ────────────────────────────────────────────────────────────
         if lvl > 0:
             bc = mk_card(self._ach_scroll)
             bc.pack(fill="x", pady=5, padx=6)
-            mk_label(bc, "Freigeschaltete Badges", size=14, weight="bold",
+            mk_label(bc, "Freigeschaltete Badges", size=13, weight="bold",
                      color=TEXT).pack(anchor="w", padx=16, pady=(14, 8))
 
             badge_frame = ctk.CTkFrame(bc, fg_color="transparent")
@@ -931,6 +1101,104 @@ class App(ctk.CTk):
             elif is_full and already_done:
                 mk_label(inner, "✓ Eingesammelt", size=12,
                          color=SUCCESS).pack(anchor="e", pady=(6, 0))
+
+    # ── Heatmap ───────────────────────────────────────────────────────────────
+    def _draw_heatmap(self, parent):
+        CELL, GAP = 11, 2
+        STEP = CELL + GAP
+        LM, TM = 26, 18
+
+        today_d = date.today()
+        past_d  = today_d - timedelta(days=364)
+        past_d -= timedelta(days=past_d.weekday())  # snap to Monday
+
+        data = get_heatmap_data()
+
+        # Count columns
+        d = past_d
+        num_cols = 0
+        while d <= today_d:
+            d += timedelta(weeks=1)
+            num_cols += 1
+
+        canvas_w = LM + num_cols * STEP + CELL + 4
+        canvas_h = TM + 7 * STEP + 4
+
+        canvas = tk.Canvas(parent, width=canvas_w, height=canvas_h,
+                           bg=PANEL, highlightthickness=0)
+        canvas.pack(padx=14, pady=(0, 6))
+
+        # Day labels (Mon/Mi/Fr/So)
+        for r, label in enumerate(["Mo", "", "Mi", "", "Fr", "", "So"]):
+            if label:
+                canvas.create_text(
+                    LM - 4, TM + r * STEP + CELL // 2,
+                    text=label, anchor="e",
+                    fill=MUTED, font=("Helvetica", 7),
+                )
+
+        # Draw weeks
+        d = past_d
+        col = 0
+        prev_month = None
+        cell_map: dict = {}   # (col, row) → (date_str, minutes)
+
+        while d <= today_d:
+            month = d.strftime("%b")
+            if month != prev_month:
+                canvas.create_text(
+                    LM + col * STEP, TM - 4,
+                    text=month, anchor="sw",
+                    fill=MUTED, font=("Helvetica", 7),
+                )
+                prev_month = month
+
+            for r in range(7):
+                cur = d + timedelta(days=r)
+                if cur > today_d:
+                    break
+                ds   = cur.strftime("%Y-%m-%d")
+                mins = data.get(ds, 0)
+                x0   = LM + col * STEP
+                y0   = TM + r * STEP
+                canvas.create_rectangle(x0, y0, x0 + CELL, y0 + CELL,
+                                        fill=_heatmap_color(mins), outline="")
+                cell_map[(col, r)] = (ds, mins)
+
+            d   += timedelta(weeks=1)
+            col += 1
+
+        # Tooltip label below canvas
+        tip = mk_label(parent, "", size=11, color=MUTED)
+        tip.pack(anchor="w", padx=14, pady=(0, 10))
+
+        def _hover(event):
+            c = (event.x - LM) // STEP
+            r = (event.y - TM) // STEP
+            info = cell_map.get((c, r))
+            if info:
+                ds, mins = info
+                if mins:
+                    h, m = divmod(int(mins), 60)
+                    ts = f"{h}h {m}min" if h else f"{m}min"
+                    tip.configure(text=f"{ds}  ·  {ts}")
+                else:
+                    tip.configure(text=f"{ds}  ·  kein Eintrag")
+            else:
+                tip.configure(text="")
+
+        canvas.bind("<Motion>", _hover)
+        canvas.bind("<Leave>", lambda _: tip.configure(text=""))
+
+        # Legend
+        leg = ctk.CTkFrame(parent, fg_color="transparent")
+        leg.pack(anchor="w", padx=14, pady=(0, 14))
+        mk_label(leg, "Wenig", size=10, color=MUTED).pack(side="left", padx=(0, 4))
+        for col_val in [CARD, "#fbbf24", "#d97706", "#92400e", DARK]:
+            c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
+                          highlightthickness=0)
+            c.pack(side="left", padx=1)
+        mk_label(leg, "Viel", size=10, color=MUTED).pack(side="left", padx=(4, 0))
 
     # ── Leaderboard View ──────────────────────────────────────────────────────
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
@@ -1028,14 +1296,12 @@ class App(ctk.CTk):
                      size=11, color=DIM).pack(anchor="w")
 
         if not filtered:
-            mk_label(self._lb_scroll,
-                     "Keine Einträge für diesen Zeitraum.",
+            mk_label(self._lb_scroll, "Keine Einträge für diesen Zeitraum.",
                      color=MUTED, size=14).pack(pady=40)
         elif shown < len(filtered):
-            remaining = len(filtered) - shown
             mk_btn(
                 self._lb_scroll,
-                f"Mehr laden  ({remaining} weitere)",
+                f"Mehr laden  ({len(filtered) - shown} weitere)",
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)

@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from config import DB_FILE, LEVEL_THRESHOLDS
+from config import DB_FILE, LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
 
 
 def initialize_db():
@@ -31,9 +31,34 @@ def initialize_db():
             name TEXT PRIMARY KEY
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS user_skills (
+            name       TEXT PRIMARY KEY,
+            emoji      TEXT DEFAULT '',
+            active     INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0
+        )
+    ''')
     conn.commit()
     conn.close()
+    _seed_user_skills()
 
+
+def _seed_user_skills():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    if c.execute("SELECT COUNT(*) FROM user_skills").fetchone()[0] == 0:
+        for i, sk in enumerate(SKILLS):
+            c.execute(
+                "INSERT OR IGNORE INTO user_skills (name, emoji, active, sort_order)"
+                " VALUES (?, ?, 1, ?)",
+                (sk, SKILL_EMOJIS.get(sk, ""), i),
+            )
+        conn.commit()
+    conn.close()
+
+
+# ── Sessions ───────────────────────────────────────────────────────────────────
 
 def calculate_total_time():
     conn = sqlite3.connect(DB_FILE)
@@ -89,6 +114,22 @@ def get_notes(limit: int = 50):
     return rows
 
 
+def delete_note(note_id: int):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("DELETE FROM notes WHERE id=?", (note_id,))
+    conn.commit()
+    conn.close()
+
+
+def rename_note(note_id: int, new_title: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE notes SET title=? WHERE id=?", (new_title, note_id))
+    conn.commit()
+    conn.close()
+
+
 # ── Skill level confirmation ───────────────────────────────────────────────────
 
 def get_skill_confirmed_levels() -> dict:
@@ -134,15 +175,12 @@ def mark_achievement_collected(name: str):
 # ── Badge unlock dates ─────────────────────────────────────────────────────────
 
 def get_badge_unlock_date(level: int) -> str | None:
-    """Return the date string when total playtime first crossed the threshold for `level`."""
     if level == 0:
         return "Von Anfang an"
-    threshold_min = LEVEL_THRESHOLDS[level - 1] * 60  # hours → minutes
+    threshold_min = LEVEL_THRESHOLDS[level - 1] * 60
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute(
-        "SELECT date, duration FROM pomodoro_session ORDER BY sessions ASC"
-    )
+    c.execute("SELECT date, duration FROM pomodoro_session ORDER BY sessions ASC")
     rows = c.fetchall()
     conn.close()
     total = 0.0
@@ -151,6 +189,52 @@ def get_badge_unlock_date(level: int) -> str | None:
         if total >= threshold_min:
             return date_s
     return None
+
+
+# ── User skills ────────────────────────────────────────────────────────────────
+
+def get_user_skills() -> list:
+    """Return [(name, emoji), ...] of all active skills."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    rows = c.execute(
+        "SELECT name, emoji FROM user_skills WHERE active=1 ORDER BY sort_order"
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def add_user_skill(name: str, emoji: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    max_order = c.execute("SELECT MAX(sort_order) FROM user_skills").fetchone()[0] or 0
+    c.execute(
+        "INSERT OR REPLACE INTO user_skills (name, emoji, active, sort_order)"
+        " VALUES (?, ?, 1, ?)",
+        (name.upper().strip(), emoji.strip(), max_order + 1),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_user_skill(name: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE user_skills SET active=0 WHERE name=?", (name,))
+    conn.commit()
+    conn.close()
+
+
+# ── Heatmap data ───────────────────────────────────────────────────────────────
+
+def get_heatmap_data() -> dict:
+    """Return {date_str: total_minutes} for all dates with sessions."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT date, SUM(duration) FROM pomodoro_session GROUP BY date")
+    rows = c.fetchall()
+    conn.close()
+    return {d: m for d, m in rows if d}
 
 
 # DB initialisieren beim Laden
