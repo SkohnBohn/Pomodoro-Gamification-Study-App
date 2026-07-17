@@ -458,7 +458,7 @@ class App(ctk.CTk):
         self._brow.pack(pady=(16, 28))
 
         self.start_btn = ctk.CTkButton(
-            self._brow, text="▶  Start", width=120, height=46, corner_radius=14,
+            self._brow, text="▶", width=120, height=46, corner_radius=14,
             fg_color=DARK, hover_color=DARK2, text_color=BG,
             border_width=0, font=ctk.CTkFont(size=15, weight="bold"),
             command=self._on_start,
@@ -812,7 +812,7 @@ class App(ctk.CTk):
         if not self.running:
             return
         self.paused = not self.paused
-        self.pause_btn.configure(text="▶  Weiter" if self.paused else "⏸  Pause")
+        self.pause_btn.configure(text="▶" if self.paused else "⏸")
         if not self.paused:
             if self.timer_mode == "Pomodoro":
                 self._tick_pomodoro()
@@ -866,13 +866,13 @@ class App(ctk.CTk):
     def _btns_running(self):
         self.start_btn.configure(state="disabled", fg_color=CARD, text_color=DIM,
                                   border_color=BORDER, border_width=1)
-        self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸  Pause")
+        self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸")
         self.stop_btn.configure(state="normal")
 
     def _btns_idle(self):
         self.start_btn.configure(state="normal", fg_color=DARK, text_color=BG,
                                   border_width=0)
-        self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸  Pause")
+        self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸")
         self.stop_btn.configure(state="disabled")
 
     def _reset_timer(self):
