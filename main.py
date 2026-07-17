@@ -179,7 +179,7 @@ def _arrow_btn(parent, direction: str, command,
                bg: str = PANEL, w: int = 32, h: int = 26) -> tk.Canvas:
     """Minimalist 2-stroke arrow button. direction: 'down'=save, 'up'=load."""
     c = tk.Canvas(parent, width=w, height=h,
-                  bg=bg, highlightthickness=0, cursor="hand2")
+                  bg=bg, highlightthickness=0)
     cx  = w // 2
     sx  = w / 32
     sy  = h / 26
