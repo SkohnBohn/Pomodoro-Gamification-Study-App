@@ -696,7 +696,7 @@ class App(ctk.CTk):
             o_lbl.bind("<Leave>", lambda _, l=o_lbl: l.configure(text_color=MUTED))
 
             x_lbl = mk_label(side, "✕", size=12, color=DANGER)
-            x_lbl.pack()
+            x_lbl.pack(pady=(0, 10))
             x_lbl.bind("<Button-1>", lambda _, o=outer, i=nid: (
                 delete_note(i), o.destroy()))
             x_lbl.bind("<Enter>", lambda _, l=x_lbl: l.configure(
@@ -704,23 +704,12 @@ class App(ctk.CTk):
             x_lbl.bind("<Leave>", lambda _, l=x_lbl: l.configure(
                 text_color=DANGER))
 
-            # ── Click card to load ───────────────────────────────────────────
-            def _load():
+            def _load(c=content):
                 self.notes_box.delete("1.0", "end")
-                self.notes_box.insert("1.0", content)
+                self.notes_box.insert("1.0", c)
                 dlg.destroy()
 
-            def _card_enter(_):
-                card.configure(fg_color=_NOTE_HOVER, cursor="hand2")
-                hdr.configure(fg_color="#f0c840")
-            def _card_leave(_):
-                card.configure(fg_color=CARD, cursor="")
-                hdr.configure(fg_color=_NOTE_HDR)
-
-            for w in (card, hdr, title_lbl, body, prev_lbl):
-                w.bind("<Enter>",    _card_enter)
-                w.bind("<Leave>",    _card_leave)
-                w.bind("<Button-1>", lambda _: _load())
+            _arrow_btn(side, "up", _load, bg=PANEL).pack()
 
         for nid, date_s, time_s, title, content in notes:
             _build_card(nid, date_s, time_s, title, content)
