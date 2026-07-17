@@ -1834,7 +1834,7 @@ class App(ctk.CTk):
             det = ctk.CTkFrame(row, fg_color="transparent")
             det.pack(side="left", fill="x", expand=True)
             mk_label(det, intention, size=12, color=MUTED).pack(anchor="w")
-            mk_label(det, f"{dt.strftime('%d.%m.%Y %H:%M')}  ·  {skill}",
+            mk_label(det, f"{dt.strftime('%d.%m.%Y')}  |  {dt.strftime('%H:%M')}  |  {skill}",
                      size=11, color=DIM).pack(anchor="w")
 
         if not filtered:
