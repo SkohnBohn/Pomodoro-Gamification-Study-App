@@ -354,12 +354,38 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("260x130")
+        dlg.geometry("280x190")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
         mk_label(dlg, "Einstellungen", size=14, weight="bold",
                  color=DARK).pack(padx=20, pady=(18, 12), anchor="w")
+
+        # Max pomo duration row
+        dur_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        dur_row.pack(fill="x", padx=20, pady=(0, 12))
+        mk_label(dur_row, "Max. Pomo Duration", size=12, color=MUTED).pack(side="left")
+        dur_var = tk.StringVar(value=str(int(self._pomo_max_mins)))
+        dur_entry = ctk.CTkEntry(
+            dur_row, textvariable=dur_var, width=52, height=28,
+            corner_radius=8, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, justify="center",
+            font=ctk.CTkFont(size=12),
+        )
+        dur_entry.pack(side="right")
+        mk_label(dur_row, "min", size=12, color=MUTED).pack(side="right", padx=(4, 4))
+
+        def _apply_max(*_):
+            try:
+                v = float(dur_var.get())
+                if v >= 5:
+                    self._pomo_max_mins = v
+            except ValueError:
+                pass
+
+        dur_entry.bind("<Return>",   _apply_max)
+        dur_entry.bind("<FocusOut>", _apply_max)
+
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20)
 
@@ -443,19 +469,20 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(8, 8))
 
-        self._pomo_mins  = 25.0
-        self._dragging   = False
+        self._pomo_mins     = 25.0
+        self._pomo_max_mins = 90.0
+        self._dragging      = False
 
         def _angle_to_mins(e):
             # 12 o'clock = 0 min, clockwise; full circle = 90 min
             cx = cy = RingTimer.SIZE // 2
             a = math.degrees(math.atan2(e.x - cx, cy - e.y)) % 360
-            return max(0.5, min(90.0, a / 360.0 * 90.0))
+            return max(0.5, min(self._pomo_max_mins, a / 360.0 * self._pomo_max_mins))
 
         def _update_ring(mins):
             total_s = int(mins * 60)
             m, s = divmod(total_s, 60)
-            self.ring.update_ring(mins / 90.0, f"{m:02d}:{s:02d}")
+            self.ring.update_ring(mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
 
         def _ring_press(e):
             if self.timer_mode != "Pomodoro" or self.running:
@@ -892,7 +919,7 @@ class App(ctk.CTk):
         if self.timer_mode == "Pomodoro":
             total_s = int(self._pomo_mins * 60)
             m, s = divmod(total_s, 60)
-            self.ring.update_ring(self._pomo_mins / 90.0, f"{m:02d}:{s:02d}")
+            self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
         else:
             self.ring.update_ring(0, "00:00")
         self._btns_idle()
