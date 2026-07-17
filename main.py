@@ -622,8 +622,9 @@ class App(ctk.CTk):
 
         scroll = ctk.CTkScrollableFrame(
             dlg, fg_color="transparent",
-            scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=DARK2,
+            scrollbar_button_color=PANEL,
+            scrollbar_button_hover_color=PANEL,
+            scrollbar_fg_color=PANEL,
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
