@@ -354,7 +354,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("280x240")
+        dlg.geometry("280x290")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -375,20 +375,23 @@ class App(ctk.CTk):
 
         preset_btns = {}
 
-        def _select_preset(v):
+        def _flash():
+            pill_container.configure(fg_color=BORDER)
+            dlg.after(180, lambda: pill_container.configure(fg_color=CARD))
+
+        def _select_preset(v, deselect_custom=True):
             self._pomo_max_mins = float(v)
             for val, btn in preset_btns.items():
                 btn.configure(
                     fg_color=DARK if val == v else "transparent",
                     text_color=BG  if val == v else MUTED,
                 )
-            # flash feedback
-            pill_container.configure(fg_color=BORDER)
-            dlg.after(180, lambda: pill_container.configure(fg_color=CARD))
+            if deselect_custom:
+                custom_entry.configure(border_color=BORDER)
+            _flash()
 
         current = int(self._pomo_max_mins)
         for i, p in enumerate(presets):
-            active = (p == current or (p not in presets and i == len(presets)-1))
             px = (2, 0) if i == 0 else (0, 2) if i == len(presets)-1 else (0, 0)
             b = ctk.CTkButton(
                 pill_container, text=f"{p}", width=pill_w, height=32,
@@ -403,8 +406,43 @@ class App(ctk.CTk):
             b.pack(side="left", padx=px, pady=2)
             preset_btns[p] = b
 
+        # Custom entry row
+        custom_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        custom_row.pack(pady=(10, 0))
+        custom_entry = ctk.CTkEntry(
+            custom_row, width=72, height=30, placeholder_text="custom",
+            corner_radius=10, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
+            font=ctk.CTkFont(size=12), justify="center",
+        )
+        custom_entry.pack(side="left", padx=(0, 8))
+        if current not in presets:
+            custom_entry.insert(0, str(current))
+
+        def _apply_custom(*_):
+            val = custom_entry.get().strip()
+            try:
+                v = float(val)
+                if v >= 5:
+                    for btn in preset_btns.values():
+                        btn.configure(fg_color="transparent", text_color=MUTED)
+                    custom_entry.configure(border_color=DARK)
+                    _select_preset(v, deselect_custom=False)
+            except ValueError:
+                custom_entry.configure(border_color=DANGER)
+                dlg.after(1200, lambda: custom_entry.configure(border_color=BORDER))
+
+        confirm_btn = ctk.CTkButton(
+            custom_row, text="✓", width=30, height=30, corner_radius=10,
+            fg_color=DARK, hover_color=DARK2, text_color=BG,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            border_width=0, command=_apply_custom,
+        )
+        confirm_btn.pack(side="left")
+        custom_entry.bind("<Return>", _apply_custom)
+
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
-               width=200, height=36).pack(padx=20, pady=(20, 0))
+               width=200, height=36).pack(padx=20, pady=(16, 0))
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
