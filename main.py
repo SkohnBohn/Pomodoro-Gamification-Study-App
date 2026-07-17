@@ -554,31 +554,21 @@ class App(ctk.CTk):
             add_row = ctk.CTkFrame(self._sk_grid_frame, fg_color="transparent")
             add_row.pack(fill="x", pady=(6, 0))
             self._new_name = ctk.CTkEntry(
-                add_row, height=28, placeholder_text="Skill name",
+                add_row, height=28, placeholder_text="New Skill",
                 corner_radius=8, fg_color=CARD, border_color=BORDER,
                 text_color=TEXT, placeholder_text_color=DIM,
                 font=ctk.CTkFont(size=12),
             )
-            self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 4))
-            def _draw_plus_btn(parent, size=28, r=8, bg=MUTED, bg_hover=DARK2,
-                               fg=BG, command=None):
-                c = tk.Canvas(parent, width=size, height=size,
-                              bg=PANEL, highlightthickness=0)
-                def _redraw(col):
-                    c.delete("all")
-                    c.create_rectangle(r, 0, size-r, size, fill=col, outline="")
-                    c.create_rectangle(0, r, size, size-r, fill=col, outline="")
-                    for cx, cy, rad in [(r,r,r),(size-r,r,r),(r,size-r,r),(size-r,size-r,r)]:
-                        c.create_oval(cx-rad, cy-rad, cx+rad, cy+rad, fill=col, outline="")
-                    c.create_text(size//2, size//2, text="+",
-                                  fill=fg, font=("Helvetica", 16, "bold"))
-                _redraw(bg)
-                c.bind("<Enter>", lambda _: _redraw(bg_hover))
-                c.bind("<Leave>", lambda _: _redraw(bg))
-                if command:
-                    c.bind("<Button-1>", lambda _: command())
-                return c
-            _draw_plus_btn(add_row, command=self._add_skill).pack(side="right")
+            self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            plus_lbl = ctk.CTkLabel(
+                add_row, text="+", width=20, height=28,
+                font=ctk.CTkFont(size=18, weight="bold"),
+                text_color=MUTED, fg_color="transparent", cursor="hand2",
+            )
+            plus_lbl.pack(side="right")
+            plus_lbl.bind("<Button-1>", lambda _: self._add_skill())
+            plus_lbl.bind("<Enter>", lambda _: plus_lbl.configure(text_color=DARK))
+            plus_lbl.bind("<Leave>", lambda _: plus_lbl.configure(text_color=MUTED))
         else:
             # Normal mode: 3-col grid
             for i, (name, emoji) in enumerate(skills):
