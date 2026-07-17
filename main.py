@@ -615,8 +615,6 @@ class App(ctk.CTk):
         mk_label(hdr, "Notizen", size=17, weight="bold", color=DARK).pack(side="left")
 
         notes = get_notes(limit=200)
-        mk_label(hdr, str(len(notes)), size=12, color=MUTED).pack(
-            side="right", pady=(4, 0))
 
         if not notes:
             mk_label(dlg, "Noch nichts gespeichert.", size=13,
