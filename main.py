@@ -50,25 +50,22 @@ _active_palette = "yellow"
 
 def _apply_palette(name: str):
     global BG, PANEL, CARD, BORDER, DARK, DARK2, MUTED, DIM, TEXT, SUCCESS, DANGER, _active_palette
+    global _ARROW_FG, _ARROW_FG_HOVER
     _active_palette = name
     p = _PALETTES[name]
     BG=p["BG"]; PANEL=p["PANEL"]; CARD=p["CARD"]; BORDER=p["BORDER"]
     DARK=p["DARK"]; DARK2=p["DARK2"]; MUTED=p["MUTED"]; DIM=p["DIM"]
     TEXT=p["TEXT"]; SUCCESS=p["SUCCESS"]; DANGER=p["DANGER"]
+    if name == "yellow":
+        _ARROW_FG       = "#8a7340"
+        _ARROW_FG_HOVER = "#3d3000"
+    else:
+        _ARROW_FG       = "#888888"
+        _ARROW_FG_HOVER = "#333333"
 
+_ARROW_FG       = "#8a7340"
+_ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
-
-BG      = _PALETTES["yellow"]["BG"]
-PANEL   = _PALETTES["yellow"]["PANEL"]
-CARD    = _PALETTES["yellow"]["CARD"]
-BORDER  = _PALETTES["yellow"]["BORDER"]
-DARK    = _PALETTES["yellow"]["DARK"]
-DARK2   = _PALETTES["yellow"]["DARK2"]
-MUTED   = _PALETTES["yellow"]["MUTED"]
-DIM     = _PALETTES["yellow"]["DIM"]
-TEXT    = _PALETTES["yellow"]["TEXT"]
-SUCCESS = _PALETTES["yellow"]["SUCCESS"]
-DANGER  = _PALETTES["yellow"]["DANGER"]
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
 _SKILL_CARD_PALETTE = [
@@ -179,13 +176,13 @@ class RingTimer(tk.Canvas):
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-def mk_card(parent, bg=PANEL, border=BORDER, **kw) -> ctk.CTkFrame:
-    return ctk.CTkFrame(parent, fg_color=bg, corner_radius=18,
-                        border_width=1, border_color=border, **kw)
+def mk_card(parent, bg=None, border=None, **kw) -> ctk.CTkFrame:
+    return ctk.CTkFrame(parent, fg_color=bg or PANEL, corner_radius=18,
+                        border_width=1, border_color=border or BORDER, **kw)
 
 
-def mk_label(parent, text, size=13, weight="normal", color=TEXT, **kw) -> ctk.CTkLabel:
-    return ctk.CTkLabel(parent, text=text, text_color=color,
+def mk_label(parent, text, size=13, weight="normal", color=None, **kw) -> ctk.CTkLabel:
+    return ctk.CTkLabel(parent, text=text, text_color=color or TEXT,
                         font=ctk.CTkFont(size=size, weight=weight), **kw)
 
 
@@ -221,9 +218,9 @@ def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButt
     )
 
 
-def progress_bar(parent, color=DARK) -> ctk.CTkProgressBar:
+def progress_bar(parent, color=None) -> ctk.CTkProgressBar:
     return ctk.CTkProgressBar(parent, height=6, corner_radius=3,
-                               progress_color=color, fg_color=BORDER)
+                               progress_color=color or DARK, fg_color=BORDER)
 
 
 def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
@@ -624,15 +621,17 @@ class App(ctk.CTk):
         ov.place(x=0, y=sh, width=sw, height=ov_h)
         self._trophy_overlay = ov
 
+        ov_inner = DARK2 if _active_palette == "yellow" else "#222222"
+        ov_accent = "#fbbf24" if _active_palette == "yellow" else "#3b82f6"
         # Inner glow ring (subtle border)
-        inner = tk.Frame(ov, bg="#2a2000", bd=0)
+        inner = tk.Frame(ov, bg=ov_inner, bd=0)
         inner.place(x=4, y=4, width=sw - 8, height=ov_h - 8)
 
         # Big delta text
         big = tk.Label(
             inner, text=delta_str,
             font=("", 34, "bold"),
-            fg="#fbbf24", bg="#2a2000",
+            fg=ov_accent, bg=ov_inner,
             anchor="center",
         )
         big.place(relx=0.5, rely=0.38, anchor="center")
@@ -640,7 +639,7 @@ class App(ctk.CTk):
         sub = tk.Label(
             inner, text="gespeichert ✓",
             font=("", 11),
-            fg="#86efac", bg="#2a2000",
+            fg="#86efac", bg=ov_inner,
             anchor="center",
         )
         sub.place(relx=0.5, rely=0.74, anchor="center")
