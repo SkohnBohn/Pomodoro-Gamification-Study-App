@@ -551,29 +551,6 @@ class App(ctk.CTk):
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20, pady=(16, 0))
 
-        # ── Close arrow (bottom-right) ────────────────────────────────────────
-        def _save_close():
-            targets = [pill_container, dir_pill, theme_pill]
-            def _blink(step=0):
-                on = step % 2 == 0
-                for t in targets:
-                    try: t.configure(fg_color=BORDER if on else CARD)
-                    except Exception: pass
-                if step < 3:
-                    dlg.after(70, lambda: _blink(step + 1))
-                else:
-                    dlg.destroy()
-            _blink()
-
-        save_btn = ctk.CTkButton(
-            dlg, text="↓", width=24, height=24,
-            corner_radius=0, fg_color="transparent", hover_color="transparent",
-            text_color=MUTED, border_width=0,
-            font=ctk.CTkFont(size=15, weight="bold"),
-            command=_save_close, cursor="arrow",
-        )
-        dlg.update_idletasks()
-        dlg.after(50, lambda: save_btn.place(in_=dlg, relx=1.0, rely=1.0, anchor="se", x=-10, y=-8))
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
