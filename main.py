@@ -998,7 +998,7 @@ class App(ctk.CTk):
             next_collect = conf_lvl + 1
             has_uncollected = lvl >= next_collect and not at_cap
 
-            card_bg, card_border = _skill_card_color(lvl)
+            card_bg, card_border = _skill_card_color(conf_lvl)
             c = mk_card(self._sk_scroll, bg=card_bg, border=card_border)
             c.pack(fill="x", pady=5, padx=6)
             inner = ctk.CTkFrame(c, fg_color="transparent")
