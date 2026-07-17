@@ -1758,8 +1758,8 @@ class App(ctk.CTk):
             def get(self): return self._r._lb_period_val
         self._lb_period = _LbPeriod(self)
 
-        self._lb_sum = mk_label(view, "", color=MUTED, size=13)
-        self._lb_sum.pack(anchor="w", padx=28, pady=(0, 6))
+        self._lb_sum = mk_label(view, "", color=MUTED, size=12)
+        self._lb_sum.pack(anchor="center", pady=(4, 2))
 
         self._lb_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -1817,25 +1817,40 @@ class App(ctk.CTk):
 
         filtered.sort(key=lambda x: x[0], reverse=True)
         medals  = ["🥇", "🥈", "🥉"]
-        mcolors = ["#92700a", "#555555", "#7a4500"]
+        mcolors = ["#92700a", "#7a5500", "#7a4500"]
+        accent_cols = ["#c8960a", "#9e8060", "#b06030"]
 
         for i, (dur, dt, skill, intention) in enumerate(filtered[:shown]):
-            c = mk_card(self._lb_scroll)
-            c.pack(fill="x", pady=4, padx=6)
-            row = ctk.CTkFrame(c, fg_color="transparent")
-            row.pack(fill="x", padx=16, pady=12)
+            is_top = i < 3
+            acc = accent_cols[i] if is_top else BORDER
+            rank_c = mcolors[i] if is_top else MUTED
 
-            rank_s = medals[i]  if i < 3 else f"# {i + 1}"
-            rank_c = mcolors[i] if i < 3 else MUTED
-            mk_label(row, rank_s, size=17, color=rank_c, width=34).pack(side="left")
-            mk_label(row, f"{dur:.0f} min", size=16, weight="bold",
-                     color=rank_c if i < 3 else TEXT).pack(side="left", padx=(0, 14))
+            outer = ctk.CTkFrame(self._lb_scroll, fg_color=CARD, corner_radius=14)
+            outer.pack(fill="x", pady=3, padx=4)
 
-            det = ctk.CTkFrame(row, fg_color="transparent")
-            det.pack(side="left", fill="x", expand=True)
-            mk_label(det, intention, size=12, color=MUTED).pack(anchor="w")
-            mk_label(det, f"{dt.strftime('%d.%m.%Y')}  |  {dt.strftime('%H:%M')}  |  {skill}",
-                     size=11, color=DIM).pack(anchor="w")
+            # left accent stripe
+            stripe = ctk.CTkFrame(outer, fg_color=acc, corner_radius=0, width=4)
+            stripe.pack(side="left", fill="y", padx=(0, 0))
+            stripe.pack_propagate(False)
+
+            inner = ctk.CTkFrame(outer, fg_color="transparent")
+            inner.pack(side="left", fill="x", expand=True, padx=(12, 14), pady=10)
+
+            # top row: rank + duration on left, meta on right
+            top = ctk.CTkFrame(inner, fg_color="transparent")
+            top.pack(fill="x")
+
+            rank_s = medals[i] if is_top else f"#{i+1}"
+            mk_label(top, rank_s, size=13, color=rank_c).pack(side="left")
+            mk_label(top, f"  {dur:.0f} min", size=15, weight="bold",
+                     color=rank_c if is_top else TEXT).pack(side="left")
+
+            meta = f"{dt.strftime('%d.%m.%Y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
+            mk_label(top, meta, size=11, color=DIM).pack(side="right")
+
+            # intention below
+            if intention:
+                mk_label(inner, intention, size=12, color=MUTED).pack(anchor="w", pady=(2, 0))
 
         if not filtered:
             mk_label(self._lb_scroll, "Keine Einträge für diesen Zeitraum.",
