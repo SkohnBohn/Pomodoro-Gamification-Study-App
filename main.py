@@ -117,12 +117,15 @@ class RingTimer(tk.Canvas):
         )
         self._draw(1.0, "00:00", "")
 
+    DOT_COLOR = "#c9920a"  # warm amber, clearly visible on yellow
+
     def update_ring(self, fraction: float, time_str: str, sub: str = "",
-                    arc_color: str = DARK, dot_color: str = DARK2):
-        self._draw(fraction, time_str, sub, arc_color, dot_color)
+                    arc_color: str = DARK, dot_color: str | None = None):
+        self._draw(fraction, time_str, sub, arc_color, dot_color or self.DOT_COLOR)
 
     def _draw(self, fraction: float, time_str: str, sub: str,
-              arc_color: str = DARK, dot_color: str = DARK2):
+              arc_color: str = DARK, dot_color: str | None = None):
+        dot_color = dot_color or self.DOT_COLOR
         self.delete("all")
         cx = cy = self.SIZE // 2
         pad, w = 14, 20
@@ -1094,7 +1097,7 @@ class App(ctk.CTk):
             m, s = divmod(max(0, int(remaining)), 60)
             # last 10 s: pulse between DARK and a warm amber for drama
             if remaining <= 10:
-                t = 0.5 + 0.5 * math.sin(elapsed * math.pi * 2)  # 0→1, ~1 Hz smooth
+                t = 0.5 + 0.5 * math.sin(elapsed * math.pi)  # ~0.5 Hz slow pulse
                 r1, g1, b1 = 0x1a, 0x12, 0x00   # DARK
                 r2, g2, b2 = 0x86, 0xef, 0xac   # pastel green
                 rc = int(r1 + (r2 - r1) * t)
