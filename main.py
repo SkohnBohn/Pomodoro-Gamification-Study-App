@@ -493,9 +493,14 @@ class App(ctk.CTk):
         # Odometer + delta animation
         prev = getattr(self, "_prev_total", total)
         delta = total - prev
-        if delta > 0.005 and prev > 0:
+        if delta >= 0 and prev > 0:
             delta_mins = round(delta * 60)
-            delta_str  = f"+{delta_mins} min" if delta_mins >= 1 else f"+{delta:.2f}h"
+            if delta_mins >= 1:
+                delta_str = f"+{delta_mins} min"
+            elif delta > 0:
+                delta_str = f"+{delta:.2f}h"
+            else:
+                delta_str = "+0 min"
             self._delta_lbl.configure(text=delta_str)
             self.after(3000, lambda: self._delta_lbl.configure(text=""))
             self._animate_odometer(prev, total, steps=24, delay=35)
@@ -566,7 +571,7 @@ class App(ctk.CTk):
                 self._trophy_after_ids.append(aid)
             else:
                 # Schedule slide out after hold
-                aid2 = self.after(2600, _slide_out)
+                aid2 = self.after(1200, _slide_out)
                 self._trophy_after_ids.append(aid2)
 
         def _slide_out(step=0, steps=10):
