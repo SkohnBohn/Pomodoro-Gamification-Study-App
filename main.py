@@ -302,25 +302,38 @@ class App(ctk.CTk):
             self._nav_btns[key] = b
 
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=14, pady=20)
+        footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
 
-        ctk.CTkFrame(footer, height=1, fg_color=BORDER).pack(fill="x", pady=(0, 14))
+        ctk.CTkFrame(footer, height=1, fg_color=BORDER).pack(fill="x", pady=(0, 16))
 
-        self._badge_lbl = ctk.CTkLabel(footer, text="")
-        self._badge_lbl.pack()
+        # Hero: total hours big + delta flash
+        hero = ctk.CTkFrame(footer, fg_color="transparent")
+        hero.pack(fill="x")
+        self._total_lbl = mk_label(hero, "0.0", size=46, weight="bold", color=DARK)
+        self._total_lbl.pack(side="left", padx=(4, 0))
+        right_col = ctk.CTkFrame(hero, fg_color="transparent")
+        right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
+        mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")
+        self._delta_lbl = mk_label(right_col, "", size=12, color="#4ade80")
+        self._delta_lbl.pack(anchor="w", pady=(2, 0))
 
-        self._level_lbl = mk_label(footer, "LVL 0", size=15, weight="bold", color=DARK)
-        self._level_lbl.pack(pady=(6, 2))
-
-        self._total_lbl = mk_label(footer, "0.0h gesamt", size=12, color=TEXT)
-        self._total_lbl.pack(pady=(0, 2))
-
-        self._next_lbl = mk_label(footer, "", size=11, color=MUTED)
-        self._next_lbl.pack()
+        # Badge + level row
+        mid = ctk.CTkFrame(footer, fg_color="transparent")
+        mid.pack(fill="x", pady=(10, 4))
+        self._badge_lbl = ctk.CTkLabel(mid, text="")
+        self._badge_lbl.pack(side="left")
+        lvl_col = ctk.CTkFrame(mid, fg_color="transparent")
+        lvl_col.pack(side="left", padx=(8, 0), anchor="center")
+        self._level_lbl = mk_label(lvl_col, "LVL 0", size=15, weight="bold", color=DARK)
+        self._level_lbl.pack(anchor="w")
+        self._next_lbl = mk_label(lvl_col, "", size=10, color=MUTED)
+        self._next_lbl.pack(anchor="w")
 
         self._lvl_bar = progress_bar(footer)
-        self._lvl_bar.pack(fill="x", pady=(8, 12))
+        self._lvl_bar.pack(fill="x", pady=(4, 0))
         self._lvl_bar.set(0)
+
+        self._prev_total = 0.0  # for delta calculation
 
         self.content = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         self.content.pack(side="right", fill="both", expand=True)
@@ -452,7 +465,6 @@ class App(ctk.CTk):
         total = calculate_total_time()
         level = calculate_level(total)
         self._level_lbl.configure(text=f"LVL {level}")
-        self._total_lbl.configure(text=f"{total:.1f}h gesamt")
 
         if level >= len(LEVEL_THRESHOLDS):
             self._lvl_bar.set(1)
@@ -468,11 +480,38 @@ class App(ctk.CTk):
         badge_path = os.path.join(BADGE_DIR, f"p{level}.png")
         if os.path.exists(badge_path):
             try:
-                img = Image.open(badge_path).resize((60, 60), Image.Resampling.LANCZOS)
-                self._badge_img = ctk.CTkImage(img, size=(60, 60))
+                img = Image.open(badge_path).resize((48, 48), Image.Resampling.LANCZOS)
+                self._badge_img = ctk.CTkImage(img, size=(48, 48))
                 self._badge_lbl.configure(image=self._badge_img, text="")
             except Exception:
                 pass
+
+        # Odometer + delta animation
+        prev = getattr(self, "_prev_total", total)
+        delta = total - prev
+        if delta > 0.005 and prev > 0:
+            self._delta_lbl.configure(text=f"+{delta:.2f}h")
+            self.after(2200, lambda: self._delta_lbl.configure(text=""))
+            self._animate_odometer(prev, total, steps=18, delay=40)
+        else:
+            self._total_lbl.configure(text=f"{total:.1f}")
+        self._prev_total = total
+
+    def _animate_odometer(self, start: float, end: float, steps: int, delay: int, step: int = 0):
+        if step > steps:
+            self._total_lbl.configure(text=f"{end:.1f}", text_color=DARK)
+            return
+        t = step / steps
+        # ease-out cubic
+        t_ease = 1 - (1 - t) ** 3
+        val = start + (end - start) * t_ease
+        # flash hero label bright at start, settle to DARK
+        brightness = max(0, 1 - t * 2)
+        r = int(0x1a + (0xf7 - 0x1a) * brightness)
+        g = int(0x12 + (0xc9 - 0x12) * brightness)
+        col = f"#{r:02x}{g:02x}00"
+        self._total_lbl.configure(text=f"{val:.1f}", text_color=col)
+        self.after(delay, lambda: self._animate_odometer(start, end, steps, delay, step + 1))
 
     # ── Timer View ────────────────────────────────────────────────────────────
     def _build_timer_view(self) -> ctk.CTkFrame:
