@@ -444,43 +444,39 @@ class App(ctk.CTk):
         self.ring.pack(pady=(8, 8))
 
         self._pomo_mins  = 25.0
-        self._drag_angle = None  # last known angle while dragging
+        self._dragging   = False
 
-        def _evt_angle(e):
+        def _angle_to_mins(e):
+            # 12 o'clock = 0, clockwise; full circle = 90 min
             cx = cy = RingTimer.SIZE // 2
-            return math.degrees(math.atan2(cy - e.y, e.x - cx))
+            a = math.degrees(math.atan2(cx - e.x, cy - e.y)) % 360  # 0° at top, CW
+            return max(0.5, a / 360.0 * 90.0)
+
+        def _update_ring(mins):
+            total_s = int(mins * 60)
+            m, s = divmod(total_s, 60)
+            self.ring.update_ring(mins / 90.0, f"{m:02d}:{s:02d}")
 
         def _ring_press(e):
             if self.timer_mode != "Pomodoro" or self.running:
                 return
-            self._drag_angle = _evt_angle(e)
-
-        def _ring_drag(e):
-            if self._drag_angle is None:
-                return
-            new_a = _evt_angle(e)
-            delta = new_a - self._drag_angle
-            if delta >  180: delta -= 360
-            if delta < -180: delta += 360
-            # clockwise drag (delta < 0) → increase time; 360° = 60 min
-            self._pomo_mins = max(1.0, min(180.0, self._pomo_mins - delta / 6.0))
-            self._drag_angle = new_a
-            total_s = int(self._pomo_mins * 60)
-            m, s    = divmod(total_s, 60)
-            frac    = (self._pomo_mins % 60) / 60.0
-            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self._dragging = True
+            self._pomo_mins = _angle_to_mins(e)
+            _update_ring(self._pomo_mins)
             self.ring.configure(cursor="fleur")
 
-        def _ring_release(e):
-            if self._drag_angle is None:
+        def _ring_drag(e):
+            if not self._dragging:
                 return
-            self._drag_angle = None
-            # snap to nearest 30 s
-            self._pomo_mins  = round(self._pomo_mins * 2) / 2
-            total_s = int(self._pomo_mins * 60)
-            m, s    = divmod(total_s, 60)
-            frac    = (self._pomo_mins % 60) / 60.0
-            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self._pomo_mins = _angle_to_mins(e)
+            _update_ring(self._pomo_mins)
+
+        def _ring_release(e):
+            if not self._dragging:
+                return
+            self._dragging = False
+            self._pomo_mins = _angle_to_mins(e)
+            _update_ring(self._pomo_mins)
             self.ring.configure(cursor="")
 
         self.ring.bind("<ButtonPress-1>",   _ring_press)
@@ -896,8 +892,7 @@ class App(ctk.CTk):
         if self.timer_mode == "Pomodoro":
             total_s = int(self._pomo_mins * 60)
             m, s = divmod(total_s, 60)
-            frac = (self._pomo_mins % 60) / 60.0
-            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self.ring.update_ring(self._pomo_mins / 90.0, f"{m:02d}:{s:02d}")
         else:
             self.ring.update_ring(0, "00:00")
         self._btns_idle()
