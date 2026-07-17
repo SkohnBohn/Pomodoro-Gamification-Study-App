@@ -394,22 +394,20 @@ class App(ctk.CTk):
     def _build_timer_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
-        hdr = ctk.CTkFrame(view, fg_color="transparent")
-        hdr.pack(fill="x", padx=28, pady=(22, 0))
-        self.mode_seg = seg_btn(hdr, ["Pomodoro", "Open Timer"],
-                                command=self._on_mode_change)
-        self.mode_seg.set("Pomodoro")
-        self.mode_seg.pack(side="right")
-
         body = ctk.CTkFrame(view, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=18)
+        body.pack(fill="both", expand=True, padx=20, pady=(22, 18))
 
         # ── Left ─────────────────────────────────────────────────────────────
         left = mk_card(body)
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
+        self.mode_seg = seg_btn(left, ["Pomodoro", "Open Timer"],
+                                command=self._on_mode_change)
+        self.mode_seg.set("Pomodoro")
+        self.mode_seg.pack(pady=(16, 0))
+
         self.ring = RingTimer(left)
-        self.ring.pack(pady=(28, 8))
+        self.ring.pack(pady=(8, 8))
 
         self._dur_row = ctk.CTkFrame(left, fg_color="transparent")
         self._dur_row.pack()
