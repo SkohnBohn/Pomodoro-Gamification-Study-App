@@ -207,8 +207,8 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
     )
 
 
-_ARROW_FG       = "#1e1c18"
-_ARROW_FG_HOVER = "#5c4300"
+_ARROW_FG       = "#8a7340"
+_ARROW_FG_HOVER = "#3d3000"
 
 def _arrow_btn(parent, direction: str, command,
                bg: str = PANEL, w: int = 32, h: int = 26) -> tk.Canvas:
