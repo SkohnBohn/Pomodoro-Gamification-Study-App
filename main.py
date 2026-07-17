@@ -403,7 +403,7 @@ class App(ctk.CTk):
 
         self._mode_state = "Pomodoro"
         toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=20, height=36,
-                              width=180)
+                              width=176)
         toggle.pack(pady=(16, 0))
         toggle.pack_propagate(False)
 
@@ -420,7 +420,7 @@ class App(ctk.CTk):
                 self._mode_state = mode
                 self._on_mode_change(mode)
             return ctk.CTkButton(
-                toggle, text=text, width=86, height=36, corner_radius=18,
+                toggle, text=text, width=84, height=32, corner_radius=18,
                 fg_color=DARK if mode == "Pomodoro" else "transparent",
                 hover_color=DARK2,
                 text_color=BG if mode == "Pomodoro" else MUTED,
@@ -430,8 +430,8 @@ class App(ctk.CTk):
 
         self._mode_btn_pomo = _mode_btn("POMO", "Pomodoro")
         self._mode_btn_open = _mode_btn("OPEN", "Open Timer")
-        self._mode_btn_pomo.pack(side="left", padx=2, pady=2)
-        self._mode_btn_open.pack(side="left", padx=(0, 2), pady=2)
+        self._mode_btn_pomo.pack(side="left", padx=(2, 1), pady=2)
+        self._mode_btn_open.pack(side="left", padx=(1, 2), pady=2)
 
         # keep a dummy .set() / .get() interface so _on_mode_change still works
         class _FakeSeg:
