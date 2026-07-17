@@ -1054,23 +1054,20 @@ class App(ctk.CTk):
                  color=MUTED, size=13).pack(pady=2)
 
         # ── Level colour legend ───────────────────────────────────────────────
-        leg_wrap = ctk.CTkFrame(self._sk_scroll, fg_color="transparent")
-        leg_wrap.pack(fill="x", padx=6, pady=(12, 8))
-        # number row
-        num_row = ctk.CTkFrame(leg_wrap, fg_color="transparent")
-        num_row.pack(fill="x")
-        for i in range(16):
-            lbl = mk_label(num_row, str(i) if i % 3 == 0 else "",
-                           size=9, color=MUTED)
-            lbl.pack(side="left", expand=True)
-        # colour strip
-        strip = ctk.CTkFrame(leg_wrap, fg_color="transparent", height=16)
-        strip.pack(fill="x")
-        strip.pack_propagate(False)
-        for col, border, _tc in _SKILL_CARD_PALETTE:
-            sq = ctk.CTkFrame(strip, fg_color=col, corner_radius=3,
-                              border_width=1, border_color=border, height=16)
-            sq.pack(side="left", fill="both", expand=True, padx=1)
+        SQ, GAP = 16, 3
+        n = len(_SKILL_CARD_PALETTE)
+        cw = n * (SQ + GAP) - GAP
+        ch = SQ + 14  # squares + number row below
+        leg_cv = tk.Canvas(self._sk_scroll, width=cw, height=ch,
+                           bg=BG, highlightthickness=0)
+        leg_cv.pack(pady=(12, 8))
+        for i, (col, border, _tc) in enumerate(_SKILL_CARD_PALETTE):
+            x0 = i * (SQ + GAP)
+            leg_cv.create_rectangle(x0, 0, x0 + SQ, SQ,
+                                    fill=col, outline=border, width=1)
+            if i % 3 == 0:
+                leg_cv.create_text(x0 + SQ // 2, SQ + 7, text=str(i),
+                                   fill=MUTED, font=("Helvetica", 8))
         if last:
             dur_min, sk = last
             emoji = active.get(sk, "")
