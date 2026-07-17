@@ -424,7 +424,7 @@ class App(ctk.CTk):
                 fg_color=DARK if mode == "Pomodoro" else "transparent",
                 hover_color=DARK2,
                 text_color=BG if mode == "Pomodoro" else MUTED,
-                font=ctk.CTkFont(size=11, weight="bold"),
+                font=ctk.CTkFont(size=14, weight="bold"),
                 border_width=0, command=_click,
             )
 
