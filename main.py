@@ -690,7 +690,7 @@ class App(ctk.CTk):
             mk_label(body, preview, size=12, color=DIM, wraplength=390).pack(
                 anchor="w", pady=(6, 10))
 
-            def _load(c=content, _e=None):
+            def _load(c=content):
                 self.notes_box.delete("1.0", "end")
                 self.notes_box.insert("1.0", c)
                 dlg.destroy()
@@ -715,7 +715,7 @@ class App(ctk.CTk):
             for w in (card, body, top):
                 w.bind("<Enter>",    _enter)
                 w.bind("<Leave>",    _leave)
-                w.bind("<Button-1>", _load)
+                w.bind("<Button-1>", lambda _: _load())
 
         for nid, date_s, time_s, title, content in notes:
             _build_card(nid, date_s, time_s, title, content)
