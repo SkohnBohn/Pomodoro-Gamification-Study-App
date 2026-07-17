@@ -628,7 +628,7 @@ class App(ctk.CTk):
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
-        _NOTE_HDR  = "#f5d060"   # slightly darker than CARD for header bar
+        _NOTE_HDR  = "#f9e070"   # very slightly darker than CARD for header bar
         _NOTE_HOVER = "#fef3c7"  # card hover colour
 
         def _build_card(nid, date_s, time_s, title, content):
@@ -643,7 +643,7 @@ class App(ctk.CTk):
             card.pack(side="left", fill="x", expand=True)
 
             # ── Header bar (slightly darker, separated by a line) ────────────
-            hdr = ctk.CTkFrame(card, fg_color=_NOTE_HDR, corner_radius=0)
+            hdr = ctk.CTkFrame(card, fg_color=_NOTE_HDR, corner_radius=12)
             hdr.pack(fill="x")
             title_lbl = mk_label(hdr, title, size=13, weight="bold", color=TEXT)
             title_lbl.pack(anchor="w", padx=12, pady=(5, 5))
