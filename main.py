@@ -963,8 +963,13 @@ class App(ctk.CTk):
             m, s = divmod(max(0, int(remaining)), 60)
             # last 10 s: pulse between DARK and a warm amber for drama
             if remaining <= 10:
-                pulse = 0.5 + 0.5 * math.sin(elapsed * math.pi * 4)  # ~2 Hz
-                col = "#ff6600" if pulse > 0.5 else DARK
+                t = 0.5 + 0.5 * math.sin(elapsed * math.pi * 2)  # 0→1, ~1 Hz smooth
+                r1, g1, b1 = 0x1a, 0x12, 0x00   # DARK
+                r2, g2, b2 = 0x86, 0xef, 0xac   # pastel green
+                rc = int(r1 + (r2 - r1) * t)
+                gc = int(g1 + (g2 - g1) * t)
+                bc = int(b1 + (b2 - b1) * t)
+                col = f"#{rc:02x}{gc:02x}{bc:02x}"
                 self.ring.update_ring(frac, f"{m:02d}:{s:02d}",
                                       arc_color=col, dot_color=col)
             else:
