@@ -568,7 +568,7 @@ class App(ctk.CTk):
             if not self._dragging:
                 return
             self._dragging = False
-            self._pomo_mins = round(_angle_to_mins(e) * 2) / 2  # snap to 30s
+            self._pomo_mins = round(_angle_to_mins(e) * 4) / 4  # snap to 15s
             _update_ring(self._pomo_mins)
             
 
@@ -963,20 +963,15 @@ class App(ctk.CTk):
             m, s = divmod(max(0, int(remaining)), 60)
             # last 10 s: pulse between DARK and a warm amber for drama
             if remaining <= 10:
-                pulse = 0.5 + 0.5 * math.sin(elapsed * math.pi * 2)  # ~1 Hz
-                r1, g1, b1 = 0x1a, 0x12, 0x00   # DARK
-                r2, g2, b2 = 0xc8, 0x78, 0x00   # warm amber
-                rc = int(r1 + (r2 - r1) * pulse)
-                gc = int(g1 + (g2 - g1) * pulse)
-                bc = int(b1 + (b2 - b1) * pulse)
-                col = f"#{rc:02x}{gc:02x}{bc:02x}"
+                pulse = 0.5 + 0.5 * math.sin(elapsed * math.pi * 4)  # ~2 Hz
+                col = "#ff6600" if pulse > 0.5 else DARK
                 self.ring.update_ring(frac, f"{m:02d}:{s:02d}",
                                       arc_color=col, dot_color=col)
             else:
                 self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
             self.after(50, self._tick_pomodoro)
         else:
-            self.ring.update_ring(0.0, "00:00", "Fertig! 🎉")
+            self.ring.update_ring(0.0, "00:00")
             self.running = False
             self._btns_idle()
             threading.Thread(target=play_sound, daemon=True).start()
