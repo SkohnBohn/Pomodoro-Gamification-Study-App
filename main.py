@@ -27,7 +27,7 @@ from data_manager import (
     get_first_session_date,
 )
 from utils import calculate_level, format_hours
-from audio_manager import play_sound
+from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("light")
@@ -861,6 +861,7 @@ class App(ctk.CTk):
             self.intention_entry.delete(0, "end")
             self._refresh_sidebar()
             if new_lvl > old_lvl:
+                play_main_levelup()
                 self._levelup_dialog(new_lvl)
 
         res.bind("<Return>", lambda _: _save())
@@ -1025,6 +1026,7 @@ class App(ctk.CTk):
 
             if has_uncollected:
                 def _collect(sk=skill, lv=next_collect, card=c):
+                    play_skill_levelup()
                     self._animate_collect(card)
                     confirm_skill_level(sk, lv)
                     self.after(600, self._refresh_skills)
@@ -1193,6 +1195,7 @@ class App(ctk.CTk):
 
             if has_uncollected:
                 def _collect_stat(k=key, lv=next_collect, n=name, card=c):
+                    play_stat_levelup()
                     confirm_stat_level(k, lv)
                     self._animate_collect(card)
                     self.after(600, self._refresh_achievements)
