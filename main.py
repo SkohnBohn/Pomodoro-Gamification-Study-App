@@ -527,36 +527,20 @@ class App(ctk.CTk):
         self._pomo_mins     = 25.0
         self._pomo_max_mins = 90.0
         self._dragging      = False
-        self._dial_lock_max = False  # locked at ceiling
-        self._dial_lock_min = False  # locked at floor
-
-        _LOCK_DEG = 30  # degrees from boundary before unlocking
-
-        def _raw_angle(e):
-            cx = cy = RingTimer.SIZE // 2
-            return math.degrees(math.atan2(e.x - cx, cy - e.y)) % 360
 
         def _angle_to_mins(e):
-            a = _raw_angle(e)
-            # unlock logic: only release lock when cursor is clearly away from boundary
-            if self._dial_lock_max:
-                if _LOCK_DEG < a < 360 - _LOCK_DEG:
-                    self._dial_lock_max = False
-                else:
-                    return self._pomo_max_mins
-            if self._dial_lock_min:
-                if _LOCK_DEG < a < 360 - _LOCK_DEG:
-                    self._dial_lock_min = False
-                else:
-                    return 0.5
+            # 12 o'clock = 0 min, clockwise; full circle = _pomo_max_mins
+            cx = cy = RingTimer.SIZE // 2
+            a    = math.degrees(math.atan2(e.x - cx, cy - e.y)) % 360
             mins = a / 360.0 * self._pomo_max_mins
-            if mins >= self._pomo_max_mins:
-                self._dial_lock_max = True
+            # clamp at max: if already near max and angle wraps near 0, hold at max
+            thresh = self._pomo_max_mins * 0.12
+            if self._pomo_mins >= self._pomo_max_mins - thresh and mins < thresh:
                 return self._pomo_max_mins
-            if mins <= 0.5:
-                self._dial_lock_min = True
+            # clamp at min: if already near 0 and angle wraps near max, hold at min
+            if self._pomo_mins <= thresh and mins > self._pomo_max_mins - thresh:
                 return 0.5
-            return mins
+            return max(0.5, min(self._pomo_max_mins, mins))
 
         def _update_ring(mins):
             total_s = int(mins * 60)
@@ -567,8 +551,6 @@ class App(ctk.CTk):
             if self.timer_mode != "Pomodoro" or self.running:
                 return
             self._dragging = True
-            self._dial_lock_max = False
-            self._dial_lock_min = False
             self._pomo_mins = _angle_to_mins(e)
             _update_ring(self._pomo_mins)
             
