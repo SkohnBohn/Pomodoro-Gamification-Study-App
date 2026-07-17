@@ -402,8 +402,8 @@ class App(ctk.CTk):
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
         self._mode_state = "Pomodoro"
-        toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=17, height=30,
-                              width=148)
+        toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=20, height=36,
+                              width=180)
         toggle.pack(pady=(16, 0))
         toggle.pack_propagate(False)
 
@@ -420,7 +420,7 @@ class App(ctk.CTk):
                 self._mode_state = mode
                 self._on_mode_change(mode)
             return ctk.CTkButton(
-                toggle, text=text, width=70, height=30, corner_radius=15,
+                toggle, text=text, width=86, height=36, corner_radius=18,
                 fg_color=DARK if mode == "Pomodoro" else "transparent",
                 hover_color=DARK2,
                 text_color=BG if mode == "Pomodoro" else MUTED,
@@ -688,8 +688,8 @@ class App(ctk.CTk):
 
         scroll = ctk.CTkScrollableFrame(
             dlg, fg_color="transparent",
-            scrollbar_button_color=PANEL,
-            scrollbar_button_hover_color=PANEL,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
             scrollbar_fg_color=PANEL,
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
@@ -1009,8 +1009,8 @@ class App(ctk.CTk):
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._sk_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
-            scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=DARK,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
         )
         self._sk_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
@@ -1135,8 +1135,8 @@ class App(ctk.CTk):
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._ach_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
-            scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=DARK,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
         )
         self._ach_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
@@ -1552,8 +1552,8 @@ class App(ctk.CTk):
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._stats_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
-            scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=DARK,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
         )
         self._stats_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
@@ -1763,8 +1763,8 @@ class App(ctk.CTk):
 
         self._lb_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
-            scrollbar_button_color=BORDER,
-            scrollbar_button_hover_color=DARK,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
         )
         self._lb_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         return view
