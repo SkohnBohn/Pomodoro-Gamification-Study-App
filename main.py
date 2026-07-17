@@ -397,12 +397,12 @@ class App(ctk.CTk):
     # ── Settings popup ────────────────────────────────────────────────────────
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Einstellungen")
+        dlg.title("Settings")
         dlg.geometry("280x510")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, "Einstellungen", size=14, weight="bold",
+        mk_label(dlg, "Settings", size=14, weight="bold",
                  color=DARK).pack(padx=20, pady=(18, 14), anchor="w")
 
         # ── Max pomo duration ──────────────────────────────────────────────────
@@ -488,7 +488,7 @@ class App(ctk.CTk):
         custom_entry.bind("<Return>", _apply_custom)
 
         # ── Timer direction ────────────────────────────────────────────────────
-        mk_label(dlg, "Timer Richtung", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+        mk_label(dlg, "Timer Direction", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
 
         dir_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
         dir_pill.pack(pady=(6, 0))
@@ -502,7 +502,7 @@ class App(ctk.CTk):
                                text_color=BG  if not fills else MUTED)
 
         fill_btn = ctk.CTkButton(
-            dir_pill, text="Füllen", width=86, height=32, corner_radius=12,
+            dir_pill, text="Fill", width=86, height=32, corner_radius=12,
             fg_color=DARK if self._timer_fills else "transparent",
             hover_color=DARK2,
             text_color=BG if self._timer_fills else MUTED,
@@ -512,7 +512,7 @@ class App(ctk.CTk):
         fill_btn.pack(side="left", padx=(2, 0), pady=2)
 
         emp_btn = ctk.CTkButton(
-            dir_pill, text="Leeren", width=86, height=32, corner_radius=12,
+            dir_pill, text="Empty", width=86, height=32, corner_radius=12,
             fg_color=DARK if not self._timer_fills else "transparent",
             hover_color=DARK2,
             text_color=BG if not self._timer_fills else MUTED,
@@ -522,14 +522,14 @@ class App(ctk.CTk):
         emp_btn.pack(side="left", padx=(0, 2), pady=2)
 
         # ── Theme ─────────────────────────────────────────────────────────────
-        mk_label(dlg, "Design", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+        mk_label(dlg, "Theme", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
 
         theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
         theme_pill.pack(pady=(6, 0))
         theme_pill.pack_propagate(False)
 
         yellow_btn = ctk.CTkButton(
-            theme_pill, text="☀ Gelb", width=86, height=32, corner_radius=12,
+            theme_pill, text="Yellow", width=86, height=32, corner_radius=12,
             fg_color=DARK if self._theme == "yellow" else "transparent",
             hover_color=DARK2,
             text_color=BG if self._theme == "yellow" else MUTED,
@@ -539,7 +539,7 @@ class App(ctk.CTk):
         yellow_btn.pack(side="left", padx=(2, 0), pady=2)
 
         light_btn = ctk.CTkButton(
-            theme_pill, text="☁ Hell", width=86, height=32, corner_radius=12,
+            theme_pill, text="White", width=86, height=32, corner_radius=12,
             fg_color=DARK if self._theme == "light" else "transparent",
             hover_color=DARK2,
             text_color=BG if self._theme == "light" else MUTED,
@@ -548,7 +548,7 @@ class App(ctk.CTk):
         )
         light_btn.pack(side="left", padx=(0, 2), pady=2)
 
-        mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
+        mk_btn(dlg, "Open Log", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20, pady=(16, 0))
 
 
