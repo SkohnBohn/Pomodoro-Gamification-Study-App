@@ -117,7 +117,7 @@ class RingTimer(tk.Canvas):
         )
         self._draw(1.0, "00:00", "")
 
-    DOT_COLOR = "#c9920a"  # warm amber, clearly visible on yellow
+    DOT_COLOR = "#9a9690"  # medium grey, lighter than arc but neutral
 
     def update_ring(self, fraction: float, time_str: str, sub: str = "",
                     arc_color: str = DARK, dot_color: str | None = None):
