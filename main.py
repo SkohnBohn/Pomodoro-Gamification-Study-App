@@ -277,7 +277,7 @@ class App(ctk.CTk):
         hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
-        icon_btn(hdr, "⚙", self._show_settings, size=15).pack(side="right")
+        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right")
 
         self._nav_btns: dict = {}
         for text, key in [
