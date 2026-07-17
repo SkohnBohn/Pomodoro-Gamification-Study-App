@@ -678,13 +678,11 @@ class App(ctk.CTk):
                 mk_btn(rd, "OK", _ok, primary=True, height=34).pack(
                     fill="x", padx=20)
 
-            ctk.CTkButton(
-                top, text="✎", command=_rename,
-                width=22, height=22, corner_radius=11,
-                fg_color=BORDER, hover_color=DARK2,
-                text_color=DARK, border_width=0,
-                font=ctk.CTkFont(size=11),
-            ).pack(side="right", padx=(4, 0))
+            o_lbl = mk_label(top, "○", size=14, color=MUTED)
+            o_lbl.pack(side="right", padx=(6, 0))
+            o_lbl.bind("<Button-1>", lambda _, r=_rename: r())
+            o_lbl.bind("<Enter>", lambda _, l=o_lbl: l.configure(text_color=DARK))
+            o_lbl.bind("<Leave>", lambda _, l=o_lbl: l.configure(text_color=MUTED))
 
             # ── Content preview ──────────────────────────────────────────────
             lines   = content.splitlines()
