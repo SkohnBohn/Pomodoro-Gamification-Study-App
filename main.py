@@ -402,7 +402,8 @@ class App(ctk.CTk):
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
         self._mode_state = "Pomodoro"
-        toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=20, height=28)
+        toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=14, height=24,
+                              width=120)
         toggle.pack(pady=(16, 0))
         toggle.pack_propagate(False)
 
@@ -419,11 +420,11 @@ class App(ctk.CTk):
                 self._mode_state = mode
                 self._on_mode_change(mode)
             return ctk.CTkButton(
-                toggle, text=text, height=28, corner_radius=20,
+                toggle, text=text, width=58, height=24, corner_radius=12,
                 fg_color=DARK if mode == "Pomodoro" else "transparent",
                 hover_color=DARK2,
                 text_color=BG if mode == "Pomodoro" else MUTED,
-                font=ctk.CTkFont(size=11, weight="bold"),
+                font=ctk.CTkFont(size=10, weight="bold"),
                 border_width=0, command=_click,
             )
 
