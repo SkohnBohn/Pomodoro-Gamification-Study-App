@@ -396,7 +396,6 @@ class App(ctk.CTk):
 
         hdr = ctk.CTkFrame(view, fg_color="transparent")
         hdr.pack(fill="x", padx=28, pady=(22, 0))
-        mk_label(hdr, "Timer", size=22, weight="bold", color=DARK).pack(side="left")
         self.mode_seg = seg_btn(hdr, ["Pomodoro", "Open Timer"],
                                 command=self._on_mode_change)
         self.mode_seg.set("Pomodoro")
@@ -976,8 +975,6 @@ class App(ctk.CTk):
     # ── Skills View ───────────────────────────────────────────────────────────
     def _build_skills_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Skilltree", size=22, weight="bold",
-                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._sk_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
@@ -1104,8 +1101,6 @@ class App(ctk.CTk):
     # ── Stats View (was Achievements) ─────────────────────────────────────────
     def _build_achievements_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Achievements", size=22, weight="bold",
-                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._ach_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
@@ -1523,8 +1518,6 @@ class App(ctk.CTk):
     # ── Stats View ────────────────────────────────────────────────────────────
     def _build_stats_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Stats", size=22, weight="bold",
-                 color=DARK).pack(anchor="w", padx=28, pady=(24, 14))
         self._stats_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
             scrollbar_button_color=BORDER,
@@ -1692,8 +1685,6 @@ class App(ctk.CTk):
     # ── Leaderboard View ──────────────────────────────────────────────────────
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        mk_label(view, "Leaderboard", size=22, weight="bold",
-                 color=DARK).pack(anchor="w", padx=28, pady=(24, 12))
 
         f = ctk.CTkFrame(view, fg_color="transparent")
         f.pack(padx=28, pady=(0, 8), fill="x")
