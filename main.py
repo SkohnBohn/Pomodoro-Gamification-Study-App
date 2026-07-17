@@ -376,7 +376,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("280x290")
+        dlg.geometry("280x400")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -462,6 +462,40 @@ class App(ctk.CTk):
         )
         confirm_btn.pack(side="left")
         custom_entry.bind("<Return>", _apply_custom)
+
+        # ── Timer direction ────────────────────────────────────────────────────
+        mk_label(dlg, "Timer Richtung", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+
+        dir_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
+        dir_pill.pack(pady=(6, 0))
+        dir_pill.pack_propagate(False)
+
+        def _set_dir(fills: bool):
+            self._timer_fills = fills
+            fill_btn.configure(fg_color=DARK if fills  else "transparent",
+                               text_color=BG  if fills  else MUTED)
+            emp_btn.configure( fg_color=DARK if not fills else "transparent",
+                               text_color=BG  if not fills else MUTED)
+
+        fill_btn = ctk.CTkButton(
+            dir_pill, text="Füllen", width=86, height=32, corner_radius=12,
+            fg_color=DARK if self._timer_fills else "transparent",
+            hover_color=DARK2,
+            text_color=BG if self._timer_fills else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: _set_dir(True),
+        )
+        fill_btn.pack(side="left", padx=(2, 0), pady=2)
+
+        emp_btn = ctk.CTkButton(
+            dir_pill, text="Leeren", width=86, height=32, corner_radius=12,
+            fg_color=DARK if not self._timer_fills else "transparent",
+            hover_color=DARK2,
+            text_color=BG if not self._timer_fills else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: _set_dir(False),
+        )
+        emp_btn.pack(side="left", padx=(0, 2), pady=2)
 
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20, pady=(16, 0))
@@ -662,6 +696,7 @@ class App(ctk.CTk):
 
         self._pomo_mins     = 25.0
         self._pomo_max_mins = 90.0
+        self._timer_fills   = False  # False = countdown (full→empty), True = fill (empty→full)
         self._dragging      = False
 
         def _angle_to_mins(e):
@@ -1092,7 +1127,8 @@ class App(ctk.CTk):
         elapsed   = _time.monotonic() - self._pomo_start_t - self._pomo_pause_t
         remaining = self.total_seconds - elapsed
         if remaining > 0:
-            frac = remaining / self.total_seconds  # full → empty
+            elapsed_frac = elapsed / self.total_seconds
+            frac = elapsed_frac if self._timer_fills else (remaining / self.total_seconds)
             m, s = divmod(max(0, int(remaining)), 60)
             # last 10 s: pulse between DARK and a warm amber for drama
             if remaining <= 10:
