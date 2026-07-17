@@ -1722,12 +1722,12 @@ class App(ctk.CTk):
         f.pack(padx=28, pady=(22, 8), fill="x")
         self._lb_period_val = "All Time"
         _lb_periods = ["Today", "This Week", "This Month", "This Year", "All Time"]
-        _lb_btn_w = 72
+        _lb_btn_w = 90
         _lb_pill = ctk.CTkFrame(
-            f, fg_color=BORDER, corner_radius=14,
-            height=24, width=len(_lb_periods) * _lb_btn_w + 4,
+            f, fg_color=BORDER, corner_radius=17,
+            height=30, width=len(_lb_periods) * _lb_btn_w + 4,
         )
-        _lb_pill.pack(side="left")
+        _lb_pill.pack(anchor="center")
         _lb_pill.pack_propagate(False)
         self._lb_btns = {}
         def _lb_select(period):
@@ -1742,11 +1742,11 @@ class App(ctk.CTk):
             active = p == "All Time"
             px = (2, 0) if i == 0 else (0, 2) if i == len(_lb_periods) - 1 else (0, 0)
             b = ctk.CTkButton(
-                _lb_pill, text=p, width=_lb_btn_w, height=24, corner_radius=12,
+                _lb_pill, text=p, width=_lb_btn_w, height=30, corner_radius=15,
                 fg_color=DARK if active else "transparent",
                 hover_color=DARK2,
                 text_color=BG if active else MUTED,
-                font=ctk.CTkFont(size=10, weight="bold"),
+                font=ctk.CTkFont(size=11, weight="bold"),
                 border_width=0,
                 command=lambda p=p: _lb_select(p),
             )
