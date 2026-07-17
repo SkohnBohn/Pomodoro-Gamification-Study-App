@@ -572,7 +572,8 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=15, weight="bold"),
             command=_save_close, cursor="arrow",
         )
-        save_btn.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)
+        dlg.update_idletasks()
+        dlg.after(50, lambda: save_btn.place(in_=dlg, relx=1.0, rely=1.0, anchor="se", x=-10, y=-8))
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
