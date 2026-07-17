@@ -1160,7 +1160,7 @@ class App(ctk.CTk):
                     self._ach_badge_imgs.append(ci)
 
                     def _on_badge(badge_i=i):
-                        date_s, cum_h = get_badge_unlock_info(badge_i)
+                        date_s, _ = get_badge_unlock_info(badge_i)
                         d = ctk.CTkToplevel(self)
                         d.title(f"Badge {badge_i}")
                         d.geometry("320x210")
@@ -1169,11 +1169,20 @@ class App(ctk.CTk):
                         d.lift()
                         mk_label(d, f"Badge LVL {badge_i}", size=18,
                                  weight="bold", color=DARK).pack(pady=(28, 6))
-                        date_text = (f"Freigeschaltet am {date_s}"
-                                     if date_s else "Datum unbekannt")
-                        mk_label(d, date_text, size=13, color=MUTED).pack()
-                        if badge_i > 0 and cum_h > 0:
-                            mk_label(d, f"nach {cum_h:.1f} h gesamt",
+                        if date_s and date_s != "Von Anfang an":
+                            try:
+                                from datetime import datetime as _dt
+                                fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d.%m.%y")
+                            except Exception:
+                                fmt = date_s
+                            mk_label(d, f"Freigeschaltet am {fmt}",
+                                     size=13, color=MUTED).pack()
+                        else:
+                            mk_label(d, date_s or "Datum unbekannt",
+                                     size=13, color=MUTED).pack()
+                        if badge_i > 0 and badge_i <= len(LEVEL_THRESHOLDS):
+                            threshold_h = LEVEL_THRESHOLDS[badge_i - 1]
+                            mk_label(d, f"nach {threshold_h} h gesamt",
                                      size=12, color=MUTED).pack(pady=(2, 0))
                         mk_btn(d, "Schließen", d.destroy,
                                width=130, height=36, primary=True).pack(pady=18)
