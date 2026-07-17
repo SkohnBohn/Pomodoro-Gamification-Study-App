@@ -613,11 +613,6 @@ class App(ctk.CTk):
         dlg.resizable(False, True)
         dlg.bind("<Escape>", lambda _: dlg.destroy())
 
-        # Header
-        hdr = ctk.CTkFrame(dlg, fg_color="transparent")
-        hdr.pack(fill="x", padx=22, pady=(20, 6))
-        mk_label(hdr, "Notizen", size=17, weight="bold", color=DARK).pack(side="left")
-
         notes = get_notes(limit=200)
 
         if not notes:
@@ -695,14 +690,12 @@ class App(ctk.CTk):
             o_lbl.bind("<Enter>", lambda _, l=o_lbl: l.configure(text_color=DARK))
             o_lbl.bind("<Leave>", lambda _, l=o_lbl: l.configure(text_color=MUTED))
 
-            x_lbl = mk_label(side, "✕", size=12, color=DANGER)
+            x_lbl = mk_label(side, "✕", size=12, color=MUTED)
             x_lbl.pack(pady=(0, 10))
             x_lbl.bind("<Button-1>", lambda _, o=outer, i=nid: (
                 delete_note(i), o.destroy()))
-            x_lbl.bind("<Enter>", lambda _, l=x_lbl: l.configure(
-                text_color="#7f1d1d"))
-            x_lbl.bind("<Leave>", lambda _, l=x_lbl: l.configure(
-                text_color=DANGER))
+            x_lbl.bind("<Enter>", lambda _, l=x_lbl: l.configure(text_color=DARK))
+            x_lbl.bind("<Leave>", lambda _, l=x_lbl: l.configure(text_color=MUTED))
 
             def _load(c=content):
                 self.notes_box.delete("1.0", "end")
