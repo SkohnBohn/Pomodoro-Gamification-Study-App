@@ -578,7 +578,7 @@ class App(ctk.CTk):
         self._brow.pack(pady=(16, 28))
 
         self.start_btn = ctk.CTkButton(
-            self._brow, text="▶", width=120, height=56, corner_radius=16,
+            self._brow, text="▶", width=100, height=56, corner_radius=16,
             fg_color=DARK, hover_color=DARK2, text_color=BG,
             border_width=0, font=ctk.CTkFont(size=32, weight="bold"),
             command=self._on_start,
@@ -984,13 +984,15 @@ class App(ctk.CTk):
         self.start_btn.configure(state="disabled", fg_color=CARD, text_color=DIM,
                                   border_color=BORDER, border_width=1)
         self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸")
-        self.stop_btn.configure(state="normal")
+        self.stop_btn.configure(state="normal", fg_color=DARK, text_color=BG,
+                                border_color=DARK, border_width=0)
 
     def _btns_idle(self):
         self.start_btn.configure(state="normal", fg_color=DARK, text_color=BG,
                                   border_width=0)
         self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸")
-        self.stop_btn.configure(state="disabled")
+        self.stop_btn.configure(state="disabled", fg_color=CARD, text_color=DANGER,
+                                border_color=BORDER, border_width=1)
 
     def _reset_timer(self):
         self.running = False
