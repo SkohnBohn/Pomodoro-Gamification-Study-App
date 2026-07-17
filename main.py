@@ -768,6 +768,14 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(8, 8))
 
+        # Lap multiplier badge (shown in open mode when elapsed > 1 revolution)
+        self._lap_lbl = ctk.CTkLabel(
+            self.ring, text="", width=34, height=22,
+            corner_radius=8, fg_color=DARK, text_color=BG,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        # placed at top-right of the ring canvas; shown/hidden dynamically
+
         self._pomo_mins     = 25.0
         self._pomo_max_mins = 90.0
         self._timer_fills   = False  # False = countdown (full→empty), True = fill (empty→full)
@@ -1240,8 +1248,17 @@ class App(ctk.CTk):
         h, m = divmod(m, 60)
         ts = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
         max_s = self._pomo_max_mins * 60
-        frac  = min(elapsed / max_s, 1.0) if self._timer_fills else max(0.0, 1.0 - elapsed / max_s)
+        laps  = int(elapsed / max_s)
+        pos   = (elapsed % max_s) / max_s  # position within current lap 0→1
+        frac  = pos if self._timer_fills else (1.0 - pos)
         self.ring.update_ring(frac, ts)
+        # Lap badge
+        if laps >= 1:
+            self._lap_lbl.configure(text=f"×{laps + 1}")
+            rs = RingTimer.SIZE
+            self._lap_lbl.place(x=rs - 38, y=6)
+        else:
+            self._lap_lbl.place_forget()
         self.after(50, self._tick_open)
 
     def _btns_running(self):
@@ -1267,6 +1284,7 @@ class App(ctk.CTk):
             self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
         else:
             self.ring.update_ring(0, "00:00")
+            self._lap_lbl.place_forget()
         self._btns_idle()
 
     # ── Result dialog ─────────────────────────────────────────────────────────
