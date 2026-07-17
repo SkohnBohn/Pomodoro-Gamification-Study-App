@@ -636,29 +636,24 @@ class App(ctk.CTk):
             outer = ctk.CTkFrame(scroll, fg_color="transparent")
             outer.pack(fill="x", pady=4, padx=2)
 
+            # Card bg = header colour; content sits in a lighter inset frame
             card = ctk.CTkFrame(
-                outer, fg_color=CARD, corner_radius=14,
+                outer, fg_color=_NOTE_HDR, corner_radius=14,
                 border_width=1, border_color=BORDER,
             )
             card.pack(side="left", fill="x", expand=True)
 
-            # ── Header bar (slightly darker, separated by a line) ────────────
-            hdr = ctk.CTkFrame(card, fg_color=_NOTE_HDR, corner_radius=12)
-            hdr.pack(fill="x")
-            title_lbl = mk_label(hdr, title, size=13, weight="bold", color=TEXT)
-            title_lbl.pack(anchor="w", padx=12, pady=(5, 5))
+            # ── Title (sits on card's header bg) ─────────────────────────────
+            title_lbl = mk_label(card, title, size=13, weight="bold", color=TEXT)
+            title_lbl.pack(anchor="w", padx=12, pady=(7, 6))
 
-            # Separator line
-            ctk.CTkFrame(card, height=1, fg_color=BORDER,
-                         corner_radius=0).pack(fill="x")
-
-            # ── Content preview ──────────────────────────────────────────────
-            body = ctk.CTkFrame(card, fg_color="transparent")
-            body.pack(fill="x", padx=12, pady=(8, 12))
+            # ── Content inset (lighter, rounded) ─────────────────────────────
+            body = ctk.CTkFrame(card, fg_color=CARD, corner_radius=10)
+            body.pack(fill="x", padx=6, pady=(0, 6))
             lines   = content.splitlines()
             preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
             prev_lbl = mk_label(body, preview, size=12, color=DIM, wraplength=340)
-            prev_lbl.pack(anchor="w")
+            prev_lbl.pack(anchor="w", padx=10, pady=8)
 
             # ── Side buttons (outside the card, to the right) ────────────────
             side = ctk.CTkFrame(outer, fg_color="transparent")
