@@ -175,19 +175,23 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
 _ARROW_FG       = "#1e1c18"
 _ARROW_FG_HOVER = "#5c4300"
 
-def _arrow_btn(parent, direction: str, command, bg: str = PANEL) -> tk.Canvas:
+def _arrow_btn(parent, direction: str, command,
+               bg: str = PANEL, w: int = 32, h: int = 26) -> tk.Canvas:
     """Minimalist 2-stroke arrow button. direction: 'down'=save, 'up'=load."""
-    W, H = 32, 26
-    c = tk.Canvas(parent, width=W, height=H,
+    c = tk.Canvas(parent, width=w, height=h,
                   bg=bg, highlightthickness=0, cursor="hand2")
-    cx, kw = W // 2, dict(fill=_ARROW_FG, width=2,
-                           capstyle="round", joinstyle="round")
+    cx  = w // 2
+    sx  = w / 32
+    sy  = h / 26
+    ow  = max(3, int(6 * sx))
+    kw  = dict(fill=_ARROW_FG, width=max(1, int(2 * min(sx, sy))),
+               capstyle="round", joinstyle="round")
     if direction == "down":
-        c.create_line(cx, 5, cx, 16, **kw)                     # stem
-        c.create_line(cx - 6, 12, cx, 20, cx + 6, 12, **kw)   # chevron \/
+        c.create_line(cx, int(5*sy), cx, int(16*sy), **kw)
+        c.create_line(cx-ow, int(12*sy), cx, int(20*sy), cx+ow, int(12*sy), **kw)
     else:
-        c.create_line(cx - 6, 14, cx, 6, cx + 6, 14, **kw)    # chevron /\
-        c.create_line(cx, 10, cx, 21, **kw)                    # stem
+        c.create_line(cx-ow, int(14*sy), cx, int(6*sy), cx+ow, int(14*sy), **kw)
+        c.create_line(cx, int(10*sy), cx, int(21*sy), **kw)
 
     def _recolor(col):
         c.itemconfigure("all", fill=col)
@@ -628,7 +632,7 @@ class App(ctk.CTk):
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
-        _NOTE_HDR  = "#f9e070"   # very slightly darker than CARD for header bar
+        _NOTE_HDR  = "#f6d955"   # slightly darker than CARD for header bar
         _NOTE_HOVER = "#fef3c7"  # card hover colour
 
         def _build_card(nid, date_s, time_s, title, content):
@@ -704,7 +708,7 @@ class App(ctk.CTk):
                 self.notes_box.insert("1.0", c)
                 dlg.destroy()
 
-            _arrow_btn(side, "up", _load, bg=PANEL).pack()
+            _arrow_btn(side, "up", _load, bg=PANEL, w=18, h=16).pack()
 
         for nid, date_s, time_s, title, content in notes:
             _build_card(nid, date_s, time_s, title, content)
