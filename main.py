@@ -654,7 +654,8 @@ class App(ctk.CTk):
                 side="right", padx=(8, 0), pady=(2, 0))
 
             # ── Content preview ──────────────────────────────────────────────
-            preview = content[:110] + ("…" if len(content) > 110 else "")
+            lines   = content.splitlines()
+            preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
             mk_label(body, preview, size=12, color=DIM, wraplength=390).pack(
                 anchor="w", pady=(6, 10))
 
