@@ -132,14 +132,13 @@ class RingTimer(tk.Canvas):
         self._arc(pad, w, BORDER, 359.99)
         if fraction > 0.001:
             self._arc(pad, w, arc_color, fraction * 359.99)
-        if 0.001 < fraction < 0.999:
-            angle = math.radians(90 - fraction * 360)
-            r = (self.SIZE - pad * 2) / 2
-            dx = cx + r * math.cos(angle)
-            dy = cy - r * math.sin(angle)
-            self.create_oval(dx - w // 2, dy - w // 2,
-                             dx + w // 2, dy + w // 2,
-                             fill=dot_color, outline="")
+        angle = math.radians(90 - fraction * 360)
+        r = (self.SIZE - pad * 2) / 2
+        dx = cx + r * math.cos(angle)
+        dy = cy - r * math.sin(angle)
+        self.create_oval(dx - w // 2, dy - w // 2,
+                         dx + w // 2, dy + w // 2,
+                         fill=dot_color, outline="")
         self.create_text(cx, cy - (14 if sub else 0),
                          text=time_str, fill=TEXT,
                          font=("Helvetica", 42, "bold"))
