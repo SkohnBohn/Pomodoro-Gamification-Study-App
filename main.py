@@ -45,21 +45,30 @@ TEXT    = "#1a1200"
 SUCCESS = "#14532d"
 DANGER  = "#991b1b"
 
+# (bg, border, text)  — one entry per level 0-15
 _SKILL_CARD_PALETTE = [
-    (PANEL,     BORDER),
-    ("#fef3c7", "#d97706"),
-    ("#fde68a", "#b45309"),
-    ("#fbbf24", "#92400e"),
-    ("#f59e0b", "#78350f"),
+    ("#fffbeb", "#d4b85a", DARK),   # 0  — Creme
+    ("#fef9c3", "#ca8a04", DARK),   # 1
+    ("#fef3c7", "#d97706", DARK),   # 2
+    ("#fde68a", "#d97706", DARK),   # 3  — Gelb
+    ("#fcd34d", "#b45309", DARK),   # 4
+    ("#fbbf24", "#92400e", DARK),   # 5
+    ("#fb923c", "#78350f", DARK),   # 6  — Orange
+    ("#f97316", "#7c2d12", DARK),   # 7
+    ("#ea580c", "#7c2d12", DARK),   # 8
+    ("#fb7185", "#9f1239", DARK),   # 9  — Rosa/Lachs
+    ("#f43f5e", "#881337", "#fff8e7"),  # 10
+    ("#e11d48", "#6f0020", "#fff8e7"),  # 11
+    ("#be123c", "#500018", "#fff8e7"),  # 12 — Ruby
+    ("#9f1239", "#3d0010", "#fff8e7"),  # 13
+    ("#7f1d1d", "#2d0009", "#fff8e7"),  # 14
+    ("#5c0a1c", "#1a0007", "#fff8e7"),  # 15 — Prestige
 ]
 
 
 def _skill_card_color(lvl: int):
-    if lvl == 0: return _SKILL_CARD_PALETTE[0]
-    if lvl <= 2: return _SKILL_CARD_PALETTE[1]
-    if lvl <= 5: return _SKILL_CARD_PALETTE[2]
-    if lvl <= 9: return _SKILL_CARD_PALETTE[3]
-    return _SKILL_CARD_PALETTE[4]
+    idx = max(0, min(lvl, len(_SKILL_CARD_PALETTE) - 1))
+    return _SKILL_CARD_PALETTE[idx]
 
 
 def _heatmap_color(minutes: float) -> str:
@@ -998,7 +1007,7 @@ class App(ctk.CTk):
             next_collect = conf_lvl + 1
             has_uncollected = lvl >= next_collect and not at_cap
 
-            card_bg, card_border = _skill_card_color(conf_lvl)
+            card_bg, card_border, card_text = _skill_card_color(conf_lvl)
             c = mk_card(self._sk_scroll, bg=card_bg, border=card_border)
             c.pack(fill="x", pady=5, padx=6)
             inner = ctk.CTkFrame(c, fg_color="transparent")
@@ -1007,22 +1016,21 @@ class App(ctk.CTk):
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
             mk_label(top, f"{emoji}  {skill}", size=15, weight="bold",
-                     color=TEXT).pack(side="left")
+                     color=card_text).pack(side="left")
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl}"
-            lvl_col   = MUTED if (not has_uncollected or at_cap) else DARK
             mk_label(top, cap_label, size=14, weight="bold",
-                     color=lvl_col).pack(side="right")
+                     color=card_text).pack(side="right")
 
-            bar = progress_bar(inner, color=DARK if not at_cap else MUTED)
+            bar = progress_bar(inner, color=card_text)
             bar.pack(fill="x", pady=(8, 4))
             bar.set(1.0 if at_cap else max(0.0, frac))
 
             stat = ctk.CTkFrame(inner, fg_color="transparent")
             stat.pack(fill="x")
-            mk_label(stat, f"{hours:.1f}h", color=MUTED, size=12).pack(side="left")
+            mk_label(stat, f"{hours:.1f}h", color=card_text, size=12).pack(side="left")
             if not at_cap:
                 mk_label(stat, f"→ {next_t}h für LVL {lvl + 1}",
-                         color=MUTED, size=12).pack(side="right")
+                         color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 def _collect(sk=skill, lv=next_collect, card=c):
@@ -1046,21 +1054,17 @@ class App(ctk.CTk):
                  color=MUTED, size=13).pack(pady=2)
 
         # ── Level colour legend ───────────────────────────────────────────────
-        _legend = [
-            (_SKILL_CARD_PALETTE[0][0], "LVL 0"),
-            (_SKILL_CARD_PALETTE[1][0], "LVL 1–2"),
-            (_SKILL_CARD_PALETTE[2][0], "LVL 3–5"),
-            (_SKILL_CARD_PALETTE[3][0], "LVL 6–9"),
-            (_SKILL_CARD_PALETTE[4][0], "LVL 10+"),
-        ]
         leg = ctk.CTkFrame(self._sk_scroll, fg_color="transparent")
-        leg.pack(pady=(10, 4))
-        for col, label in _legend:
-            dot = ctk.CTkFrame(leg, width=12, height=12, corner_radius=6,
+        leg.pack(pady=(12, 6))
+        for i, (col, _, _tc) in enumerate(_SKILL_CARD_PALETTE):
+            cell = ctk.CTkFrame(leg, fg_color="transparent")
+            cell.pack(side="left", padx=2)
+            dot = ctk.CTkFrame(cell, width=14, height=14, corner_radius=7,
                                fg_color=col, border_width=1, border_color=BORDER)
-            dot.pack(side="left", padx=(6, 2))
+            dot.pack()
             dot.pack_propagate(False)
-            mk_label(leg, label, size=11, color=MUTED).pack(side="left", padx=(0, 6))
+            if i in (0, 3, 6, 9, 12, 15):
+                mk_label(cell, str(i), size=9, color=MUTED).pack()
         if last:
             dur_min, sk = last
             emoji = active.get(sk, "")
