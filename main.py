@@ -401,10 +401,43 @@ class App(ctk.CTk):
         left = mk_card(body)
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
-        self.mode_seg = seg_btn(left, ["Pomodoro", "Open Timer"],
-                                command=self._on_mode_change)
-        self.mode_seg.set("Pomodoro")
-        self.mode_seg.pack(pady=(16, 0))
+        self._mode_state = "Pomodoro"
+        toggle = ctk.CTkFrame(left, fg_color=BORDER, corner_radius=20, height=28)
+        toggle.pack(pady=(16, 0))
+        toggle.pack_propagate(False)
+
+        def _mode_btn(text, mode):
+            def _click():
+                self._mode_btn_pomo.configure(
+                    fg_color=DARK if mode == "Pomodoro" else "transparent",
+                    text_color=BG if mode == "Pomodoro" else MUTED,
+                )
+                self._mode_btn_open.configure(
+                    fg_color=DARK if mode == "Open Timer" else "transparent",
+                    text_color=BG if mode == "Open Timer" else MUTED,
+                )
+                self._mode_state = mode
+                self._on_mode_change(mode)
+            return ctk.CTkButton(
+                toggle, text=text, height=28, corner_radius=20,
+                fg_color=DARK if mode == "Pomodoro" else "transparent",
+                hover_color=DARK2,
+                text_color=BG if mode == "Pomodoro" else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                border_width=0, command=_click,
+            )
+
+        self._mode_btn_pomo = _mode_btn("POMO", "Pomodoro")
+        self._mode_btn_open = _mode_btn("OPEN", "Open Timer")
+        self._mode_btn_pomo.pack(side="left", padx=2, pady=2)
+        self._mode_btn_open.pack(side="left", padx=(0, 2), pady=2)
+
+        # keep a dummy .set() / .get() interface so _on_mode_change still works
+        class _FakeSeg:
+            def __init__(self, ref): self._ref = ref
+            def set(self, v): pass
+            def get(self): return self._ref._mode_state
+        self.mode_seg = _FakeSeg(self)
 
         self.ring = RingTimer(left)
         self.ring.pack(pady=(8, 8))
