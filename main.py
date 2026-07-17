@@ -980,7 +980,7 @@ class App(ctk.CTk):
             scrollbar_button_color=BORDER,
             scrollbar_button_hover_color=DARK,
         )
-        self._sk_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self._sk_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
 
     def _refresh_skills(self):
@@ -1106,7 +1106,7 @@ class App(ctk.CTk):
             scrollbar_button_color=BORDER,
             scrollbar_button_hover_color=DARK,
         )
-        self._ach_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self._ach_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
 
     def _refresh_achievements(self):
@@ -1523,7 +1523,7 @@ class App(ctk.CTk):
             scrollbar_button_color=BORDER,
             scrollbar_button_hover_color=DARK,
         )
-        self._stats_scroll.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self._stats_scroll.pack(fill="both", expand=True, padx=18, pady=(22, 18))
         return view
 
     def _refresh_stats(self):
@@ -1687,7 +1687,7 @@ class App(ctk.CTk):
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
         f = ctk.CTkFrame(view, fg_color="transparent")
-        f.pack(padx=28, pady=(0, 8), fill="x")
+        f.pack(padx=28, pady=(22, 8), fill="x")
         self._lb_period = ctk.StringVar(value="All Time")
         seg_btn(
             f,
