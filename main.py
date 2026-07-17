@@ -398,7 +398,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("280x580")
+        dlg.geometry("280x510")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -551,46 +551,28 @@ class App(ctk.CTk):
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20, pady=(16, 0))
 
-        # ── Save & close ──────────────────────────────────────────────────────
+        # ── Close arrow (bottom-right) ────────────────────────────────────────
         def _save_close():
-            # Blink: flash all pill containers bright then back, then slide out
             targets = [pill_container, dir_pill, theme_pill]
             def _blink(step=0):
                 on = step % 2 == 0
-                col = BORDER if on else CARD
                 for t in targets:
-                    try: t.configure(fg_color=col)
+                    try: t.configure(fg_color=BORDER if on else CARD)
                     except Exception: pass
                 if step < 3:
-                    dlg.after(80, lambda: _blink(step + 1))
-                else:
-                    _slide_close()
-
-            def _slide_close(step=0, steps=8):
-                if not dlg.winfo_exists():
-                    return
-                dlg.update_idletasks()
-                if step == 0:
-                    self._dlg_start_y = dlg.winfo_y()
-                    self._dlg_h = dlg.winfo_height()
-                target_y = self._dlg_start_y + self._dlg_h + 30
-                t = step / steps
-                y = int(self._dlg_start_y + (target_y - self._dlg_start_y) * (t ** 2))
-                dlg.geometry(f"+{dlg.winfo_x()}+{y}")
-                if step < steps:
-                    dlg.after(18, lambda: _slide_close(step + 1, steps))
+                    dlg.after(70, lambda: _blink(step + 1))
                 else:
                     dlg.destroy()
-
             _blink()
 
         save_btn = ctk.CTkButton(
-            dlg, text="↓", width=48, height=48, corner_radius=24,
-            fg_color=DARK, hover_color=DARK2, text_color=BG,
-            font=ctk.CTkFont(size=22, weight="bold"), border_width=0,
-            command=_save_close,
+            dlg, text="↓", width=24, height=24,
+            corner_radius=0, fg_color="transparent", hover_color="transparent",
+            text_color=MUTED, border_width=0,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            command=_save_close, cursor="arrow",
         )
-        save_btn.pack(pady=(14, 18))
+        save_btn.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
