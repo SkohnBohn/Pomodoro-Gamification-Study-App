@@ -646,7 +646,7 @@ class App(ctk.CTk):
             hdr = ctk.CTkFrame(card, fg_color=_NOTE_HDR, corner_radius=0)
             hdr.pack(fill="x")
             title_lbl = mk_label(hdr, title, size=13, weight="bold", color=TEXT)
-            title_lbl.pack(anchor="w", padx=12, pady=(9, 9))
+            title_lbl.pack(anchor="w", padx=12, pady=(5, 5))
 
             # Separator line
             ctk.CTkFrame(card, height=1, fg_color=BORDER,
