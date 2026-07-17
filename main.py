@@ -314,8 +314,12 @@ class App(ctk.CTk):
         right_col = ctk.CTkFrame(hero, fg_color="transparent")
         right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
         mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")
-        self._delta_lbl = mk_label(right_col, "", size=12, color="#4ade80")
+        self._delta_lbl = mk_label(right_col, "", size=14, color="#4ade80", weight="bold")
         self._delta_lbl.pack(anchor="w", pady=(2, 0))
+
+        # Trophy overlay (placed dynamically over the sidebar footer)
+        self._trophy_overlay = None
+        self._trophy_after_ids: list = []
 
         # Badge + level row
         mid = ctk.CTkFrame(footer, fg_color="transparent")
@@ -490,25 +494,108 @@ class App(ctk.CTk):
         prev = getattr(self, "_prev_total", total)
         delta = total - prev
         if delta > 0.005 and prev > 0:
-            self._delta_lbl.configure(text=f"+{delta:.2f}h")
-            self.after(2200, lambda: self._delta_lbl.configure(text=""))
-            self._animate_odometer(prev, total, steps=18, delay=40)
+            delta_mins = round(delta * 60)
+            delta_str  = f"+{delta_mins} min" if delta_mins >= 1 else f"+{delta:.2f}h"
+            self._delta_lbl.configure(text=delta_str)
+            self.after(3000, lambda: self._delta_lbl.configure(text=""))
+            self._animate_odometer(prev, total, steps=24, delay=35)
+            self._show_trophy(delta_str)
         else:
             self._total_lbl.configure(text=f"{total:.1f}")
         self._prev_total = total
+
+    def _show_trophy(self, delta_str: str):
+        # Cancel any previous trophy
+        for aid in getattr(self, "_trophy_after_ids", []):
+            try:
+                self.after_cancel(aid)
+            except Exception:
+                pass
+        self._trophy_after_ids = []
+        if self._trophy_overlay:
+            try:
+                self._trophy_overlay.destroy()
+            except Exception:
+                pass
+            self._trophy_overlay = None
+
+        sidebar = self.sidebar
+        sidebar.update_idletasks()
+        sw = sidebar.winfo_width()
+        sh = sidebar.winfo_height()
+
+        # Build overlay on the sidebar
+        ov = tk.Frame(sidebar, bg=DARK, bd=0, highlightthickness=0)
+        # Place it at the bottom, full width, tall enough for big text
+        ov_h = 110
+        ov.place(x=0, y=sh, width=sw, height=ov_h)
+        self._trophy_overlay = ov
+
+        # Inner glow ring (subtle border)
+        inner = tk.Frame(ov, bg="#2a2000", bd=0)
+        inner.place(x=4, y=4, width=sw - 8, height=ov_h - 8)
+
+        # Big delta text
+        big = tk.Label(
+            inner, text=delta_str,
+            font=("", 34, "bold"),
+            fg="#fbbf24", bg="#2a2000",
+            anchor="center",
+        )
+        big.place(relx=0.5, rely=0.38, anchor="center")
+
+        sub = tk.Label(
+            inner, text="gespeichert ✓",
+            font=("", 11),
+            fg="#86efac", bg="#2a2000",
+            anchor="center",
+        )
+        sub.place(relx=0.5, rely=0.74, anchor="center")
+
+        # Slide in from bottom (ease-out)
+        target_y = sh - ov_h - 8
+
+        def _slide_in(step=0, steps=12):
+            t = step / steps
+            t_ease = 1 - (1 - t) ** 3
+            y = sh + (target_y - sh) * t_ease
+            if ov.winfo_exists():
+                ov.place(x=0, y=int(y), width=sw, height=ov_h)
+            if step < steps:
+                aid = self.after(18, lambda: _slide_in(step + 1, steps))
+                self._trophy_after_ids.append(aid)
+            else:
+                # Schedule slide out after hold
+                aid2 = self.after(2600, _slide_out)
+                self._trophy_after_ids.append(aid2)
+
+        def _slide_out(step=0, steps=10):
+            t = step / steps
+            t_ease = t ** 2
+            y = target_y + (sh - target_y) * t_ease
+            if ov.winfo_exists():
+                ov.place(x=0, y=int(y), width=sw, height=ov_h)
+            if step < steps:
+                aid = self.after(22, lambda: _slide_out(step + 1, steps))
+                self._trophy_after_ids.append(aid)
+            else:
+                if ov.winfo_exists():
+                    ov.destroy()
+                self._trophy_overlay = None
+
+        _slide_in()
 
     def _animate_odometer(self, start: float, end: float, steps: int, delay: int, step: int = 0):
         if step > steps:
             self._total_lbl.configure(text=f"{end:.1f}", text_color=DARK)
             return
         t = step / steps
-        # ease-out cubic
         t_ease = 1 - (1 - t) ** 3
         val = start + (end - start) * t_ease
-        # flash hero label bright at start, settle to DARK
-        brightness = max(0, 1 - t * 2)
-        r = int(0x1a + (0xf7 - 0x1a) * brightness)
-        g = int(0x12 + (0xc9 - 0x12) * brightness)
+        # bright golden burst at start → settle to DARK
+        brightness = max(0, 1 - t * 1.6)
+        r = int(0x1a + (0xff - 0x1a) * brightness)
+        g = int(0x12 + (0xbb - 0x12) * brightness)
         col = f"#{r:02x}{g:02x}00"
         self._total_lbl.configure(text=f"{val:.1f}", text_color=col)
         self.after(delay, lambda: self._animate_odometer(start, end, steps, delay, step + 1))
