@@ -469,7 +469,7 @@ class App(ctk.CTk):
                                 width=100, height=46, state="disabled")
         self.pause_btn.pack(side="left", padx=5)
 
-        self.stop_btn = mk_btn(self._brow, "⏹  Stop", self._on_stop,
+        self.stop_btn = mk_btn(self._brow, "⏹", self._on_stop,
                                width=100, height=46, danger=True, state="disabled")
         self.stop_btn.pack(side="left", padx=5)
 
