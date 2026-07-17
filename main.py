@@ -563,7 +563,7 @@ class App(ctk.CTk):
             plus_lbl = ctk.CTkLabel(
                 add_row, text="+", width=20, height=28,
                 font=ctk.CTkFont(size=18, weight="bold"),
-                text_color=MUTED, fg_color="transparent", cursor="hand2",
+                text_color=MUTED, fg_color="transparent",
             )
             plus_lbl.pack(side="right")
             plus_lbl.bind("<Button-1>", lambda _: self._add_skill())
