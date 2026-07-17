@@ -71,6 +71,32 @@ def _skill_card_color(lvl: int):
     return _SKILL_CARD_PALETTE[idx]
 
 
+# (bg, border, text) — smooth gradient white → mint → fresh green → dark forest
+_STAT_CARD_PALETTE = [
+    ("#fffcf5", "#c6c4bf", DARK),        # 0  — warm white
+    ("#f1fbed", "#bbc3b8", DARK),        # 1
+    ("#e3fae6", "#b1c3b3", DARK),        # 2
+    ("#d6f9de", "#a6c2ad", DARK),        # 3
+    ("#c8f8d7", "#9cc1a7", DARK),        # 4
+    ("#bbf7d0", "#91c0a2", DARK),        # 5  — mint
+    ("#a4f2c0", "#7fbc95", DARK),        # 6
+    ("#8dedb0", "#6db889", DARK),        # 7
+    ("#77e8a0", "#5cb47c", DARK),        # 8
+    ("#60e390", "#4ab170", DARK),        # 9
+    ("#4ade80", "#39ad63", "#f0fdf4"),   # 10 — fresh green
+    ("#3fc26f", "#319756", "#f0fdf4"),   # 11
+    ("#34a65e", "#288149", "#f0fdf4"),   # 12
+    ("#298a4e", "#1f6b3c", "#f0fdf4"),   # 13
+    ("#1e6e3d", "#17552f", "#f0fdf4"),   # 14
+    ("#14532d", "#0f4023", "#f0fdf4"),   # 15 — dark forest
+]
+
+
+def _stat_card_color(lvl: int):
+    idx = max(0, min(lvl, len(_STAT_CARD_PALETTE) - 1))
+    return _STAT_CARD_PALETTE[idx]
+
+
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
     if minutes < 30:   return "#fbbf24"
@@ -1190,20 +1216,20 @@ class App(ctk.CTk):
             next_collect    = conf_lvl + 1
             has_uncollected = lvl_s >= next_collect and not at_cap
 
-            c = mk_card(self._ach_scroll)
+            card_bg, card_border, card_text = _stat_card_color(conf_lvl)
+            c = mk_card(self._ach_scroll, bg=card_bg, border=card_border)
             c.pack(fill="x", pady=5, padx=6)
             inner = ctk.CTkFrame(c, fg_color="transparent")
             inner.pack(fill="x", padx=16, pady=14)
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, name, size=14, weight="bold", color=TEXT).pack(side="left")
+            mk_label(top, name, size=14, weight="bold", color=card_text).pack(side="left")
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl_s}"
-            lvl_col   = DARK if has_uncollected else MUTED
             mk_label(top, cap_label, size=14, weight="bold",
-                     color=lvl_col).pack(side="right")
+                     color=card_text).pack(side="right")
 
-            bar = progress_bar(inner, color=SUCCESS)
+            bar = progress_bar(inner, color=card_text)
             bar.pack(fill="x", pady=(8, 4))
             bar.set(1.0 if at_cap else max(0.0, frac))
 
@@ -1211,11 +1237,11 @@ class App(ctk.CTk):
             val_row.pack(fill="x")
             val_s = (f"{val:.1f}" if isinstance(val, float) and val != int(val)
                      else str(int(val)))
-            mk_label(val_row, f"{val_s}{unit}", color=MUTED, size=12).pack(side="left")
+            mk_label(val_row, f"{val_s}{unit}", color=card_text, size=12).pack(side="left")
             if not at_cap:
                 next_s = str(int(next_t)) if next_t == int(next_t) else f"{next_t:.0f}"
                 mk_label(val_row, f"→ {next_s}{unit} für LVL {lvl_s + 1}",
-                         color=MUTED, size=12).pack(side="right")
+                         color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 def _collect_stat(k=key, lv=next_collect, n=name, card=c):
@@ -1232,6 +1258,24 @@ class App(ctk.CTk):
                     font=ctk.CTkFont(size=13, weight="bold"),
                     command=_collect_stat,
                 ).pack(fill="x", pady=(10, 0))
+
+        # ── Level colour legend ───────────────────────────────────────────────
+        ctk.CTkFrame(self._ach_scroll, height=1, fg_color=BORDER).pack(
+            fill="x", padx=6, pady=14)
+        SQ, GAP = 16, 3
+        n = len(_STAT_CARD_PALETTE)
+        cw = n * (SQ + GAP) - GAP
+        ch = SQ + 14
+        leg_cv = tk.Canvas(self._ach_scroll, width=cw, height=ch,
+                           bg=BG, highlightthickness=0)
+        leg_cv.pack(pady=(0, 8))
+        for i, (col, border, _tc) in enumerate(_STAT_CARD_PALETTE):
+            x0 = i * (SQ + GAP)
+            leg_cv.create_rectangle(x0, 0, x0 + SQ, SQ,
+                                    fill=col, outline=border, width=1)
+            if i % 3 == 0:
+                leg_cv.create_text(x0 + SQ // 2, SQ + 7, text=str(i),
+                                   fill=MUTED, font=("Helvetica", 8))
 
     # ── Heatmap ───────────────────────────────────────────────────────────────
     def _draw_heatmap(self, parent):
