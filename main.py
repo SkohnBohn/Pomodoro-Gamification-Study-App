@@ -577,19 +577,21 @@ class App(ctk.CTk):
         self._brow.pack(pady=(16, 28))
 
         self.start_btn = ctk.CTkButton(
-            self._brow, text="▶", width=120, height=46, corner_radius=14,
+            self._brow, text="▶", width=120, height=56, corner_radius=16,
             fg_color=DARK, hover_color=DARK2, text_color=BG,
-            border_width=0, font=ctk.CTkFont(size=15, weight="bold"),
+            border_width=0, font=ctk.CTkFont(size=32, weight="bold"),
             command=self._on_start,
         )
         self.start_btn.pack(side="left", padx=5)
 
         self.pause_btn = mk_btn(self._brow, "⏸", self._on_pause,
-                                width=100, height=46, state="disabled")
+                                width=100, height=56, state="disabled")
+        self.pause_btn.configure(font=ctk.CTkFont(size=28, weight="bold"), corner_radius=16)
         self.pause_btn.pack(side="left", padx=5)
 
         self.stop_btn = mk_btn(self._brow, "⏹", self._on_stop,
-                               width=100, height=46, danger=True, state="disabled")
+                               width=100, height=56, danger=True, state="disabled")
+        self.stop_btn.configure(font=ctk.CTkFont(size=28, weight="bold"), corner_radius=16)
         self.stop_btn.pack(side="left", padx=5)
 
         # ── Right ─────────────────────────────────────────────────────────────
