@@ -1104,8 +1104,15 @@ class App(ctk.CTk):
                 gc = int(g1 + (g2 - g1) * t)
                 bc = int(b1 + (b2 - b1) * t)
                 col = f"#{rc:02x}{gc:02x}{bc:02x}"
+                # dot pulses between its grey and near-white
+                dr1, dg1, db1 = 0x9a, 0x96, 0x90  # DOT_COLOR grey
+                dr2, dg2, db2 = 0xe8, 0xe6, 0xe3  # light grey / near-white
+                drc = int(dr1 + (dr2 - dr1) * t)
+                dgc = int(dg1 + (dg2 - dg1) * t)
+                dbc = int(db1 + (db2 - db1) * t)
+                dot_col = f"#{drc:02x}{dgc:02x}{dbc:02x}"
                 self.ring.update_ring(frac, f"{m:02d}:{s:02d}",
-                                      arc_color=col, dot_color=col)
+                                      arc_color=col, dot_color=dot_col)
             else:
                 self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
             self.after(50, self._tick_pomodoro)
