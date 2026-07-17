@@ -559,13 +559,25 @@ class App(ctk.CTk):
                 font=ctk.CTkFont(size=12),
             )
             self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 4))
-            ctk.CTkButton(
-                add_row, text="+", width=28, height=28, corner_radius=8,
-                fg_color=MUTED, hover_color=DARK2, text_color=BG,
-                border_width=0, font=ctk.CTkFont(size=18),
-                anchor="center",
-                command=self._add_skill,
-            ).pack(side="right")
+            def _draw_plus_btn(parent, size=28, r=8, bg=MUTED, bg_hover=DARK2,
+                               fg=BG, command=None):
+                c = tk.Canvas(parent, width=size, height=size,
+                              bg=PANEL, highlightthickness=0)
+                def _redraw(col):
+                    c.delete("all")
+                    c.create_rectangle(r, 0, size-r, size, fill=col, outline="")
+                    c.create_rectangle(0, r, size, size-r, fill=col, outline="")
+                    for cx, cy, rad in [(r,r,r),(size-r,r,r),(r,size-r,r),(size-r,size-r,r)]:
+                        c.create_oval(cx-rad, cy-rad, cx+rad, cy+rad, fill=col, outline="")
+                    c.create_text(size//2, size//2, text="+",
+                                  fill=fg, font=("Helvetica", 16, "bold"))
+                _redraw(bg)
+                c.bind("<Enter>", lambda _: _redraw(bg_hover))
+                c.bind("<Leave>", lambda _: _redraw(bg))
+                if command:
+                    c.bind("<Button-1>", lambda _: command())
+                return c
+            _draw_plus_btn(add_row, command=self._add_skill).pack(side="right")
         else:
             # Normal mode: 3-col grid
             for i, (name, emoji) in enumerate(skills):
