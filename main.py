@@ -56,13 +56,13 @@ _SKILL_CARD_PALETTE = [
     ("#fb923c", "#78350f", DARK),   # 6  — Orange
     ("#f97316", "#7c2d12", DARK),   # 7
     ("#ea580c", "#7c2d12", DARK),   # 8
-    ("#fb7185", "#9f1239", DARK),   # 9  — Rosa/Lachs
-    ("#f43f5e", "#881337", "#fff8e7"),  # 10
-    ("#e11d48", "#6f0020", "#fff8e7"),  # 11
-    ("#be123c", "#500018", "#fff8e7"),  # 12 — Ruby
-    ("#9f1239", "#3d0010", "#fff8e7"),  # 13
-    ("#7f1d1d", "#2d0009", "#fff8e7"),  # 14
-    ("#5c0a1c", "#1a0007", "#fff8e7"),  # 15 — Prestige
+    ("#fecdd3", "#f9a8b4", DARK),   # 9  — Rosa/Lachs
+    ("#fda4af", "#f43f5e", DARK),   # 10
+    ("#fb7185", "#e11d48", DARK),   # 11
+    ("#f4a0a8", "#be123c", DARK),   # 12 — Ruby pastell
+    ("#e8828e", "#9f1239", DARK),   # 13
+    ("#d4606b", "#7f1d1d", "#fff8e7"),  # 14
+    ("#c0444f", "#5c0a1c", "#fff8e7"),  # 15 — Prestige
 ]
 
 
