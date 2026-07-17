@@ -443,16 +443,43 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(8, 8))
 
-        self._dur_row = ctk.CTkFrame(left, fg_color="transparent")
-        self._dur_row.pack()
-        self._dur_label = mk_label(self._dur_row, "Minuten:", color=MUTED)
-        self._dur_label.pack(side="left", padx=(0, 8))
-        self.dur_entry = ctk.CTkEntry(
-            self._dur_row, width=72, height=36, placeholder_text="25",
-            corner_radius=10, fg_color=CARD, border_color=BORDER,
-            text_color=TEXT, placeholder_text_color=DIM,
+        self._pomo_mins = 25
+
+        # invisible inline entry overlaid on the ring for editing duration
+        self._ring_entry = tk.Entry(
+            left, width=5, justify="center",
+            font=("Helvetica", 42, "bold"),
+            fg=TEXT, bg=PANEL, bd=0, highlightthickness=0,
+            insertbackground=TEXT, relief="flat",
         )
-        self.dur_entry.pack(side="left")
+
+        def _ring_start_edit(event=None):
+            if self.timer_mode != "Pomodoro" or self.running:
+                return
+            self._ring_entry.delete(0, "end")
+            self._ring_entry.insert(0, str(self._pomo_mins))
+            self._ring_entry.place(relx=0.5, rely=0.5, anchor="center")
+            self._ring_entry.focus_set()
+            self._ring_entry.select_range(0, "end")
+
+        def _ring_commit(event=None):
+            val = self._ring_entry.get().strip()
+            try:
+                mins = float(val)
+                if mins > 0:
+                    self._pomo_mins = mins
+            except ValueError:
+                pass
+            self._ring_entry.place_forget()
+            self.ring.update_ring(0, f"{int(self._pomo_mins):02d}:00")
+
+        def _ring_cancel(event=None):
+            self._ring_entry.place_forget()
+
+        self._ring_entry.bind("<Return>",  _ring_commit)
+        self._ring_entry.bind("<Escape>",  _ring_cancel)
+        self._ring_entry.bind("<FocusOut>", _ring_commit)
+        self.ring.bind("<Button-1>", _ring_start_edit)
 
         self._brow = ctk.CTkFrame(left, fg_color="transparent")
         self._brow.pack(pady=(16, 28))
@@ -617,16 +644,6 @@ class App(ctk.CTk):
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
         self._reset_timer()
-        if mode == "Pomodoro":
-            self._dur_label.configure(text_color=MUTED)
-            self.dur_entry.configure(fg_color=CARD, border_color=BORDER,
-                                     text_color=TEXT, placeholder_text_color=DIM,
-                                     state="normal")
-        else:
-            self._dur_label.configure(text_color=PANEL)
-            self.dur_entry.configure(fg_color=PANEL, border_color=PANEL,
-                                     text_color=PANEL, placeholder_text_color=PANEL,
-                                     state="disabled")
 
     # ── Notes ─────────────────────────────────────────────────────────────────
     def _save_note(self):
@@ -787,15 +804,7 @@ class App(ctk.CTk):
         self.intention_text = intention
 
         if self.timer_mode == "Pomodoro":
-            try:
-                mins = float(self.dur_entry.get() or "25")
-                if mins <= 0:
-                    raise ValueError
-            except ValueError:
-                self.dur_entry.configure(border_color=DANGER)
-                self.after(1800, lambda: self.dur_entry.configure(border_color=BORDER))
-                return
-            self.total_seconds = int(mins * 60)
+            self.total_seconds = int(self._pomo_mins * 60)
             self.seconds_left  = self.total_seconds
             self.running = True
             self.paused  = False
@@ -878,7 +887,11 @@ class App(ctk.CTk):
     def _reset_timer(self):
         self.running = False
         self.paused  = False
-        self.ring.update_ring(0, "00:00")
+        if self.timer_mode == "Pomodoro":
+            mins = int(self._pomo_mins)
+            self.ring.update_ring(0, f"{mins:02d}:00")
+        else:
+            self.ring.update_ring(0, "00:00")
         self._btns_idle()
 
     # ── Result dialog ─────────────────────────────────────────────────────────
