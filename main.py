@@ -690,34 +690,32 @@ class App(ctk.CTk):
             mk_label(body, preview, size=12, color=DIM, wraplength=390).pack(
                 anchor="w", pady=(6, 10))
 
-            # ── Actions ──────────────────────────────────────────────────────
-            act = ctk.CTkFrame(body, fg_color="transparent")
-            act.pack(fill="x")
-
-            def _load(c=content):
+            def _load(c=content, _e=None):
                 self.notes_box.delete("1.0", "end")
                 self.notes_box.insert("1.0", c)
                 dlg.destroy()
 
-            def _delete(card=card, note_id=nid):
+            def _delete(_e=None, card=card, note_id=nid):
                 delete_note(note_id)
                 card.destroy()
 
-            mk_btn(act, "Laden", _load, width=80, height=28).pack(side="left")
-            ctk.CTkButton(
-                act, text="✕", command=_delete,
+            # ✕ delete button — bottom right, stops click propagation
+            del_btn = ctk.CTkButton(
+                body, text="✕", command=_delete,
                 width=28, height=28, corner_radius=7,
                 fg_color="transparent", hover_color="#fee2e2",
                 text_color=DANGER, border_width=0,
                 font=ctk.CTkFont(size=12),
-            ).pack(side="right")
+            )
+            del_btn.pack(anchor="e")
 
-            # ── Hover: lighten card ───────────────────────────────────────────
-            def _enter(_): card.configure(fg_color="#fef3c7")
-            def _leave(_): card.configure(fg_color=CARD)
-            for w in (card, body, top, act):
-                w.bind("<Enter>", _enter)
-                w.bind("<Leave>", _leave)
+            # ── Click card to load ────────────────────────────────────────────
+            def _enter(_): card.configure(fg_color="#fef3c7", cursor="hand2")
+            def _leave(_): card.configure(fg_color=CARD, cursor="")
+            for w in (card, body, top):
+                w.bind("<Enter>",    _enter)
+                w.bind("<Leave>",    _leave)
+                w.bind("<Button-1>", _load)
 
         for nid, date_s, time_s, title, content in notes:
             _build_card(nid, date_s, time_s, title, content)
