@@ -505,7 +505,7 @@ class App(ctk.CTk):
                 row = ctk.CTkFrame(self._sk_grid_frame, fg_color="transparent")
                 row.pack(fill="x", pady=2)
                 ctk.CTkButton(
-                    row, text=f"{emoji} {name}", height=30, corner_radius=8,
+                    row, text=name, height=30, corner_radius=8,
                     fg_color=CARD, hover_color=BORDER, text_color=MUTED,
                     border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                     command=lambda s=name: self._pick_skill(s),
@@ -520,13 +520,6 @@ class App(ctk.CTk):
             # Add skill row
             add_row = ctk.CTkFrame(self._sk_grid_frame, fg_color="transparent")
             add_row.pack(fill="x", pady=(6, 0))
-            self._new_emoji = ctk.CTkEntry(
-                add_row, width=36, height=28, placeholder_text="📌",
-                corner_radius=8, fg_color=CARD, border_color=BORDER,
-                text_color=TEXT, placeholder_text_color=DIM,
-                font=ctk.CTkFont(size=13),
-            )
-            self._new_emoji.pack(side="left", padx=(0, 4))
             self._new_name = ctk.CTkEntry(
                 add_row, height=28, placeholder_text="Skill name",
                 corner_radius=8, fg_color=CARD, border_color=BORDER,
@@ -565,10 +558,9 @@ class App(ctk.CTk):
         self._build_skill_grid()
 
     def _add_skill(self):
-        name  = self._new_name.get().strip()
-        emoji = self._new_emoji.get().strip()
+        name = self._new_name.get().strip()
         if name:
-            add_user_skill(name, emoji or "📌")
+            add_user_skill(name, "")
             self._build_skill_grid()
 
     def _remove_skill(self, name: str):
