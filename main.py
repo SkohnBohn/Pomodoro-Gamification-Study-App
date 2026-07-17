@@ -115,18 +115,20 @@ class RingTimer(tk.Canvas):
             parent, width=self.SIZE, height=self.SIZE,
             bg=PANEL, highlightthickness=0, **kw,
         )
-        self._draw(0.0, "00:00", "")
+        self._draw(1.0, "00:00", "")
 
-    def update_ring(self, fraction: float, time_str: str, sub: str = ""):
-        self._draw(fraction, time_str, sub)
+    def update_ring(self, fraction: float, time_str: str, sub: str = "",
+                    arc_color: str = DARK, dot_color: str = DARK2):
+        self._draw(fraction, time_str, sub, arc_color, dot_color)
 
-    def _draw(self, fraction: float, time_str: str, sub: str):
+    def _draw(self, fraction: float, time_str: str, sub: str,
+              arc_color: str = DARK, dot_color: str = DARK2):
         self.delete("all")
         cx = cy = self.SIZE // 2
         pad, w = 14, 20
         self._arc(pad, w, BORDER, 359.99)
         if fraction > 0.001:
-            self._arc(pad, w, DARK, fraction * 359.99)
+            self._arc(pad, w, arc_color, fraction * 359.99)
         if 0.001 < fraction < 0.999:
             angle = math.radians(90 - fraction * 360)
             r = (self.SIZE - pad * 2) / 2
@@ -134,7 +136,7 @@ class RingTimer(tk.Canvas):
             dy = cy - r * math.sin(angle)
             self.create_oval(dx - w // 2, dy - w // 2,
                              dx + w // 2, dy + w // 2,
-                             fill=DARK2, outline="")
+                             fill=dot_color, outline="")
         self.create_text(cx, cy - (14 if sub else 0),
                          text=time_str, fill=TEXT,
                          font=("Helvetica", 42, "bold"))
@@ -954,16 +956,27 @@ class App(ctk.CTk):
     def _tick_pomodoro(self):
         if not self.running or self.paused:
             return
-        elapsed = _time.monotonic() - self._pomo_start_t - self._pomo_pause_t
+        elapsed   = _time.monotonic() - self._pomo_start_t - self._pomo_pause_t
         remaining = self.total_seconds - elapsed
         if remaining > 0:
-            frac = elapsed / self.total_seconds
-            secs_left = int(remaining) + 1  # show ceiling so 0:01 shows until done
+            frac = remaining / self.total_seconds  # full → empty
             m, s = divmod(max(0, int(remaining)), 60)
-            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            # last 10 s: pulse between DARK and a warm amber for drama
+            if remaining <= 10:
+                pulse = 0.5 + 0.5 * math.sin(elapsed * math.pi * 2)  # ~1 Hz
+                r1, g1, b1 = 0x1a, 0x12, 0x00   # DARK
+                r2, g2, b2 = 0xc8, 0x78, 0x00   # warm amber
+                rc = int(r1 + (r2 - r1) * pulse)
+                gc = int(g1 + (g2 - g1) * pulse)
+                bc = int(b1 + (b2 - b1) * pulse)
+                col = f"#{rc:02x}{gc:02x}{bc:02x}"
+                self.ring.update_ring(frac, f"{m:02d}:{s:02d}",
+                                      arc_color=col, dot_color=col)
+            else:
+                self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
             self.after(50, self._tick_pomodoro)
         else:
-            self.ring.update_ring(1.0, "00:00", "Fertig! 🎉")
+            self.ring.update_ring(0.0, "00:00", "Fertig! 🎉")
             self.running = False
             self._btns_idle()
             threading.Thread(target=play_sound, daemon=True).start()
