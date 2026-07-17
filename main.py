@@ -560,8 +560,9 @@ class App(ctk.CTk):
             self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 4))
             ctk.CTkButton(
                 add_row, text="+", width=28, height=28, corner_radius=8,
-                fg_color=DARK2, hover_color=DARK, text_color=BG,
-                border_width=0, font=ctk.CTkFont(size=16, weight="bold"),
+                fg_color=MUTED, hover_color=DARK2, text_color=BG,
+                border_width=0, font=ctk.CTkFont(size=18),
+                anchor="center",
                 command=self._add_skill,
             ).pack(side="right")
         else:
