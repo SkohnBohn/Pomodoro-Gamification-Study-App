@@ -542,8 +542,8 @@ class App(ctk.CTk):
                 return self._pomo_max_mins
             # clamp at min: if already near 0 and angle wraps near max, hold at min
             if self._pomo_mins <= thresh and mins > self._pomo_max_mins - thresh:
-                return 0.5
-            return max(0.5, min(self._pomo_max_mins, mins))
+                return 0.25
+            return max(0.25, min(self._pomo_max_mins, mins))
 
         def _update_ring(mins):
             total_s = int(mins * 60)
