@@ -628,28 +628,41 @@ class App(ctk.CTk):
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
+        _NOTE_HDR  = "#f5d060"   # slightly darker than CARD for header bar
+        _NOTE_HOVER = "#fef3c7"  # card hover colour
+
         def _build_card(nid, date_s, time_s, title, content):
+            # ── Outer row: card (left, expands) + side buttons (right) ──────
+            outer = ctk.CTkFrame(scroll, fg_color="transparent")
+            outer.pack(fill="x", pady=4, padx=2)
+
             card = ctk.CTkFrame(
-                scroll, fg_color=CARD, corner_radius=14,
+                outer, fg_color=CARD, corner_radius=14,
                 border_width=1, border_color=BORDER,
             )
-            card.pack(fill="x", pady=5, padx=4)
+            card.pack(side="left", fill="x", expand=True)
 
+            # ── Header bar (slightly darker, separated by a line) ────────────
+            hdr = ctk.CTkFrame(card, fg_color=_NOTE_HDR, corner_radius=0)
+            hdr.pack(fill="x")
+            title_lbl = mk_label(hdr, title, size=13, weight="bold", color=TEXT)
+            title_lbl.pack(anchor="w", padx=12, pady=(9, 9))
+
+            # Separator line
+            ctk.CTkFrame(card, height=1, fg_color=BORDER,
+                         corner_radius=0).pack(fill="x")
+
+            # ── Content preview ──────────────────────────────────────────────
             body = ctk.CTkFrame(card, fg_color="transparent")
-            body.pack(fill="x", padx=(8, 16), pady=13)
+            body.pack(fill="x", padx=12, pady=(8, 12))
+            lines   = content.splitlines()
+            preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
+            prev_lbl = mk_label(body, preview, size=12, color=DIM, wraplength=340)
+            prev_lbl.pack(anchor="w")
 
-            # ── Title + timestamp ────────────────────────────────────────────
-            top = ctk.CTkFrame(body, fg_color="transparent")
-            top.pack(fill="x")
-            title_lbl = mk_label(top, title, size=13, weight="bold", color=TEXT)
-            title_lbl.pack(side="left", fill="x", expand=True)
-            try:
-                dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
-                ts  = dt.strftime("%d.%m  %H:%M")
-            except Exception:
-                ts = date_s
-            mk_label(top, ts, size=10, color=MUTED).pack(
-                side="right", padx=(8, 0), pady=(2, 0))
+            # ── Side buttons (outside the card, to the right) ────────────────
+            side = ctk.CTkFrame(outer, fg_color="transparent")
+            side.pack(side="right", padx=(6, 0))
 
             def _rename(note_id=nid, lbl=title_lbl):
                 rd = ctk.CTkToplevel(dlg)
@@ -671,48 +684,42 @@ class App(ctk.CTk):
                         rename_note(note_id, t)
                         lbl.configure(text=t)
                     rd.destroy()
-                e.bind("<Return>",  lambda _: _ok())
-                e.bind("<Escape>",  lambda _: rd.destroy())
+                e.bind("<Return>", lambda _: _ok())
+                e.bind("<Escape>", lambda _: rd.destroy())
                 mk_btn(rd, "OK", _ok, primary=True, height=34).pack(
                     fill="x", padx=20)
 
-            o_lbl = mk_label(top, "○", size=14, color=MUTED)
-            o_lbl.pack(side="right", padx=(6, 0))
-            o_lbl.bind("<Button-1>", lambda _, r=_rename: r())
+            o_lbl = mk_label(side, "○", size=13, color=MUTED)
+            o_lbl.pack(pady=(4, 10))
+            o_lbl.bind("<Button-1>", lambda _: _rename())
             o_lbl.bind("<Enter>", lambda _, l=o_lbl: l.configure(text_color=DARK))
             o_lbl.bind("<Leave>", lambda _, l=o_lbl: l.configure(text_color=MUTED))
 
-            # ── Content preview ──────────────────────────────────────────────
-            lines   = content.splitlines()
-            preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
-            mk_label(body, preview, size=12, color=DIM, wraplength=390).pack(
-                anchor="w", pady=(6, 10))
+            x_lbl = mk_label(side, "✕", size=12, color=DANGER)
+            x_lbl.pack()
+            x_lbl.bind("<Button-1>", lambda _, o=outer, i=nid: (
+                delete_note(i), o.destroy()))
+            x_lbl.bind("<Enter>", lambda _, l=x_lbl: l.configure(
+                text_color="#7f1d1d"))
+            x_lbl.bind("<Leave>", lambda _, l=x_lbl: l.configure(
+                text_color=DANGER))
 
-            def _load(c=content):
+            # ── Click card to load ───────────────────────────────────────────
+            def _load():
                 self.notes_box.delete("1.0", "end")
-                self.notes_box.insert("1.0", c)
+                self.notes_box.insert("1.0", content)
                 dlg.destroy()
 
-            def _delete(_e=None, card=card, note_id=nid):
-                delete_note(note_id)
-                card.destroy()
+            def _card_enter(_):
+                card.configure(fg_color=_NOTE_HOVER, cursor="hand2")
+                hdr.configure(fg_color="#f0c840")
+            def _card_leave(_):
+                card.configure(fg_color=CARD, cursor="")
+                hdr.configure(fg_color=_NOTE_HDR)
 
-            # ✕ delete button — bottom right, stops click propagation
-            del_btn = ctk.CTkButton(
-                body, text="✕", command=_delete,
-                width=28, height=28, corner_radius=7,
-                fg_color="transparent", hover_color="#fee2e2",
-                text_color=DANGER, border_width=0,
-                font=ctk.CTkFont(size=12),
-            )
-            del_btn.pack(anchor="e")
-
-            # ── Click card to load ────────────────────────────────────────────
-            def _enter(_): card.configure(fg_color="#fef3c7", cursor="hand2")
-            def _leave(_): card.configure(fg_color=CARD, cursor="")
-            for w in (card, body, top):
-                w.bind("<Enter>",    _enter)
-                w.bind("<Leave>",    _leave)
+            for w in (card, hdr, title_lbl, body, prev_lbl):
+                w.bind("<Enter>",    _card_enter)
+                w.bind("<Leave>",    _card_leave)
                 w.bind("<Button-1>", lambda _: _load())
 
         for nid, date_s, time_s, title, content in notes:
