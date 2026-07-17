@@ -1198,7 +1198,7 @@ class App(ctk.CTk):
         else:
             elapsed = (_time.monotonic() - self._open_start_t - self._open_pause_t) / 60
         self._btns_idle()
-        if elapsed >= 0.5:
+        if elapsed >= (1/60):
             self._result_dialog(elapsed)
         else:
             self._reset_timer()
