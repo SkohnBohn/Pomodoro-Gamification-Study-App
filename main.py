@@ -443,43 +443,49 @@ class App(ctk.CTk):
         self.ring = RingTimer(left)
         self.ring.pack(pady=(8, 8))
 
-        self._pomo_mins = 25
+        self._pomo_mins  = 25.0
+        self._drag_angle = None  # last known angle while dragging
 
-        # invisible inline entry overlaid on the ring for editing duration
-        self._ring_entry = tk.Entry(
-            left, width=5, justify="center",
-            font=("Helvetica", 42, "bold"),
-            fg=TEXT, bg=PANEL, bd=0, highlightthickness=0,
-            insertbackground=TEXT, relief="flat",
-        )
+        def _evt_angle(e):
+            cx = cy = RingTimer.SIZE // 2
+            return math.degrees(math.atan2(cy - e.y, e.x - cx))
 
-        def _ring_start_edit(event=None):
+        def _ring_press(e):
             if self.timer_mode != "Pomodoro" or self.running:
                 return
-            self._ring_entry.delete(0, "end")
-            self._ring_entry.insert(0, str(self._pomo_mins))
-            self._ring_entry.place(relx=0.5, rely=0.5, anchor="center")
-            self._ring_entry.focus_set()
-            self._ring_entry.select_range(0, "end")
+            self._drag_angle = _evt_angle(e)
 
-        def _ring_commit(event=None):
-            val = self._ring_entry.get().strip()
-            try:
-                mins = float(val)
-                if mins > 0:
-                    self._pomo_mins = mins
-            except ValueError:
-                pass
-            self._ring_entry.place_forget()
-            self.ring.update_ring(0, f"{int(self._pomo_mins):02d}:00")
+        def _ring_drag(e):
+            if self._drag_angle is None:
+                return
+            new_a = _evt_angle(e)
+            delta = new_a - self._drag_angle
+            if delta >  180: delta -= 360
+            if delta < -180: delta += 360
+            # clockwise drag (delta < 0) → increase time; 360° = 60 min
+            self._pomo_mins = max(1.0, min(180.0, self._pomo_mins - delta / 6.0))
+            self._drag_angle = new_a
+            total_s = int(self._pomo_mins * 60)
+            m, s    = divmod(total_s, 60)
+            frac    = (self._pomo_mins % 60) / 60.0
+            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self.ring.configure(cursor="fleur")
 
-        def _ring_cancel(event=None):
-            self._ring_entry.place_forget()
+        def _ring_release(e):
+            if self._drag_angle is None:
+                return
+            self._drag_angle = None
+            # snap to nearest 30 s
+            self._pomo_mins  = round(self._pomo_mins * 2) / 2
+            total_s = int(self._pomo_mins * 60)
+            m, s    = divmod(total_s, 60)
+            frac    = (self._pomo_mins % 60) / 60.0
+            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self.ring.configure(cursor="")
 
-        self._ring_entry.bind("<Return>",  _ring_commit)
-        self._ring_entry.bind("<Escape>",  _ring_cancel)
-        self._ring_entry.bind("<FocusOut>", _ring_commit)
-        self.ring.bind("<Button-1>", _ring_start_edit)
+        self.ring.bind("<ButtonPress-1>",   _ring_press)
+        self.ring.bind("<B1-Motion>",       _ring_drag)
+        self.ring.bind("<ButtonRelease-1>", _ring_release)
 
         self._brow = ctk.CTkFrame(left, fg_color="transparent")
         self._brow.pack(pady=(16, 28))
@@ -888,8 +894,10 @@ class App(ctk.CTk):
         self.running = False
         self.paused  = False
         if self.timer_mode == "Pomodoro":
-            mins = int(self._pomo_mins)
-            self.ring.update_ring(0, f"{mins:02d}:00")
+            total_s = int(self._pomo_mins * 60)
+            m, s = divmod(total_s, 60)
+            frac = (self._pomo_mins % 60) / 60.0
+            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
         else:
             self.ring.update_ring(0, "00:00")
         self._btns_idle()
