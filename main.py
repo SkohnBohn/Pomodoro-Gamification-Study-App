@@ -643,8 +643,8 @@ class App(ctk.CTk):
             # ── Title + timestamp ────────────────────────────────────────────
             top = ctk.CTkFrame(body, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, title, size=13, weight="bold", color=TEXT).pack(
-                side="left", fill="x", expand=True)
+            title_lbl = mk_label(top, title, size=13, weight="bold", color=TEXT)
+            title_lbl.pack(side="left", fill="x", expand=True)
             try:
                 dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
                 ts  = dt.strftime("%d.%m  %H:%M")
@@ -652,6 +652,39 @@ class App(ctk.CTk):
                 ts = date_s
             mk_label(top, ts, size=10, color=MUTED).pack(
                 side="right", padx=(8, 0), pady=(2, 0))
+
+            def _rename(note_id=nid, lbl=title_lbl):
+                rd = ctk.CTkToplevel(dlg)
+                rd.title("Umbenennen")
+                rd.geometry("340x128")
+                rd.configure(fg_color=PANEL)
+                rd.grab_set()
+                rd.lift()
+                rd.resizable(False, False)
+                e = ctk.CTkEntry(rd, height=38, fg_color=CARD, border_color=BORDER,
+                                 text_color=TEXT, font=ctk.CTkFont(size=13))
+                e.insert(0, lbl.cget("text"))
+                e.pack(fill="x", padx=20, pady=(20, 12))
+                e.focus_set()
+                e.select_range(0, "end")
+                def _ok():
+                    t = e.get().strip()
+                    if t:
+                        rename_note(note_id, t)
+                        lbl.configure(text=t)
+                    rd.destroy()
+                e.bind("<Return>",  lambda _: _ok())
+                e.bind("<Escape>",  lambda _: rd.destroy())
+                mk_btn(rd, "OK", _ok, primary=True, height=34).pack(
+                    fill="x", padx=20)
+
+            ctk.CTkButton(
+                top, text="✎", command=_rename,
+                width=22, height=22, corner_radius=11,
+                fg_color=BORDER, hover_color=DARK2,
+                text_color=DARK, border_width=0,
+                font=ctk.CTkFont(size=11),
+            ).pack(side="right", padx=(4, 0))
 
             # ── Content preview ──────────────────────────────────────────────
             lines   = content.splitlines()
