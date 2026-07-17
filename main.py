@@ -8,6 +8,7 @@ import threading
 import math
 import os
 import platform
+import time as _time
 import subprocess
 from datetime import datetime, date, timedelta
 from PIL import Image
@@ -898,14 +899,18 @@ class App(ctk.CTk):
         self.intention_text = intention
 
         if self.timer_mode == "Pomodoro":
-            self.total_seconds = int(self._pomo_mins * 60)
-            self.seconds_left  = self.total_seconds
+            self.total_seconds  = int(self._pomo_mins * 60)
+            self.seconds_left   = self.total_seconds
+            self._pomo_start_t  = _time.monotonic()
+            self._pomo_pause_t  = 0.0
             self.running = True
             self.paused  = False
             self._btns_running()
             self._tick_pomodoro()
         else:
-            self.elapsed_secs = 0
+            self.elapsed_secs  = 0
+            self._open_start_t = _time.monotonic()
+            self._open_pause_t = 0.0
             self.running = True
             self.paused  = False
             self._btns_running()
@@ -914,6 +919,16 @@ class App(ctk.CTk):
     def _on_pause(self):
         if not self.running:
             return
+        if not self.paused:
+            # going into pause: record when pause started
+            self._pause_started = _time.monotonic()
+        else:
+            # resuming: accumulate pause duration
+            pause_dur = _time.monotonic() - self._pause_started
+            if self.timer_mode == "Pomodoro":
+                self._pomo_pause_t += pause_dur
+            else:
+                self._open_pause_t += pause_dur
         self.paused = not self.paused
         self.pause_btn.configure(text="▶" if self.paused else "⏸")
         if not self.paused:
@@ -926,11 +941,10 @@ class App(ctk.CTk):
         if not self.running:
             return
         self.running = False
-        elapsed = (
-            (self.total_seconds - self.seconds_left) / 60
-            if self.timer_mode == "Pomodoro"
-            else self.elapsed_secs / 60
-        )
+        if self.timer_mode == "Pomodoro":
+            elapsed = (_time.monotonic() - self._pomo_start_t - self._pomo_pause_t) / 60
+        else:
+            elapsed = (_time.monotonic() - self._open_start_t - self._open_pause_t) / 60
         self._btns_idle()
         if elapsed >= 0.5:
             self._result_dialog(elapsed)
@@ -940,15 +954,14 @@ class App(ctk.CTk):
     def _tick_pomodoro(self):
         if not self.running or self.paused:
             return
-        if self.seconds_left > 0:
-            m, s  = divmod(self.seconds_left, 60)
-            frac  = (self.total_seconds - self.seconds_left) / self.total_seconds
-            self.ring.update_ring(
-                frac, f"{m:02d}:{s:02d}",
-                f"{self.total_seconds // 60} min · {self.selected_skill}",
-            )
-            self.seconds_left -= 1
-            self.after(1000, self._tick_pomodoro)
+        elapsed = _time.monotonic() - self._pomo_start_t - self._pomo_pause_t
+        remaining = self.total_seconds - elapsed
+        if remaining > 0:
+            frac = elapsed / self.total_seconds
+            secs_left = int(remaining) + 1  # show ceiling so 0:01 shows until done
+            m, s = divmod(max(0, int(remaining)), 60)
+            self.ring.update_ring(frac, f"{m:02d}:{s:02d}")
+            self.after(50, self._tick_pomodoro)
         else:
             self.ring.update_ring(1.0, "00:00", "Fertig! 🎉")
             self.running = False
@@ -959,12 +972,13 @@ class App(ctk.CTk):
     def _tick_open(self):
         if not self.running or self.paused:
             return
-        m, s = divmod(self.elapsed_secs, 60)
+        elapsed = _time.monotonic() - self._open_start_t - self._open_pause_t
+        total_s = int(elapsed)
+        m, s = divmod(total_s, 60)
         h, m = divmod(m, 60)
-        ts   = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-        self.ring.update_ring(0, ts, self.selected_skill)
-        self.elapsed_secs += 1
-        self.after(1000, self._tick_open)
+        ts = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+        self.ring.update_ring(0, ts)
+        self.after(50, self._tick_open)
 
     def _btns_running(self):
         self.start_btn.configure(state="disabled", fg_color=CARD, text_color=DIM,
