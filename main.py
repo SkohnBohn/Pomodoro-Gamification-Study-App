@@ -20,7 +20,7 @@ from data_manager import (
     save_note, get_notes, delete_note, rename_note,
     get_skill_confirmed_levels, confirm_skill_level,
     get_achievements_collected, mark_achievement_collected,
-    get_badge_unlock_date,
+    get_badge_unlock_date, get_badge_unlock_info,
     get_user_skills, add_user_skill, delete_user_skill,
     get_heatmap_data,
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
@@ -1160,20 +1160,23 @@ class App(ctk.CTk):
                     self._ach_badge_imgs.append(ci)
 
                     def _on_badge(badge_i=i):
-                        date_s = get_badge_unlock_date(badge_i)
+                        date_s, cum_h = get_badge_unlock_info(badge_i)
                         d = ctk.CTkToplevel(self)
                         d.title(f"Badge {badge_i}")
-                        d.geometry("320x190")
+                        d.geometry("320x210")
                         d.configure(fg_color=PANEL)
                         d.grab_set()
                         d.lift()
                         mk_label(d, f"Badge LVL {badge_i}", size=18,
-                                 weight="bold", color=DARK).pack(pady=(28, 8))
+                                 weight="bold", color=DARK).pack(pady=(28, 6))
                         date_text = (f"Freigeschaltet am {date_s}"
                                      if date_s else "Datum unbekannt")
                         mk_label(d, date_text, size=13, color=MUTED).pack()
+                        if badge_i > 0 and cum_h > 0:
+                            mk_label(d, f"nach {cum_h:.1f} h gesamt",
+                                     size=12, color=MUTED).pack(pady=(2, 0))
                         mk_btn(d, "Schließen", d.destroy,
-                               width=130, height=36, primary=True).pack(pady=20)
+                               width=130, height=36, primary=True).pack(pady=18)
 
                     btn = ctk.CTkButton(
                         badge_frame, image=ci, text="", width=64, height=64,

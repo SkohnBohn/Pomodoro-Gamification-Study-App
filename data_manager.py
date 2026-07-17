@@ -207,8 +207,13 @@ def mark_achievement_collected(name: str):
 # ── Badge unlock dates ─────────────────────────────────────────────────────────
 
 def get_badge_unlock_date(level: int) -> str | None:
+    return get_badge_unlock_info(level)[0]
+
+
+def get_badge_unlock_info(level: int) -> tuple:
+    """Return (date_str, cumulative_hours) when the badge was unlocked."""
     if level == 0:
-        return "Von Anfang an"
+        return ("Von Anfang an", 0.0)
     threshold_min = LEVEL_THRESHOLDS[level - 1] * 60
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -219,8 +224,8 @@ def get_badge_unlock_date(level: int) -> str | None:
     for date_s, dur in rows:
         total += dur or 0
         if total >= threshold_min:
-            return date_s
-    return None
+            return (date_s, total / 60.0)
+    return (None, 0.0)
 
 
 # ── User skills ────────────────────────────────────────────────────────────────
