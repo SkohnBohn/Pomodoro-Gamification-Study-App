@@ -566,7 +566,7 @@ class App(ctk.CTk):
             self.after(900, lambda: self.notes_box.configure(border_color=BORDER))
             return
 
-        auto_title = datetime.now().strftime("%d.%m.%Y  %H:%M:%S")
+        auto_title = f"Note {len(get_notes(limit=10000)) + 1}"
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("Speichern")
