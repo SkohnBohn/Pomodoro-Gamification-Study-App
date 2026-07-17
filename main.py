@@ -452,7 +452,7 @@ class App(ctk.CTk):
         sk_hdr = ctk.CTkFrame(self._sk_card, fg_color="transparent")
         sk_hdr.pack(fill="x", padx=16, pady=(14, 6))
         mk_label(sk_hdr, "SKILL", size=10, color=MUTED).pack(side="left")
-        icon_btn(sk_hdr, "✏", self._toggle_skill_edit, size=13).pack(side="right")
+        icon_btn(sk_hdr, "○", self._toggle_skill_edit, size=13).pack(side="right")
 
         self._sk_grid_frame = ctk.CTkFrame(self._sk_card, fg_color="transparent")
         self._sk_grid_frame.pack(padx=12, pady=(0, 14), fill="x")
@@ -545,7 +545,7 @@ class App(ctk.CTk):
             for i, (name, emoji) in enumerate(skills):
                 b = ctk.CTkButton(
                     self._sk_grid_frame,
-                    text=f"{emoji} {name}", width=82, height=32, corner_radius=8,
+                    text=name, width=82, height=32, corner_radius=8,
                     fg_color=CARD, hover_color=BORDER, text_color=MUTED,
                     border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
                     command=lambda s=name: self._pick_skill(s),
