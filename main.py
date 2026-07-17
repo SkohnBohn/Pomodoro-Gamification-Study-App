@@ -638,7 +638,7 @@ class App(ctk.CTk):
             card.pack(fill="x", pady=5, padx=4)
 
             body = ctk.CTkFrame(card, fg_color="transparent")
-            body.pack(fill="x", padx=(2, 14), pady=13)
+            body.pack(fill="x", padx=(8, 16), pady=13)
 
             # ── Title + timestamp ────────────────────────────────────────────
             top = ctk.CTkFrame(body, fg_color="transparent")
