@@ -34,17 +34,41 @@ from audio_manager import play_sound, play_main_levelup, play_skill_levelup, pla
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-BG      = "#f7c90f"
-PANEL   = "#f9d340"
-CARD    = "#fce380"
-BORDER  = "#ddb800"
-DARK    = "#1a1200"
-DARK2   = "#3d3000"
-MUTED   = "#5c4300"
-DIM     = "#7a5f00"
-TEXT    = "#1a1200"
-SUCCESS = "#14532d"
-DANGER  = "#991b1b"
+_PALETTES = {
+    "yellow": dict(
+        BG="#f7c90f", PANEL="#f9d340", CARD="#fce380", BORDER="#ddb800",
+        DARK="#1a1200", DARK2="#3d3000", MUTED="#5c4300", DIM="#7a5f00",
+        TEXT="#1a1200", SUCCESS="#14532d", DANGER="#991b1b",
+    ),
+    "light": dict(
+        BG="#f5f5f5", PANEL="#ffffff", CARD="#ececec", BORDER="#d0d0d0",
+        DARK="#111111", DARK2="#333333", MUTED="#666666", DIM="#999999",
+        TEXT="#111111", SUCCESS="#14532d", DANGER="#991b1b",
+    ),
+}
+_active_palette = "yellow"
+
+def _apply_palette(name: str):
+    global BG, PANEL, CARD, BORDER, DARK, DARK2, MUTED, DIM, TEXT, SUCCESS, DANGER, _active_palette
+    _active_palette = name
+    p = _PALETTES[name]
+    BG=p["BG"]; PANEL=p["PANEL"]; CARD=p["CARD"]; BORDER=p["BORDER"]
+    DARK=p["DARK"]; DARK2=p["DARK2"]; MUTED=p["MUTED"]; DIM=p["DIM"]
+    TEXT=p["TEXT"]; SUCCESS=p["SUCCESS"]; DANGER=p["DANGER"]
+
+_apply_palette("yellow")
+
+BG      = _PALETTES["yellow"]["BG"]
+PANEL   = _PALETTES["yellow"]["PANEL"]
+CARD    = _PALETTES["yellow"]["CARD"]
+BORDER  = _PALETTES["yellow"]["BORDER"]
+DARK    = _PALETTES["yellow"]["DARK"]
+DARK2   = _PALETTES["yellow"]["DARK2"]
+MUTED   = _PALETTES["yellow"]["MUTED"]
+DIM     = _PALETTES["yellow"]["DIM"]
+TEXT    = _PALETTES["yellow"]["TEXT"]
+SUCCESS = _PALETTES["yellow"]["SUCCESS"]
+DANGER  = _PALETTES["yellow"]["DANGER"]
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
 _SKILL_CARD_PALETTE = [
@@ -266,6 +290,7 @@ class App(ctk.CTk):
 
         self._views: dict = {}
         self._active_view = ""
+        self._theme = "yellow"
 
         self._build_ui()
         self._nav("timer")
@@ -376,7 +401,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("280x400")
+        dlg.geometry("280x510")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -496,6 +521,33 @@ class App(ctk.CTk):
             command=lambda: _set_dir(False),
         )
         emp_btn.pack(side="left", padx=(0, 2), pady=2)
+
+        # ── Theme ─────────────────────────────────────────────────────────────
+        mk_label(dlg, "Design", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+
+        theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
+        theme_pill.pack(pady=(6, 0))
+        theme_pill.pack_propagate(False)
+
+        yellow_btn = ctk.CTkButton(
+            theme_pill, text="☀ Gelb", width=86, height=32, corner_radius=12,
+            fg_color=DARK if self._theme == "yellow" else "transparent",
+            hover_color=DARK2,
+            text_color=BG if self._theme == "yellow" else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: (dlg.destroy(), self._switch_theme("yellow")),
+        )
+        yellow_btn.pack(side="left", padx=(2, 0), pady=2)
+
+        light_btn = ctk.CTkButton(
+            theme_pill, text="☁ Hell", width=86, height=32, corner_radius=12,
+            fg_color=DARK if self._theme == "light" else "transparent",
+            hover_color=DARK2,
+            text_color=BG if self._theme == "light" else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: (dlg.destroy(), self._switch_theme("light")),
+        )
+        light_btn.pack(side="left", padx=(0, 2), pady=2)
 
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
                width=200, height=36).pack(padx=20, pady=(16, 0))
@@ -640,6 +692,27 @@ class App(ctk.CTk):
         col = f"#{r:02x}{g:02x}00"
         self._total_lbl.configure(text=f"{val:.1f}", text_color=col)
         self.after(delay, lambda: self._animate_odometer(start, end, steps, delay, step + 1))
+
+    # ── Theme switch ─────────────────────────────────────────────────────────
+    def _switch_theme(self, name: str):
+        if name == self._theme:
+            return
+        self._theme = name
+        _apply_palette(name)
+        # Stop any running timer to avoid dangling callbacks
+        was_running = self.running
+        self.running = False
+        prev_view = self._active_view
+        # Destroy all built views and sidebar
+        for v in self._views.values():
+            v.destroy()
+        self._views = {}
+        self.sidebar.destroy()
+        self.content.destroy()
+        self.configure(fg_color=BG)
+        self._build_ui()
+        self._nav(prev_view or "timer")
+        self.after(100, self._refresh_sidebar)
 
     # ── Timer View ────────────────────────────────────────────────────────────
     def _build_timer_view(self) -> ctk.CTkFrame:
