@@ -354,40 +354,57 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Einstellungen")
-        dlg.geometry("280x190")
+        dlg.geometry("280x240")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
         mk_label(dlg, "Einstellungen", size=14, weight="bold",
-                 color=DARK).pack(padx=20, pady=(18, 12), anchor="w")
+                 color=DARK).pack(padx=20, pady=(18, 14), anchor="w")
 
-        # Max pomo duration row
-        dur_row = ctk.CTkFrame(dlg, fg_color="transparent")
-        dur_row.pack(fill="x", padx=20, pady=(0, 12))
-        mk_label(dur_row, "Max. Pomo Duration", size=12, color=MUTED).pack(side="left")
-        dur_var = tk.StringVar(value=str(int(self._pomo_max_mins)))
-        dur_entry = ctk.CTkEntry(
-            dur_row, textvariable=dur_var, width=52, height=28,
-            corner_radius=8, fg_color=CARD, border_color=BORDER,
-            text_color=TEXT, justify="center",
-            font=ctk.CTkFont(size=12),
+        # ── Max pomo duration ──────────────────────────────────────────────────
+        mk_label(dlg, "Max. Pomo Duration", size=11, color=MUTED).pack(anchor="w", padx=20)
+
+        presets = [25, 45, 60, 90, 120]
+        pill_w  = 44
+        pill_container = ctk.CTkFrame(
+            dlg, fg_color=CARD, corner_radius=14,
+            height=32, width=len(presets) * pill_w + 4,
         )
-        dur_entry.pack(side="right")
-        mk_label(dur_row, "min", size=12, color=MUTED).pack(side="right", padx=(4, 4))
+        pill_container.pack(pady=(6, 0))
+        pill_container.pack_propagate(False)
 
-        def _apply_max(*_):
-            try:
-                v = float(dur_var.get())
-                if v >= 5:
-                    self._pomo_max_mins = v
-            except ValueError:
-                pass
+        preset_btns = {}
 
-        dur_entry.bind("<Return>",   _apply_max)
-        dur_entry.bind("<FocusOut>", _apply_max)
+        def _select_preset(v):
+            self._pomo_max_mins = float(v)
+            for val, btn in preset_btns.items():
+                btn.configure(
+                    fg_color=DARK if val == v else "transparent",
+                    text_color=BG  if val == v else MUTED,
+                )
+            # flash feedback
+            pill_container.configure(fg_color=BORDER)
+            dlg.after(180, lambda: pill_container.configure(fg_color=CARD))
+
+        current = int(self._pomo_max_mins)
+        for i, p in enumerate(presets):
+            active = (p == current or (p not in presets and i == len(presets)-1))
+            px = (2, 0) if i == 0 else (0, 2) if i == len(presets)-1 else (0, 0)
+            b = ctk.CTkButton(
+                pill_container, text=f"{p}", width=pill_w, height=32,
+                corner_radius=12,
+                fg_color=DARK if p == current else "transparent",
+                hover_color=DARK2,
+                text_color=BG if p == current else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                border_width=0,
+                command=lambda v=p: _select_preset(v),
+            )
+            b.pack(side="left", padx=px, pady=2)
+            preset_btns[p] = b
 
         mk_btn(dlg, "Log öffnen", lambda: (self._open_log(), dlg.destroy()),
-               width=200, height=36).pack(padx=20)
+               width=200, height=36).pack(padx=20, pady=(20, 0))
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
