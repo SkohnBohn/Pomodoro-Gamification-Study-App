@@ -649,7 +649,7 @@ class App(ctk.CTk):
 
             # ── Content inset (lighter, rounded) ─────────────────────────────
             body = ctk.CTkFrame(card, fg_color=CARD, corner_radius=10, height=100)
-            body.pack(fill="x", padx=(10, 6), pady=(0, 6))
+            body.pack(fill="x", padx=10, pady=(0, 10))
             body.pack_propagate(False)
             lines   = content.splitlines()
             preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
