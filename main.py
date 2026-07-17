@@ -1042,14 +1042,13 @@ class App(ctk.CTk):
 
         scroll = ctk.CTkScrollableFrame(
             dlg, fg_color="transparent",
-            scrollbar_button_color=BG,
-            scrollbar_button_hover_color=BG,
+            scrollbar_button_color=PANEL,
+            scrollbar_button_hover_color=PANEL,
             scrollbar_fg_color=PANEL,
         )
         scroll.pack(fill="both", expand=True, padx=10, pady=(0, 14))
 
-        _NOTE_HDR  = "#f6d955"   # slightly darker than CARD for header bar
-        _NOTE_HOVER = "#fef3c7"  # card hover colour
+        _NOTE_HDR = BORDER  # adapts to current palette
 
         def _build_card(nid, date_s, time_s, title, content):
             # ── Outer row: card (left, expands) + side buttons (right) ──────
