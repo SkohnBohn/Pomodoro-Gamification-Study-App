@@ -652,8 +652,9 @@ class App(ctk.CTk):
             body.pack_propagate(False)
             lines   = content.splitlines()
             preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
-            prev_lbl = mk_label(body, preview, size=12, color=DIM, wraplength=340)
-            prev_lbl.pack(anchor="w", padx=10, pady=8)
+            prev_lbl = mk_label(body, preview, size=12, color=DIM,
+                                wraplength=340, anchor="nw", justify="left")
+            prev_lbl.pack(anchor="nw", padx=10, pady=(8, 0))
 
             # ── Side buttons (outside the card, to the right) ────────────────
             side = ctk.CTkFrame(outer, fg_color="transparent")
