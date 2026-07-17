@@ -1044,6 +1044,23 @@ class App(ctk.CTk):
             fill="x", padx=6, pady=14)
         mk_label(self._sk_scroll, f"Gesamt: {total_all:.1f} Stunden",
                  color=MUTED, size=13).pack(pady=2)
+
+        # ── Level colour legend ───────────────────────────────────────────────
+        _legend = [
+            (_SKILL_CARD_PALETTE[0][0], "LVL 0"),
+            (_SKILL_CARD_PALETTE[1][0], "LVL 1–2"),
+            (_SKILL_CARD_PALETTE[2][0], "LVL 3–5"),
+            (_SKILL_CARD_PALETTE[3][0], "LVL 6–9"),
+            (_SKILL_CARD_PALETTE[4][0], "LVL 10+"),
+        ]
+        leg = ctk.CTkFrame(self._sk_scroll, fg_color="transparent")
+        leg.pack(pady=(10, 4))
+        for col, label in _legend:
+            dot = ctk.CTkFrame(leg, width=12, height=12, corner_radius=6,
+                               fg_color=col, border_width=1, border_color=BORDER)
+            dot.pack(side="left", padx=(6, 2))
+            dot.pack_propagate(False)
+            mk_label(leg, label, size=11, color=MUTED).pack(side="left", padx=(0, 6))
         if last:
             dur_min, sk = last
             emoji = active.get(sk, "")
