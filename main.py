@@ -445,7 +445,8 @@ class App(ctk.CTk):
 
         self._dur_row = ctk.CTkFrame(left, fg_color="transparent")
         self._dur_row.pack()
-        mk_label(self._dur_row, "Minuten:", color=MUTED).pack(side="left", padx=(0, 8))
+        self._dur_label = mk_label(self._dur_row, "Minuten:", color=MUTED)
+        self._dur_label.pack(side="left", padx=(0, 8))
         self.dur_entry = ctk.CTkEntry(
             self._dur_row, width=72, height=36, placeholder_text="25",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
@@ -627,11 +628,15 @@ class App(ctk.CTk):
         self.timer_mode = mode
         self._reset_timer()
         if mode == "Pomodoro":
-            self._dur_row.pack(after=self.ring)
-            self._brow.pack_configure(pady=(16, 28))
+            self._dur_label.configure(text_color=MUTED)
+            self.dur_entry.configure(fg_color=CARD, border_color=BORDER,
+                                     text_color=TEXT, placeholder_text_color=DIM,
+                                     state="normal")
         else:
-            self._dur_row.pack_forget()
-            self._brow.pack_configure(pady=(28, 28))
+            self._dur_label.configure(text_color=PANEL)
+            self.dur_entry.configure(fg_color=PANEL, border_color=PANEL,
+                                     text_color=PANEL, placeholder_text_color=PANEL,
+                                     state="disabled")
 
     # ── Notes ─────────────────────────────────────────────────────────────────
     def _save_note(self):
