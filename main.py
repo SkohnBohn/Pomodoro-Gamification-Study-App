@@ -652,8 +652,9 @@ class App(ctk.CTk):
             title_lbl.pack(anchor="w", padx=12, pady=(7, 6))
 
             # ── Content inset (lighter, rounded) ─────────────────────────────
-            body = ctk.CTkFrame(card, fg_color=CARD, corner_radius=10)
+            body = ctk.CTkFrame(card, fg_color=CARD, corner_radius=10, height=100)
             body.pack(fill="x", padx=6, pady=(0, 6))
+            body.pack_propagate(False)
             lines   = content.splitlines()
             preview = "\n".join(lines[:5]) + ("…" if len(lines) > 5 else "")
             prev_lbl = mk_label(body, preview, size=12, color=DIM, wraplength=340)
