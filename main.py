@@ -447,9 +447,9 @@ class App(ctk.CTk):
         self._dragging   = False
 
         def _angle_to_mins(e):
-            # 12 o'clock = 0, clockwise; full circle = 90 min
+            # 12 o'clock = 0 min, clockwise; full circle = 90 min
             cx = cy = RingTimer.SIZE // 2
-            a = math.degrees(math.atan2(cx - e.x, cy - e.y)) % 360  # 0° at top, CW
+            a = math.degrees(math.atan2(e.x - cx, cy - e.y)) % 360
             return max(0.5, a / 360.0 * 90.0)
 
         def _update_ring(mins):
@@ -475,7 +475,7 @@ class App(ctk.CTk):
             if not self._dragging:
                 return
             self._dragging = False
-            self._pomo_mins = _angle_to_mins(e)
+            self._pomo_mins = round(_angle_to_mins(e) * 2) / 2  # snap to 30s
             _update_ring(self._pomo_mins)
             self.ring.configure(cursor="")
 
