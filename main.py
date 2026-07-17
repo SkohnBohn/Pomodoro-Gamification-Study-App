@@ -1054,17 +1054,23 @@ class App(ctk.CTk):
                  color=MUTED, size=13).pack(pady=2)
 
         # ── Level colour legend ───────────────────────────────────────────────
-        leg = ctk.CTkFrame(self._sk_scroll, fg_color="transparent")
-        leg.pack(pady=(12, 6))
-        for i, (col, _, _tc) in enumerate(_SKILL_CARD_PALETTE):
-            cell = ctk.CTkFrame(leg, fg_color="transparent")
-            cell.pack(side="left", padx=2)
-            dot = ctk.CTkFrame(cell, width=14, height=14, corner_radius=7,
-                               fg_color=col, border_width=1, border_color=BORDER)
-            dot.pack()
-            dot.pack_propagate(False)
-            if i in (0, 3, 6, 9, 12, 15):
-                mk_label(cell, str(i), size=9, color=MUTED).pack()
+        leg_wrap = ctk.CTkFrame(self._sk_scroll, fg_color="transparent")
+        leg_wrap.pack(fill="x", padx=6, pady=(12, 8))
+        # number row
+        num_row = ctk.CTkFrame(leg_wrap, fg_color="transparent")
+        num_row.pack(fill="x")
+        for i in range(16):
+            lbl = mk_label(num_row, str(i) if i % 3 == 0 else "",
+                           size=9, color=MUTED)
+            lbl.pack(side="left", expand=True)
+        # colour strip
+        strip = ctk.CTkFrame(leg_wrap, fg_color="transparent", height=16)
+        strip.pack(fill="x")
+        strip.pack_propagate(False)
+        for col, border, _tc in _SKILL_CARD_PALETTE:
+            sq = ctk.CTkFrame(strip, fg_color=col, corner_radius=3,
+                              border_width=1, border_color=border, height=16)
+            sq.pack(side="left", fill="both", expand=True, padx=1)
         if last:
             dur_min, sk = last
             emoji = active.get(sk, "")
