@@ -1220,6 +1220,7 @@ class App(ctk.CTk):
             ("Sessions > 30 min", "over30",   over30,    STAT_THRESHOLDS["over30"],   ""),
             ("Sessions > 60 min", "over60",   over60,    STAT_THRESHOLDS["over60"],   ""),
         ]
+        stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[0], reverse=True)
 
         for name, key, val, thresholds, unit in stats:
             lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
