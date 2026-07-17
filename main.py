@@ -467,11 +467,13 @@ class App(ctk.CTk):
             val = custom_entry.get().strip()
             try:
                 v = float(val)
-                if v >= 5:
+                if v > 0:
                     for btn in preset_btns.values():
                         btn.configure(fg_color="transparent", text_color=MUTED)
                     custom_entry.configure(border_color=DARK)
                     _select_preset(v, deselect_custom=False)
+                else:
+                    raise ValueError
             except ValueError:
                 custom_entry.configure(border_color=DANGER)
                 dlg.after(1200, lambda: custom_entry.configure(border_color=BORDER))
@@ -1237,7 +1239,9 @@ class App(ctk.CTk):
         m, s = divmod(total_s, 60)
         h, m = divmod(m, 60)
         ts = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-        self.ring.update_ring(0, ts)
+        max_s = self._pomo_max_mins * 60
+        frac  = min(elapsed / max_s, 1.0) if self._timer_fills else max(0.0, 1.0 - elapsed / max_s)
+        self.ring.update_ring(frac, ts)
         self.after(50, self._tick_open)
 
     def _btns_running(self):
