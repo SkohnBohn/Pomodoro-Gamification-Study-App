@@ -2653,13 +2653,6 @@ class App(ctk.CTk):
                 n = streak_state["n"]
                 for i in range(0, min(n, len(streaks) - 1)):
                     s = streaks[i + 1]
-                    row = ctk.CTkFrame(streak_container, fg_color="transparent")
-                    row.pack(fill="x", padx=28, pady=1)
-                    row.columnconfigure(2, weight=1)
-                    mk_label(row, f"#{i+2}", size=11, color=DIM,
-                             weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
-                    mk_label(row, f"{s['length']} days", size=13,
-                             color=TEXT, width=80).grid(row=0, column=1, sticky="w")
                     try:
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
@@ -2667,9 +2660,56 @@ class App(ctk.CTk):
                         range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
                     except Exception:
                         range_s = f"{s['start_date']} – {s['end_date']}"
-                    ctk.CTkFrame(row, fg_color="transparent").grid(row=0, column=2, sticky="ew")
-                    mk_label(row, range_s, size=11, color=DIM).grid(
-                        row=0, column=3, sticky="e", padx=(12, 0))
+                    row = ctk.CTkFrame(streak_container, fg_color="transparent")
+                    row.pack(fill="x", padx=28, pady=2)
+                    row.columnconfigure(2, weight=1)
+                    # col0: rank
+                    mk_label(row, f"#{i+2}", size=11, color=DIM,
+                             weight="bold", width=32).grid(row=0, column=0, sticky="w")
+                    # col1: days count
+                    mk_label(row, f"{s['length']}d", size=13,
+                             color=TEXT, width=44).grid(row=0, column=1, sticky="w")
+                    # col2: mini circle strip
+                    c = tk.Canvas(row, height=10, bg=BG, highlightthickness=0)
+                    c.grid(row=0, column=2, sticky="ew", padx=(8, 8))
+                    length_s = s["length"]
+                    def _draw_mini(event=None, cv=c, ln=length_s):
+                        cv.delete("all")
+                        W2 = cv.winfo_width()
+                        if W2 < 4:
+                            return
+                        sz2, gap2, sep_w2, sep_gap2 = 6, 3, 1, 5
+                        step2 = sz2 + gap2
+                        max_c = min(ln, W2 // step2)
+                        elements2 = []
+                        for di in range(max_c):
+                            elements2.append("c")
+                            if (di + 1) % 7 == 0 and di + 1 < max_c:
+                                elements2.append("s")
+                        total2 = (elements2.count("c") * step2
+                                  + elements2.count("s") * (sep_w2 + sep_gap2 * 2))
+                        x2 = 0
+                        cy2 = 5
+                        for el in elements2:
+                            if el == "c":
+                                cv.create_oval(x2, cy2 - sz2 // 2, x2 + sz2, cy2 + sz2 // 2,
+                                               fill="", outline=_CIRCLE_CLR, width=1.2)
+                                x2 += step2
+                            else:
+                                x2 += sep_gap2
+                                cv.create_line(x2, cy2 - 3, x2, cy2 + 3,
+                                               fill=_SEP_CLR, width=sep_w2)
+                                x2 += sep_w2 + sep_gap2
+                        remaining2 = ln - elements2.count("c")
+                        if remaining2 > 0:
+                            cv.create_text(W2 - 2, cy2, anchor="e",
+                                           text=f"+{remaining2}",
+                                           fill=MUTED, font=("Helvetica", 8))
+                    c.bind("<Configure>", _draw_mini)
+                    c.after(80, _draw_mini)
+                    # col3: date range
+                    mk_label(row, range_s, size=11, color=DIM,
+                             width=120).grid(row=0, column=3, sticky="e")
                 if n < len(streaks) - 1:
                     def _load_s():
                         streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
