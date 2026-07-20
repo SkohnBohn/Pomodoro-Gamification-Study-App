@@ -2619,6 +2619,47 @@ class App(ctk.CTk):
             dot_c.bind("<Configure>", _draw_dots)
             dot_c.after(60, _draw_dots)
 
+        # longest streak extras — button visible by default, entries hidden until clicked
+        if streaks and len(streaks) > 1:
+            streak_state = {"n": 0}
+            streak_container = ctk.CTkFrame(sc, fg_color="transparent")
+            streak_container.pack(fill="x")
+
+            def _render_streaks():
+                for w in streak_container.winfo_children():
+                    w.destroy()
+                n = streak_state["n"]
+                for i in range(0, min(n, len(streaks) - 1)):
+                    s = streaks[i + 1]
+                    row = ctk.CTkFrame(streak_container, fg_color="transparent")
+                    row.pack(fill="x", padx=28, pady=1)
+                    row.columnconfigure(2, weight=1)
+                    mk_label(row, f"#{i+2}", size=11, color=DIM,
+                             weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
+                    mk_label(row, f"{s['length']} days", size=13,
+                             color=TEXT, width=80).grid(row=0, column=1, sticky="w")
+                    try:
+                        from datetime import date as _date
+                        d1 = _date.fromisoformat(s["start_date"])
+                        d2 = _date.fromisoformat(s["end_date"])
+                        range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+                    except Exception:
+                        range_s = f"{s['start_date']} – {s['end_date']}"
+                    ctk.CTkFrame(row, fg_color="transparent").grid(row=0, column=2, sticky="ew")
+                    mk_label(row, range_s, size=11, color=DIM).grid(
+                        row=0, column=3, sticky="e", padx=(12, 0))
+                if n < len(streaks) - 1:
+                    def _load_s():
+                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
+                        _render_streaks()
+                    load_more_btn(streak_container, _load_s)
+                if n > 0:
+                    def _collapse_s():
+                        streak_state["n"] = 0
+                        _render_streaks()
+                    collapse_btn(streak_container, _collapse_s)
+            _render_streaks()
+
         # ── Expand toggle arrow ───────────────────────────────────────────────
         expand_state = {"open": False}
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
@@ -2695,47 +2736,6 @@ class App(ctk.CTk):
         _render_period_in(detail_container, "Best Days", "day")
         _render_period_in(detail_container, "Best Weeks", "week")
         _render_period_in(detail_container, "Best Months", "month")
-
-        # longest streak extras — button visible by default, entries hidden until clicked
-        if streaks and len(streaks) > 1:
-            streak_state = {"n": 0}
-            streak_container = ctk.CTkFrame(sh_inner, fg_color="transparent")
-            streak_container.pack(fill="x", pady=(8, 0))
-
-            def _render_streaks():
-                for w in streak_container.winfo_children():
-                    w.destroy()
-                n = streak_state["n"]
-                for i in range(0, min(n, len(streaks) - 1)):
-                    s = streaks[i + 1]
-                    row = ctk.CTkFrame(streak_container, fg_color="transparent")
-                    row.pack(fill="x", pady=1)
-                    row.columnconfigure(2, weight=1)
-                    mk_label(row, f"#{i+2}", size=11, color=DIM,
-                             weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
-                    mk_label(row, f"{s['length']} days", size=13,
-                             color=TEXT, width=80).grid(row=0, column=1, sticky="w")
-                    try:
-                        from datetime import date as _date
-                        d1 = _date.fromisoformat(s["start_date"])
-                        d2 = _date.fromisoformat(s["end_date"])
-                        range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
-                    except Exception:
-                        range_s = f"{s['start_date']} – {s['end_date']}"
-                    ctk.CTkFrame(row, fg_color="transparent").grid(row=0, column=2, sticky="ew")
-                    mk_label(row, range_s, size=11, color=DIM).grid(
-                        row=0, column=3, sticky="e", padx=(12, 0))
-                if n < len(streaks) - 1:
-                    def _load_s():
-                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
-                        _render_streaks()
-                    load_more_btn(streak_container, _load_s)
-                if n > 0:
-                    def _collapse_s():
-                        streak_state["n"] = 0
-                        _render_streaks()
-                    collapse_btn(streak_container, _collapse_s)
-            _render_streaks()
 
         # ── Per-skill best days ───────────────────────────────────────────────
         try:
