@@ -2361,12 +2361,12 @@ class App(ctk.CTk):
             row.columnconfigure(2, weight=1)
 
             mk_label(row, f"#{rank}", size=11, color=DIM,
-                     weight="bold").grid(row=0, column=0, sticky="w", padx=(0, 12))
+                     weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
             mk_label(row, fmt_min(record["total_min"]), size=13,
-                     color=TEXT).grid(row=0, column=1, sticky="w")
+                     color=TEXT, width=80).grid(row=0, column=1, sticky="w")
 
             lbl_text = record.get("label", "")
-            mk_label(row, lbl_text, size=11, color=DIM).grid(
+            mk_label(row, lbl_text, size=11, color=DIM, width=130).grid(
                 row=0, column=3, sticky="e", padx=(12, 0))
 
             # inline skill bar
@@ -2596,9 +2596,9 @@ class App(ctk.CTk):
                     row.pack(fill="x", padx=28, pady=1)
                     row.columnconfigure(2, weight=1)
                     mk_label(row, f"#{i+1}", size=11, color=DIM,
-                             weight="bold").grid(row=0, column=0, sticky="w", padx=(0, 12))
+                             weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
                     mk_label(row, f"{s['length']} days", size=13,
-                             color=TEXT).grid(row=0, column=1, sticky="w")
+                             color=TEXT, width=80).grid(row=0, column=1, sticky="w")
                     try:
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
