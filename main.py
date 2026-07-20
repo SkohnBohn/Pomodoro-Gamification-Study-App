@@ -2260,12 +2260,13 @@ class App(ctk.CTk):
                 mk_label(inner, intention, size=12, color=MUTED).pack(anchor="w", pady=(2, 0))
 
         if not filtered:
-            mk_label(self._lb_scroll, "Keine Einträge für diesen Zeitraum.",
+            mk_label(self._lb_scroll, "No entries for this period.",
                      color=MUTED, size=14).pack(pady=40)
         elif shown < len(filtered):
+            remaining = len(filtered) - shown
             mk_btn(
                 self._lb_scroll,
-                f"Mehr laden  ({len(filtered) - shown} weitere)",
+                f"Load 10  ({remaining} more)",
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
