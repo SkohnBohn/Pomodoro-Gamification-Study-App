@@ -1671,14 +1671,8 @@ class App(ctk.CTk):
                 except Exception:
                     pass
 
-            def _layout_badges(event=None):
-                w = badge_frame.winfo_width()
-                per_row = max(1, (w - 8) // 72) if w > 10 else 5
-                for j, b in enumerate(badge_btns):
-                    b.grid(row=j // per_row, column=j % per_row, padx=4, pady=4)
-
-            badge_frame.bind("<Configure>", _layout_badges)
-            badge_frame.after(100, _layout_badges)
+            for j, b in enumerate(badge_btns):
+                b.grid(row=j // 9, column=j % 9, padx=4, pady=4)
 
         # ── Stat level bars ───────────────────────────────────────────────────
         def _lvl_prog_stat(val, thresholds):
