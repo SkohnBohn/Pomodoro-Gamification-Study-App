@@ -2353,7 +2353,8 @@ class App(ctk.CTk):
             return card
 
         def compact_row(parent, rank: int, record: dict, is_skill=False,
-                        single_skill: str = None, max_min: float = None):
+                        single_skill: str = None, max_min: float = None,
+                        status_lbl=None):
             """Minimal single-line row for ranks 2+, grid-aligned."""
             row = ctk.CTkFrame(parent, fg_color="transparent")
             row.pack(fill="x", padx=28, pady=1)
@@ -2385,15 +2386,13 @@ class App(ctk.CTk):
                 bc.place(relx=0, rely=0.5, relwidth=1, anchor="w", y=-2)
 
                 skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
-                _tip = [None]
 
                 def _redraw_inline(event=None, c=bc, sk_list=skills_sorted,
-                                   tot=total_min, bmax=bar_max):
+                                   tot=total_min, bmax=bar_max, slbl=status_lbl):
                     c.delete("all")
                     W = c.winfo_width()
                     if W < 2:
                         return
-                    # bar fills proportional fraction of available width
                     bar_w = max(4, int(W * tot / bmax))
                     x = 0
                     segs = []
@@ -2406,27 +2405,20 @@ class App(ctk.CTk):
                         segs.append((sk, mins, x, x + sw))
                         x += sw
 
-                    def _on_move(e, c=c, segs=segs, tot=tot):
+                    def _on_move(e, c=c, segs=segs, tot=tot, slbl=slbl):
                         hit = next(((sk, m) for sk, m, x0, x1 in segs
                                     if x0 <= e.x <= x1), None)
-                        if hit:
+                        if hit and slbl is not None:
                             pct = int(hit[1] / tot * 100 + 0.5)
-                            txt = f"{hit[0]} {pct}%"
-                            if _tip[0] is None:
-                                _tip[0] = tk.Label(c, text=txt, bg=DARK, fg=BG,
-                                                   font=("Helvetica", 9),
-                                                   padx=5, pady=1, relief="flat", bd=0)
-                            else:
-                                _tip[0].configure(text=txt)
-                            tx = min(e.x + 6, c.winfo_width() - 60)
-                            _tip[0].place(x=tx, y=-16)
-                        else:
-                            if _tip[0]:
-                                _tip[0].place_forget()
+                            h_val = hit[1] / 60
+                            h_str = f"{h_val:.1f}h" if h_val < 10 else f"{int(h_val)}h"
+                            slbl.configure(text=f"{hit[0]}  {pct}%  {h_str}")
+                        elif slbl is not None:
+                            slbl.configure(text="")
 
-                    def _on_leave(e):
-                        if _tip[0]:
-                            _tip[0].place_forget()
+                    def _on_leave(e, slbl=slbl):
+                        if slbl is not None:
+                            slbl.configure(text="")
 
                     c.bind("<Motion>", _on_move)
                     c.bind("<Leave>", _on_leave)
@@ -2453,6 +2445,9 @@ class App(ctk.CTk):
             shown_state = {"n": 1}
             container = ctk.CTkFrame(sc, fg_color="transparent")
             container.pack(fill="x")
+            # shared status label — lives outside container so it survives re-renders
+            status_lbl = mk_label(sc, "", size=11, color=MUTED)
+            status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
 
             def _render():
                 for w in container.winfo_children():
@@ -2460,9 +2455,7 @@ class App(ctk.CTk):
                 n = shown_state["n"]
                 if not records:
                     return
-                # hero
                 r0 = records[0]
-                # get session count for hero
                 try:
                     conn2 = sqlite3.connect(DB_FILE)
                     c2 = conn2.cursor()
@@ -2482,7 +2475,8 @@ class App(ctk.CTk):
 
                 max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
-                    compact_row(container, i + 1, records[i], max_min=max_m)
+                    compact_row(container, i + 1, records[i], max_min=max_m,
+                                status_lbl=status_lbl)
 
                 if n < len(records):
                     def _load(s=shown_state):
@@ -2633,9 +2627,12 @@ class App(ctk.CTk):
             sk_state = {"n": 1}
             sk_container = ctk.CTkFrame(sc, fg_color="transparent")
             sk_container.pack(fill="x")
+            sk_status_lbl = mk_label(sc, "", size=11, color=MUTED)
+            sk_status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
 
             def _render_skill(skill=skill, records=skill_records,
-                              state=sk_state, cont=sk_container):
+                              state=sk_state, cont=sk_container,
+                              slbl=sk_status_lbl):
                 for w in cont.winfo_children():
                     w.destroy()
                 n = state["n"]
@@ -2672,7 +2669,8 @@ class App(ctk.CTk):
                 max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
                     compact_row(cont, i + 1, records[i], is_skill=True,
-                                single_skill=skill, max_min=max_m)
+                                single_skill=skill, max_min=max_m,
+                                status_lbl=slbl)
 
                 if n < len(records):
                     def _load_sk(s=state, r=records, fn=_render_skill):
