@@ -68,16 +68,16 @@ _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
 
-# Skill colors — warm heatmap-style palette, one distinct tone per skill
+# Skill colors — desaturated jewel tones, chosen to sit beautifully on golden yellow
 _SKILL_COLORS = {
-    "SOZ":     "#c0392b",   # red
-    "SUR":     "#92400e",   # dark brown
-    "MATH":    "#d97706",   # amber
-    "JOURNAL": "#f59e0b",   # golden yellow
-    "TECH":    "#b45309",   # medium brown
-    "UNI":     "#78350f",   # deep brown
-    "DESIGN":  "#fbbf24",   # bright yellow
-    "ORGA":    "#6b4226",   # muted sienna
+    "SOZ":     "#c1666b",   # dusty rose-red
+    "SUR":     "#9b7eb8",   # soft plum
+    "MATH":    "#6b7fa3",   # slate blue
+    "JOURNAL": "#c4724a",   # warm terracotta
+    "TECH":    "#4a8b8b",   # deep teal
+    "UNI":     "#7a9e7e",   # muted sage
+    "DESIGN":  "#b07b8e",   # dusty mauve
+    "ORGA":    "#8a9a5b",   # warm olive
 }
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
