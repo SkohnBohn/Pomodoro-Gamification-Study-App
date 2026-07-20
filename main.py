@@ -1816,10 +1816,13 @@ class App(ctk.CTk):
         leg = ctk.CTkFrame(parent, fg_color="transparent")
         leg.pack(anchor="w", padx=14, pady=(0, 14))
         mk_label(leg, "Less", size=10, color=MUTED).pack(side="left", padx=(0, 4))
-        for col_val in [CARD, "#fbbf24", "#d97706", "#92400e", DARK]:
+        _legend_ranges = ["0h", "< 0.5h", "0.5–2h", "2–5h", "> 5h"]
+        for col_val, rng in zip([CARD, "#fbbf24", "#d97706", "#92400e", DARK], _legend_ranges):
             c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
                           highlightthickness=0)
             c.pack(side="left", padx=1)
+            c.bind("<Enter>", lambda _, r=rng: tip.configure(text=r))
+            c.bind("<Leave>", lambda _: tip.configure(text=""))
         mk_label(leg, "More", size=10, color=MUTED).pack(side="left", padx=(4, 0))
 
     # ── Stat level-up dialog ─────────────────────────────────────────────────
