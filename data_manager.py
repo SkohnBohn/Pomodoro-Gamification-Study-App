@@ -363,5 +363,163 @@ def get_streak() -> int:
     return streak
 
 
+# ── Records ────────────────────────────────────────────────────────────────────
+
+def _skill_breakdown(conn, dates: list) -> dict:
+    """Return {skill: minutes} for a list of date strings."""
+    if not dates:
+        return {}
+    placeholders = ",".join("?" * len(dates))
+    c = conn.cursor()
+    rows = c.execute(
+        f"SELECT skill, SUM(duration) FROM pomodoro_session"
+        f" WHERE date IN ({placeholders}) GROUP BY skill",
+        dates,
+    ).fetchall()
+    return {sk: (m or 0) for sk, m in rows}
+
+
+def get_best_periods(period: str = "day") -> list:
+    """Return records sorted best-first.
+
+    period: 'day' | 'week' | 'month'
+    Each record: {label, total_min, breakdown: {skill: min}, dates: [date_str, ...]}
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+
+    if period == "day":
+        c.execute(
+            "SELECT date, SUM(duration) FROM pomodoro_session"
+            " WHERE date IS NOT NULL GROUP BY date ORDER BY 2 DESC"
+        )
+        rows = c.fetchall()
+        result = []
+        for date_s, total in rows:
+            bd = _skill_breakdown(conn, [date_s])
+            try:
+                from datetime import date as _date
+                d = _date.fromisoformat(date_s)
+                label = d.strftime("%a, %d %b %Y")
+            except Exception:
+                label = date_s
+            result.append({"label": label, "total_min": total or 0,
+                           "breakdown": bd, "dates": [date_s]})
+
+    elif period == "week":
+        c.execute(
+            "SELECT strftime('%Y-W%W', date) as wk, SUM(duration), MIN(date), MAX(date)"
+            " FROM pomodoro_session WHERE date IS NOT NULL GROUP BY wk ORDER BY 2 DESC"
+        )
+        rows = c.fetchall()
+        result = []
+        for wk, total, dmin, dmax in rows:
+            # collect all dates in that week
+            c2 = conn.cursor()
+            dates = [r[0] for r in c2.execute(
+                "SELECT DISTINCT date FROM pomodoro_session"
+                " WHERE strftime('%Y-W%W', date)=?", (wk,)
+            ).fetchall()]
+            bd = _skill_breakdown(conn, dates)
+            try:
+                from datetime import date as _date
+                d1 = _date.fromisoformat(dmin)
+                d2 = _date.fromisoformat(dmax)
+                label = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+            except Exception:
+                label = wk
+            result.append({"label": label, "total_min": total or 0,
+                           "breakdown": bd, "dates": dates})
+
+    else:  # month
+        c.execute(
+            "SELECT strftime('%Y-%m', date) as mo, SUM(duration), MIN(date)"
+            " FROM pomodoro_session WHERE date IS NOT NULL GROUP BY mo ORDER BY 2 DESC"
+        )
+        rows = c.fetchall()
+        result = []
+        for mo, total, dmin in rows:
+            c2 = conn.cursor()
+            dates = [r[0] for r in c2.execute(
+                "SELECT DISTINCT date FROM pomodoro_session"
+                " WHERE strftime('%Y-%m', date)=?", (mo,)
+            ).fetchall()]
+            bd = _skill_breakdown(conn, dates)
+            try:
+                from datetime import date as _date
+                d = _date.fromisoformat(dmin)
+                label = d.strftime("%B %Y")
+            except Exception:
+                label = mo
+            result.append({"label": label, "total_min": total or 0,
+                           "breakdown": bd, "dates": dates})
+
+    conn.close()
+    return result
+
+
+def get_all_streaks() -> list:
+    """Return all streaks sorted longest-first.
+    Each: {length, start_date, end_date}
+    """
+    from datetime import date as _date, timedelta
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date ASC")
+    raw = [r[0] for r in c.fetchall()]
+    conn.close()
+
+    streaks = []
+    if not raw:
+        return streaks
+
+    try:
+        dates = sorted(_date.fromisoformat(d) for d in raw)
+    except Exception:
+        return streaks
+
+    start = dates[0]
+    length = 1
+    for i in range(1, len(dates)):
+        if dates[i] == dates[i - 1] + timedelta(days=1):
+            length += 1
+        else:
+            streaks.append({"length": length,
+                            "start_date": start.isoformat(),
+                            "end_date": dates[i - 1].isoformat()})
+            start = dates[i]
+            length = 1
+    streaks.append({"length": length,
+                    "start_date": start.isoformat(),
+                    "end_date": dates[-1].isoformat()})
+    streaks.sort(key=lambda x: x["length"], reverse=True)
+    return streaks
+
+
+def get_best_days_for_skill(skill: str) -> list:
+    """Return best days for a specific skill, sorted best-first.
+    Each: {label, total_min, date_s}
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT date, SUM(duration) FROM pomodoro_session"
+        " WHERE skill=? AND date IS NOT NULL GROUP BY date ORDER BY 2 DESC",
+        (skill,),
+    )
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for date_s, total in rows:
+        try:
+            from datetime import date as _date
+            d = _date.fromisoformat(date_s)
+            label = d.strftime("%a, %d %b %Y")
+        except Exception:
+            label = date_s
+        result.append({"label": label, "total_min": total or 0, "date_s": date_s})
+    return result
+
+
 # DB initialisieren beim Laden
 initialize_db()

@@ -26,6 +26,7 @@ from data_manager import (
     get_heatmap_data,
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
     get_first_session_date, get_streak,
+    get_best_periods, get_all_streaks, get_best_days_for_skill,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
@@ -66,6 +67,18 @@ def _apply_palette(name: str):
 _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
+
+# Muted skill colors for the breakdown bar segments
+_SKILL_COLORS = {
+    "SOZ":     "#a8c5da",
+    "SUR":     "#c5b4e3",
+    "MATH":    "#a8d5b5",
+    "JOURNAL": "#f0c090",
+    "TECH":    "#9ec5d4",
+    "UNI":     "#b5cfa8",
+    "DESIGN":  "#e8b4c0",
+    "ORGA":    "#c8c090",
+}
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
 _SKILL_CARD_PALETTE = [
@@ -312,6 +325,7 @@ class App(ctk.CTk):
             ("Skilltree",     "skills"),
             ("Achievements",  "achievements"),
             ("Stats",         "stats"),
+            ("Records",       "records"),
             ("Leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
@@ -388,6 +402,7 @@ class App(ctk.CTk):
                 "skills":       self._build_skills_view,
                 "achievements": self._build_achievements_view,
                 "stats":        self._build_stats_view,
+                "records":      self._build_records_view,
                 "leaderboard":  self._build_leaderboard_view,
             }
             self._views[key] = builders[key]()
@@ -398,6 +413,7 @@ class App(ctk.CTk):
         if key == "skills":         self._refresh_skills()
         elif key == "achievements": self._refresh_achievements()
         elif key == "stats":        self._refresh_stats()
+        elif key == "records":      self._refresh_records()
         elif key == "leaderboard":  self._refresh_leaderboard()
 
     # ── Settings popup ────────────────────────────────────────────────────────
@@ -2182,6 +2198,415 @@ class App(ctk.CTk):
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
 
     # ── Leaderboard View ──────────────────────────────────────────────────────
+    # ── Records ───────────────────────────────────────────────────────────────
+
+    def _build_records_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+        self._rec_scroll = ctk.CTkScrollableFrame(
+            view, fg_color=BG,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
+        )
+        self._rec_scroll.pack(fill="both", expand=True, padx=0, pady=0)
+        return view
+
+    def _refresh_records(self):
+        if not hasattr(self, "_rec_scroll"):
+            return
+        for w in self._rec_scroll.winfo_children():
+            w.destroy()
+        sc = self._rec_scroll
+
+        def fmt_min(m):
+            m = int(m or 0)
+            h, mn = divmod(m, 60)
+            if h and mn:
+                return f"{h}h {mn}m"
+            elif h:
+                return f"{h}h"
+            return f"{mn}m"
+
+        def skill_color(sk):
+            return _SKILL_COLORS.get(sk, "#bbbbbb")
+
+        def draw_bar(parent, breakdown: dict, total_min: float, height=6):
+            """Draw a proportional skill-color bar across the full width."""
+            bar_host = ctk.CTkFrame(parent, fg_color="transparent", height=height + 4)
+            bar_host.pack(fill="x", padx=0, pady=(6, 0))
+            bar_host.pack_propagate(False)
+            canvas = tk.Canvas(bar_host, height=height, bg=PANEL,
+                               highlightthickness=0, bd=0)
+            canvas.pack(fill="x", expand=True)
+
+            if not breakdown or total_min <= 0:
+                return
+
+            skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
+            tooltip_lbl = None
+
+            def _redraw(event=None):
+                canvas.delete("all")
+                W = canvas.winfo_width()
+                if W < 2:
+                    return
+                x = 0
+                segments = []
+                for sk, mins in skills_sorted:
+                    if mins <= 0:
+                        continue
+                    w = max(1, int(W * mins / total_min))
+                    color = skill_color(sk)
+                    seg_id = canvas.create_rectangle(x, 0, x + w, height,
+                                                     fill=color, outline="")
+                    segments.append((seg_id, sk, mins, x, x + w))
+                    x += w
+                # fill any rounding gap
+                if x < W:
+                    canvas.create_rectangle(x, 0, W, height,
+                                            fill=segments[-1][2] and skill_color(segments[-1][1]),
+                                            outline="")
+
+                def on_move(e):
+                    nonlocal tooltip_lbl
+                    hit = None
+                    for seg_id, sk, mins, x0, x1 in segments:
+                        if x0 <= e.x <= x1:
+                            hit = (sk, mins)
+                            break
+                    if hit:
+                        txt = f"{hit[0]}  {fmt_min(hit[1])}"
+                        if tooltip_lbl is None:
+                            tooltip_lbl = tk.Label(canvas, text=txt,
+                                                   bg=DARK, fg=BG,
+                                                   font=("Helvetica", 10),
+                                                   padx=6, pady=2,
+                                                   relief="flat", bd=0)
+                        else:
+                            tooltip_lbl.configure(text=txt)
+                        tx = min(e.x + 8, W - 80)
+                        tooltip_lbl.place(x=tx, y=-18)
+                    else:
+                        if tooltip_lbl:
+                            tooltip_lbl.place_forget()
+
+                def on_leave(e):
+                    nonlocal tooltip_lbl
+                    if tooltip_lbl:
+                        tooltip_lbl.place_forget()
+
+                canvas.bind("<Motion>", on_move)
+                canvas.bind("<Leave>", on_leave)
+
+            canvas.bind("<Configure>", _redraw)
+            canvas.after(50, _redraw)
+
+        def skill_list(parent, breakdown: dict, total_min: float):
+            """Compact percentage list: MATH 42%  TECH 31%  ..."""
+            if not breakdown or total_min <= 0:
+                return
+            items = sorted(breakdown.items(), key=lambda x: -x[1])
+            row = ctk.CTkFrame(parent, fg_color="transparent")
+            row.pack(fill="x", pady=(5, 0))
+            for sk, mins in items:
+                pct = int(mins / total_min * 100 + 0.5)
+                color = skill_color(sk)
+                dot = tk.Canvas(row, width=7, height=7, bg=PANEL,
+                                highlightthickness=0)
+                dot.pack(side="left", padx=(0, 2))
+                dot.create_oval(0, 0, 7, 7, fill=color, outline="")
+                mk_label(row, f"{sk} {pct}%", size=11, color=MUTED).pack(
+                    side="left", padx=(0, 10))
+
+        def section_header(parent, title: str):
+            h = ctk.CTkFrame(parent, fg_color="transparent")
+            h.pack(fill="x", padx=28, pady=(28, 6))
+            mk_label(h, title.upper(), size=10, weight="bold", color=DIM).pack(side="left")
+            ctk.CTkFrame(h, height=1, fg_color=BORDER).pack(
+                side="left", fill="x", expand=True, padx=(10, 0), pady=(1, 0))
+
+        def hero_card(parent, record: dict, session_count: int = None,
+                      period: str = "day"):
+            """Full-detail card for the #1 record."""
+            card = ctk.CTkFrame(parent, fg_color=PANEL, corner_radius=14)
+            card.pack(fill="x", padx=28, pady=(0, 4))
+
+            inner = ctk.CTkFrame(card, fg_color="transparent")
+            inner.pack(fill="x", padx=20, pady=16)
+
+            # top row: time + date
+            top = ctk.CTkFrame(inner, fg_color="transparent")
+            top.pack(fill="x")
+            mk_label(top, fmt_min(record["total_min"]), size=36,
+                     weight="bold", color=DARK).pack(side="left")
+            mk_label(top, record["label"], size=13, color=MUTED).pack(
+                side="right", anchor="s", pady=(0, 6))
+
+            # skill breakdown bar
+            draw_bar(inner, record.get("breakdown", {}), record["total_min"])
+
+            # skill pct list
+            skill_list(inner, record.get("breakdown", {}), record["total_min"])
+
+            if session_count is not None:
+                mk_label(inner, f"{session_count} sessions", size=11,
+                         color=DIM).pack(anchor="w", pady=(6, 0))
+            return card
+
+        def compact_row(parent, rank: int, record: dict, is_skill=False):
+            """Minimal single-line row for ranks 2+."""
+            row = ctk.CTkFrame(parent, fg_color="transparent")
+            row.pack(fill="x", padx=28, pady=1)
+            mk_label(row, f"#{rank}", size=11, color=DIM, weight="bold").pack(side="left",
+                                                                               padx=(0, 10))
+            mk_label(row, fmt_min(record["total_min"]), size=13,
+                     weight="bold", color=TEXT).pack(side="left")
+            lbl_key = "date_s" if is_skill else "label"
+            lbl_text = record.get("label", "")
+            mk_label(row, lbl_text, size=11, color=DIM).pack(side="right")
+
+        def load_more_btn(parent, callback):
+            b = ctk.CTkButton(
+                parent, text="+ 3 more", width=90, height=26,
+                fg_color="transparent", hover_color=BORDER,
+                text_color=MUTED, border_width=1, border_color=BORDER,
+                font=ctk.CTkFont(size=11), corner_radius=8,
+                command=callback,
+            )
+            b.pack(anchor="w", padx=28, pady=(4, 0))
+            return b
+
+        def render_period_section(title: str, period: str):
+            records = get_best_periods(period)
+            if not records:
+                return
+            section_header(sc, title)
+            shown_state = {"n": 1}
+            container = ctk.CTkFrame(sc, fg_color="transparent")
+            container.pack(fill="x")
+
+            def _render():
+                for w in container.winfo_children():
+                    w.destroy()
+                n = shown_state["n"]
+                if not records:
+                    return
+                # hero
+                r0 = records[0]
+                # get session count for hero
+                try:
+                    conn2 = sqlite3.connect(DB_FILE)
+                    c2 = conn2.cursor()
+                    if period == "day":
+                        cnt = c2.execute(
+                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
+                            (r0["dates"][0],)).fetchone()[0]
+                    else:
+                        placeholders = ",".join("?" * len(r0["dates"]))
+                        cnt = c2.execute(
+                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
+                            r0["dates"]).fetchone()[0]
+                    conn2.close()
+                except Exception:
+                    cnt = None
+                hero_card(container, r0, cnt, period)
+
+                for i in range(1, min(n, len(records))):
+                    compact_row(container, i + 1, records[i])
+
+                if n < len(records):
+                    def _load(s=shown_state):
+                        s["n"] = min(s["n"] + 3, len(records))
+                        _render()
+                    load_more_btn(container, _load)
+
+            _render()
+
+        # ── Best Day / Week / Month ───────────────────────────────────────────
+        top_row = ctk.CTkFrame(sc, fg_color="transparent")
+        top_row.pack(fill="x", padx=28, pady=(22, 0))
+        top_row.columnconfigure(0, weight=1)
+        top_row.columnconfigure(1, weight=1)
+        top_row.columnconfigure(2, weight=1)
+
+        for col_i, (lbl, period_key) in enumerate(
+                [("Best Day", "day"), ("Best Week", "week"), ("Best Month", "month")]):
+            col = ctk.CTkFrame(top_row, fg_color="transparent")
+            col.grid(row=0, column=col_i, sticky="nsew",
+                     padx=(0, 12) if col_i < 2 else 0)
+
+            records = get_best_periods(period_key)
+            card = ctk.CTkFrame(col, fg_color=PANEL, corner_radius=14)
+            card.pack(fill="both", expand=True)
+            inner = ctk.CTkFrame(card, fg_color="transparent")
+            inner.pack(fill="x", padx=18, pady=16)
+
+            mk_label(inner, lbl.upper(), size=9, weight="bold", color=DIM).pack(anchor="w")
+            if records:
+                r = records[0]
+                mk_label(inner, fmt_min(r["total_min"]), size=28,
+                         weight="bold", color=DARK).pack(anchor="w", pady=(4, 0))
+                mk_label(inner, r["label"], size=11, color=MUTED).pack(anchor="w")
+                draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5)
+            else:
+                mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
+
+        # ── Detailed sections ─────────────────────────────────────────────────
+        render_period_section("Best Days", "day")
+        render_period_section("Best Weeks", "week")
+        render_period_section("Best Months", "month")
+
+        # ── Longest Streaks ───────────────────────────────────────────────────
+        streaks = get_all_streaks()
+        if streaks:
+            section_header(sc, "Longest Streaks")
+            streak_state = {"n": 1}
+            streak_container = ctk.CTkFrame(sc, fg_color="transparent")
+            streak_container.pack(fill="x")
+
+            def _render_streaks():
+                for w in streak_container.winfo_children():
+                    w.destroy()
+                n = streak_state["n"]
+
+                # hero streak card
+                s0 = streaks[0]
+                card = ctk.CTkFrame(streak_container, fg_color=PANEL, corner_radius=14)
+                card.pack(fill="x", padx=28, pady=(0, 4))
+                inner = ctk.CTkFrame(card, fg_color="transparent")
+                inner.pack(fill="x", padx=20, pady=16)
+                top = ctk.CTkFrame(inner, fg_color="transparent")
+                top.pack(fill="x")
+                mk_label(top, f"{s0['length']} days", size=36,
+                         weight="bold", color=DARK).pack(side="left")
+                try:
+                    from datetime import date as _date
+                    d1 = _date.fromisoformat(s0["start_date"])
+                    d2 = _date.fromisoformat(s0["end_date"])
+                    range_str = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+                except Exception:
+                    range_str = f"{s0['start_date']} – {s0['end_date']}"
+                mk_label(top, range_str, size=13, color=MUTED).pack(
+                    side="right", anchor="s", pady=(0, 6))
+
+                # dot strip
+                dot_row = ctk.CTkFrame(inner, fg_color="transparent")
+                dot_row.pack(fill="x", pady=(10, 0))
+                dot_c = tk.Canvas(dot_row, height=10, bg=PANEL, highlightthickness=0)
+                dot_c.pack(fill="x")
+
+                def _draw_dots(event=None, s=s0):
+                    dot_c.delete("all")
+                    W = dot_c.winfo_width()
+                    length = s["length"]
+                    if length < 1 or W < 4:
+                        return
+                    sz = 7
+                    gap = 4
+                    step = sz + gap
+                    max_dots = min(length, W // step)
+                    x0 = (W - max_dots * step + gap) // 2
+                    for di in range(max_dots):
+                        x = x0 + di * step
+                        dot_c.create_oval(x, 1, x + sz, 1 + sz,
+                                          fill=DARK, outline="")
+                    if max_dots < length:
+                        dot_c.create_text(W - 2, 5, anchor="e",
+                                          text=f"+{length - max_dots}",
+                                          fill=MUTED, font=("Helvetica", 9))
+
+                dot_c.bind("<Configure>", _draw_dots)
+                dot_c.after(60, _draw_dots)
+
+                # compact rows for 2+
+                for i in range(1, min(n, len(streaks))):
+                    s = streaks[i]
+                    row = ctk.CTkFrame(streak_container, fg_color="transparent")
+                    row.pack(fill="x", padx=28, pady=1)
+                    mk_label(row, f"#{i+1}", size=11, color=DIM,
+                             weight="bold").pack(side="left", padx=(0, 10))
+                    mk_label(row, f"{s['length']} days", size=13,
+                             weight="bold", color=TEXT).pack(side="left")
+                    try:
+                        from datetime import date as _date
+                        d1 = _date.fromisoformat(s["start_date"])
+                        d2 = _date.fromisoformat(s["end_date"])
+                        range_s = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+                    except Exception:
+                        range_s = f"{s['start_date']} – {s['end_date']}"
+                    mk_label(row, range_s, size=11, color=DIM).pack(side="right")
+
+                if n < len(streaks):
+                    def _load_s():
+                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks))
+                        _render_streaks()
+                    load_more_btn(streak_container, _load_s)
+
+            _render_streaks()
+
+        # ── Per-skill best days ───────────────────────────────────────────────
+        try:
+            active_skills = [sk for sk, _ in get_user_skills()]
+        except Exception:
+            active_skills = []
+
+        for skill in active_skills:
+            skill_records = get_best_days_for_skill(skill)
+            if not skill_records:
+                continue
+            section_header(sc, f"Best Day — {skill}")
+            sk_state = {"n": 1}
+            sk_container = ctk.CTkFrame(sc, fg_color="transparent")
+            sk_container.pack(fill="x")
+
+            def _render_skill(skill=skill, records=skill_records,
+                              state=sk_state, cont=sk_container):
+                for w in cont.winfo_children():
+                    w.destroy()
+                n = state["n"]
+                r0 = records[0]
+
+                card = ctk.CTkFrame(cont, fg_color=PANEL, corner_radius=14)
+                card.pack(fill="x", padx=28, pady=(0, 4))
+                inner = ctk.CTkFrame(card, fg_color="transparent")
+                inner.pack(fill="x", padx=20, pady=16)
+                top = ctk.CTkFrame(inner, fg_color="transparent")
+                top.pack(fill="x")
+                mk_label(top, fmt_min(r0["total_min"]), size=36,
+                         weight="bold", color=DARK).pack(side="left")
+                mk_label(top, r0["label"], size=13, color=MUTED).pack(
+                    side="right", anchor="s", pady=(0, 6))
+
+                # single-color bar for this skill
+                bar_host = ctk.CTkFrame(inner, fg_color="transparent", height=10)
+                bar_host.pack(fill="x", pady=(8, 0))
+                bar_host.pack_propagate(False)
+                sk_canvas = tk.Canvas(bar_host, height=6, bg=PANEL,
+                                      highlightthickness=0)
+                sk_canvas.pack(fill="x", expand=True)
+
+                def _draw_sk_bar(event=None, c=sk_canvas, sk=skill):
+                    c.delete("all")
+                    W = c.winfo_width()
+                    if W > 2:
+                        c.create_rectangle(0, 0, W, 6,
+                                           fill=skill_color(sk), outline="")
+                sk_canvas.bind("<Configure>", _draw_sk_bar)
+                sk_canvas.after(60, _draw_sk_bar)
+
+                for i in range(1, min(n, len(records))):
+                    compact_row(cont, i + 1, records[i], is_skill=True)
+
+                if n < len(records):
+                    def _load_sk(s=state, r=records, fn=_render_skill):
+                        s["n"] = min(s["n"] + 3, len(r))
+                        fn()
+                    load_more_btn(cont, _load_sk)
+
+            _render_skill()
+
+        # bottom padding
+        ctk.CTkFrame(sc, fg_color="transparent", height=40).pack()
+
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
