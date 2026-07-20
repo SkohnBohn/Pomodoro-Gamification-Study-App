@@ -2696,9 +2696,9 @@ class App(ctk.CTk):
         _render_period_in(detail_container, "Best Weeks", "week")
         _render_period_in(detail_container, "Best Months", "month")
 
-        # longest streak extras — always visible, directly below streak hero
+        # longest streak extras — button visible by default, entries hidden until clicked
         if streaks and len(streaks) > 1:
-            streak_state = {"n": 1}
+            streak_state = {"n": 0}
             streak_container = ctk.CTkFrame(sc, fg_color="transparent")
             streak_container.pack(fill="x")
 
@@ -2730,9 +2730,9 @@ class App(ctk.CTk):
                         streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
                         _render_streaks()
                     load_more_btn(streak_container, _load_s)
-                if n > 1:
+                if n > 0:
                     def _collapse_s():
-                        streak_state["n"] = 1
+                        streak_state["n"] = 0
                         _render_streaks()
                     collapse_btn(streak_container, _collapse_s)
             _render_streaks()
