@@ -321,12 +321,12 @@ class App(ctk.CTk):
 
         self._nav_btns: dict = {}
         for text, key in [
-            ("timer",         "timer"),
-            ("skilltree",     "skills"),
-            ("achievements",  "achievements"),
-            ("stats",         "stats"),
-            ("records",       "records"),
-            ("leaderboard",   "leaderboard"),
+            ("Timer",         "timer"),
+            ("Skilltree",     "skills"),
+            ("Achievements",  "achievements"),
+            ("Stats",         "stats"),
+            ("Records",       "records"),
+            ("Leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
                 self.sidebar, text=text, anchor="w",
