@@ -1642,7 +1642,7 @@ class App(ctk.CTk):
                         d.configure(fg_color=PANEL)
                         d.grab_set()
                         d.lift()
-                        mk_label(d, f"Badge LVL {badge_i}", size=18,
+                        mk_label(d, f"Badge {badge_i}", size=18,
                                  weight="bold", color=DARK).pack(pady=(28, 6))
                         if date_s and date_s != "Von Anfang an":
                             try:
@@ -1650,16 +1650,16 @@ class App(ctk.CTk):
                                 fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d.%m.%y")
                             except Exception:
                                 fmt = date_s
-                            mk_label(d, f"Freigeschaltet am {fmt}",
+                            mk_label(d, f"unlocked on {fmt}",
                                      size=13, color=MUTED).pack()
                         else:
                             mk_label(d, date_s or "Datum unbekannt",
                                      size=13, color=MUTED).pack()
                         if badge_i > 0 and badge_i <= len(LEVEL_THRESHOLDS):
                             threshold_h = LEVEL_THRESHOLDS[badge_i - 1]
-                            mk_label(d, f"nach {threshold_h} h gesamt",
+                            mk_label(d, f"≥{threshold_h}h",
                                      size=12, color=MUTED).pack(pady=(2, 0))
-                        mk_btn(d, "Schließen", d.destroy,
+                        mk_btn(d, "Close", d.destroy,
                                width=130, height=36, primary=True).pack(pady=18)
 
                     btn = ctk.CTkButton(
