@@ -1842,8 +1842,7 @@ class App(ctk.CTk):
     def _draw_bar_chart(self, parent):
         ctrl = ctk.CTkFrame(parent, fg_color="transparent")
         ctrl.pack(fill="x", padx=16, pady=(14, 6))
-        mk_label(ctrl, "Verlauf (letzte 60 Tage)", size=13, weight="bold",
-                 color=TEXT).pack(side="left")
+
 
         skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
         chart_skill = ctk.StringVar(value="Alle")
