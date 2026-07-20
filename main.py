@@ -620,10 +620,7 @@ class App(ctk.CTk):
         # Streak
         streak = get_streak()
         prev_streak = getattr(self, "_prev_streak", streak)
-        if streak > 0:
-            self._streak_lbl.configure(text=f"🔥 {streak} day streak")
-        else:
-            self._streak_lbl.configure(text="")
+        self._streak_lbl.configure(text=f"🔥 {streak} day streak")
         if streak > prev_streak and prev_streak > 0:
             self._animate_streak_bump()
         self._prev_streak = streak
