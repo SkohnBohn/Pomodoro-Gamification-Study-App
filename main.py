@@ -13,8 +13,10 @@ import subprocess
 from datetime import datetime, date, timedelta
 from PIL import Image
 
+import config
 from config import (
     DB_FILE, BADGE_DIR, LEVEL_THRESHOLDS, SKILL_THRESHOLDS, STAT_THRESHOLDS,
+    DB_NEWUI, DB_MAIN,
 )
 from data_manager import (
     calculate_total_time, save_session, initialize_db,
@@ -420,7 +422,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("280x510")
+        dlg.geometry("280x610")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -569,6 +571,36 @@ class App(ctk.CTk):
             command=lambda: (dlg.destroy(), self._switch_theme("light")),
         )
         light_btn.pack(side="left", padx=(0, 2), pady=2)
+
+        # ── DB selector ───────────────────────────────────────────────────────
+        mk_label(dlg, "Database", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(16, 0))
+        db_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=220)
+        db_pill.pack(pady=(6, 0))
+        db_pill.pack_propagate(False)
+        db_btns = {}
+
+        def _select_db(key):
+            config.DB_FILE  # read to avoid import issues
+            for k, b in db_btns.items():
+                b.configure(
+                    fg_color=DARK if k == key else "transparent",
+                    text_color=BG if k == key else MUTED,
+                )
+            dlg.destroy()
+            self._switch_db(key)
+
+        _cur_db = "newui" if config.DB_FILE == DB_NEWUI else "main"
+        for key, label in [("newui", "DB New UI"), ("main", "DB Main")]:
+            b = ctk.CTkButton(
+                db_pill, text=label, width=106, height=28, corner_radius=12,
+                fg_color=DARK if _cur_db == key else "transparent",
+                hover_color=DARK2,
+                text_color=BG if _cur_db == key else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+                command=lambda k=key: _select_db(k),
+            )
+            b.pack(side="left", padx=2, pady=2)
+            db_btns[key] = b
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
@@ -763,6 +795,26 @@ class App(ctk.CTk):
         self.running = False
         prev_view = self._active_view
         # Destroy all built views and sidebar
+        for v in self._views.values():
+            v.destroy()
+        self._views = {}
+        self.sidebar.destroy()
+        self.content.destroy()
+        self.configure(fg_color=BG)
+        self._build_ui()
+        self._nav(prev_view or "timer")
+        self.after(100, self._refresh_sidebar)
+
+    # ── DB switch ─────────────────────────────────────────────────────────────
+    def _switch_db(self, db_key: str):
+        new_path = DB_NEWUI if db_key == "newui" else DB_MAIN
+        if config.DB_FILE == new_path:
+            return
+        config.DB_FILE = new_path
+        from data_manager import initialize_db as _init
+        _init()
+        prev_view = self._active_view
+        self.running = False
         for v in self._views.values():
             v.destroy()
         self._views = {}

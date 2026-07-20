@@ -1,10 +1,11 @@
 import sqlite3
+import config
 from datetime import datetime
-from config import DB_FILE, LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
+from config import LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
 
 
 def initialize_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS pomodoro_session (
@@ -69,7 +70,7 @@ def initialize_db():
 
 
 def _seed_user_skills():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     if c.execute("SELECT COUNT(*) FROM user_skills").fetchone()[0] == 0:
         for i, sk in enumerate(SKILLS):
@@ -85,7 +86,7 @@ def _seed_user_skills():
 # ── Sessions ───────────────────────────────────────────────────────────────────
 
 def calculate_total_time():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT SUM(duration) FROM pomodoro_session")
     result = c.fetchone()[0]
@@ -95,7 +96,7 @@ def calculate_total_time():
 
 def save_session(duration, intention, result, skill="Pomodoro"):
     now = datetime.now()
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT MAX(sessions) FROM pomodoro_session")
     last_id = c.fetchone()[0] or 0
@@ -116,7 +117,7 @@ def save_session(duration, intention, result, skill="Pomodoro"):
 
 def save_note(title: str, content: str):
     now = datetime.now()
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     row = c.execute("SELECT id FROM notes WHERE title=?", (title,)).fetchone()
     if row:
@@ -134,7 +135,7 @@ def save_note(title: str, content: str):
 
 
 def get_notes(limit: int = 50):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute(
         "SELECT id, date, time, title, content FROM notes"
@@ -147,7 +148,7 @@ def get_notes(limit: int = 50):
 
 
 def delete_note(note_id: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("DELETE FROM notes WHERE id=?", (note_id,))
     conn.commit()
@@ -155,7 +156,7 @@ def delete_note(note_id: int):
 
 
 def rename_note(note_id: int, new_title: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("UPDATE notes SET title=? WHERE id=?", (new_title, note_id))
     conn.commit()
@@ -165,7 +166,7 @@ def rename_note(note_id: int, new_title: str):
 # ── Skill level confirmation ───────────────────────────────────────────────────
 
 def get_skill_confirmed_levels() -> dict:
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     rows = c.execute(
         "SELECT skill, confirmed_level FROM skill_confirmed_levels"
@@ -175,7 +176,7 @@ def get_skill_confirmed_levels() -> dict:
 
 
 def confirm_skill_level(skill: str, level: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute(
         """INSERT INTO skill_confirmed_levels (skill, confirmed_level) VALUES (?, ?)
@@ -189,7 +190,7 @@ def confirm_skill_level(skill: str, level: int):
 # ── Achievement collection ─────────────────────────────────────────────────────
 
 def get_achievements_collected() -> set:
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     rows = c.execute("SELECT name FROM achievement_collected").fetchall()
     conn.close()
@@ -197,7 +198,7 @@ def get_achievements_collected() -> set:
 
 
 def mark_achievement_collected(name: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO achievement_collected (name) VALUES (?)", (name,))
     conn.commit()
@@ -215,7 +216,7 @@ def get_badge_unlock_info(level: int) -> tuple:
     if level == 0:
         return ("Von Anfang an", 0.0)
     threshold_min = LEVEL_THRESHOLDS[level - 1] * 60
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT date, duration FROM pomodoro_session ORDER BY sessions ASC")
     rows = c.fetchall()
@@ -232,7 +233,7 @@ def get_badge_unlock_info(level: int) -> tuple:
 
 def get_user_skills() -> list:
     """Return [(name, emoji), ...] of all active skills."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     rows = c.execute(
         "SELECT name, emoji FROM user_skills WHERE active=1 ORDER BY sort_order"
@@ -242,7 +243,7 @@ def get_user_skills() -> list:
 
 
 def add_user_skill(name: str, emoji: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     max_order = c.execute("SELECT MAX(sort_order) FROM user_skills").fetchone()[0] or 0
     c.execute(
@@ -255,7 +256,7 @@ def add_user_skill(name: str, emoji: str):
 
 
 def delete_user_skill(name: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("UPDATE user_skills SET active=0 WHERE name=?", (name,))
     conn.commit()
@@ -265,7 +266,7 @@ def delete_user_skill(name: str):
 # ── Stat level confirmation ────────────────────────────────────────────────────
 
 def get_stat_confirmed_levels() -> dict:
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     rows = c.execute(
         "SELECT stat, confirmed_level FROM stat_confirmed_levels"
@@ -275,7 +276,7 @@ def get_stat_confirmed_levels() -> dict:
 
 
 def confirm_stat_level(stat: str, level: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute(
         """INSERT INTO stat_confirmed_levels (stat, confirmed_level) VALUES (?, ?)
@@ -290,7 +291,7 @@ def confirm_stat_level(stat: str, level: int):
 
 def get_chart_data(skill: str = None) -> dict:
     """Return {date_str: hours} for bar chart, optionally filtered by skill."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     if skill and skill != "Alle":
         c.execute(
@@ -311,7 +312,7 @@ def get_chart_data(skill: str = None) -> dict:
 # ── First session date ─────────────────────────────────────────────────────────
 
 def get_first_session_date() -> str | None:
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     row = c.execute("SELECT MIN(date) FROM pomodoro_session").fetchone()
     conn.close()
@@ -322,7 +323,7 @@ def get_first_session_date() -> str | None:
 
 def get_heatmap_data() -> dict:
     """Return {date_str: total_minutes} for all dates with sessions."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT date, SUM(duration) FROM pomodoro_session GROUP BY date")
     rows = c.fetchall()
@@ -333,7 +334,7 @@ def get_heatmap_data() -> dict:
 def get_streak() -> int:
     """Return current consecutive-day streak (days with ≥1 session ending today or yesterday)."""
     from datetime import date, timedelta
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC")
     rows = [r[0] for r in c.fetchall()]
@@ -385,7 +386,7 @@ def get_best_periods(period: str = "day") -> list:
     period: 'day' | 'week' | 'month'
     Each record: {label, total_min, breakdown: {skill: min}, dates: [date_str, ...]}
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
 
     if period == "day":
@@ -463,7 +464,7 @@ def get_all_streaks() -> list:
     Each: {length, start_date, end_date}
     """
     from datetime import date as _date, timedelta
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date ASC")
     raw = [r[0] for r in c.fetchall()]
@@ -500,7 +501,7 @@ def get_best_days_for_skill(skill: str) -> list:
     """Return best days for a specific skill, sorted best-first.
     Each: {label, total_min, date_s}
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute(
         "SELECT date, SUM(duration) FROM pomodoro_session"
