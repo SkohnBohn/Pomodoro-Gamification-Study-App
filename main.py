@@ -68,16 +68,16 @@ _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
 
-# Muted skill colors for the breakdown bar segments
+# Skill colors for breakdown bars — clearly distinct hues
 _SKILL_COLORS = {
-    "SOZ":     "#a8c5da",
-    "SUR":     "#c5b4e3",
-    "MATH":    "#a8d5b5",
-    "JOURNAL": "#f0c090",
-    "TECH":    "#9ec5d4",
-    "UNI":     "#b5cfa8",
-    "DESIGN":  "#e8b4c0",
-    "ORGA":    "#c8c090",
+    "SOZ":     "#5b9bd5",   # strong blue
+    "SUR":     "#e06b8b",   # rose pink
+    "MATH":    "#4caf82",   # teal green
+    "JOURNAL": "#e8a838",   # amber
+    "TECH":    "#7c6fc4",   # purple
+    "UNI":     "#3ab0b0",   # cyan
+    "DESIGN":  "#d45f3c",   # terracotta
+    "ORGA":    "#8faa44",   # olive green
 }
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
@@ -2286,8 +2286,9 @@ class App(ctk.CTk):
         def skill_color(sk):
             return _SKILL_COLORS.get(sk, "#bbbbbb")
 
-        def draw_bar(parent, breakdown: dict, total_min: float, height=6):
-            """Draw a proportional skill-color bar across the full width."""
+        def draw_bar(parent, breakdown: dict, total_min: float, height=6,
+                     status_lbl=None):
+            """Draw a proportional skill-color bar. Hover shows info in status_lbl."""
             bar_host = ctk.CTkFrame(parent, fg_color="transparent", height=height + 4)
             bar_host.pack(fill="x", padx=0, pady=(6, 0))
             bar_host.pack_propagate(False)
@@ -2299,7 +2300,6 @@ class App(ctk.CTk):
                 return
 
             skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
-            tooltip_lbl = None
 
             def _redraw(event=None):
                 canvas.delete("all")
@@ -2312,44 +2312,27 @@ class App(ctk.CTk):
                     if mins <= 0:
                         continue
                     w = max(1, int(W * mins / total_min))
-                    color = skill_color(sk)
-                    seg_id = canvas.create_rectangle(x, 0, x + w, height,
-                                                     fill=color, outline="")
-                    segments.append((seg_id, sk, mins, x, x + w))
+                    canvas.create_rectangle(x, 0, x + w, height,
+                                            fill=skill_color(sk), outline="")
+                    segments.append((sk, mins, x, x + w))
                     x += w
-                # fill any rounding gap
-                if x < W:
+                if x < W and segments:
                     canvas.create_rectangle(x, 0, W, height,
-                                            fill=segments[-1][2] and skill_color(segments[-1][1]),
-                                            outline="")
+                                            fill=skill_color(segments[-1][0]), outline="")
 
-                def on_move(e):
-                    nonlocal tooltip_lbl
-                    hit = None
-                    for seg_id, sk, mins, x0, x1 in segments:
-                        if x0 <= e.x <= x1:
-                            hit = (sk, mins)
-                            break
-                    if hit:
-                        txt = f"{hit[0]}  {fmt_min(hit[1])}"
-                        if tooltip_lbl is None:
-                            tooltip_lbl = tk.Label(canvas, text=txt,
-                                                   bg=DARK, fg=BG,
-                                                   font=("Helvetica", 10),
-                                                   padx=6, pady=2,
-                                                   relief="flat", bd=0)
-                        else:
-                            tooltip_lbl.configure(text=txt)
-                        tx = min(e.x + 8, W - 80)
-                        tooltip_lbl.place(x=tx, y=-18)
-                    else:
-                        if tooltip_lbl:
-                            tooltip_lbl.place_forget()
+                def on_move(e, segs=segments, tot=total_min, slbl=status_lbl):
+                    hit = next(((sk, m) for sk, m, x0, x1 in segs if x0 <= e.x <= x1), None)
+                    if hit and slbl is not None:
+                        pct = int(hit[1] / tot * 100 + 0.5)
+                        h_val = hit[1] / 60
+                        h_str = f"{h_val:.1f}h" if h_val < 10 else f"{int(h_val)}h"
+                        slbl.configure(text=f"{hit[0]}  {pct}%  {h_str}")
+                    elif slbl is not None:
+                        slbl.configure(text="")
 
-                def on_leave(e):
-                    nonlocal tooltip_lbl
-                    if tooltip_lbl:
-                        tooltip_lbl.place_forget()
+                def on_leave(e, slbl=status_lbl):
+                    if slbl is not None:
+                        slbl.configure(text="")
 
                 canvas.bind("<Motion>", on_move)
                 canvas.bind("<Leave>", on_leave)
@@ -2398,15 +2381,15 @@ class App(ctk.CTk):
             mk_label(top, fmt_date_short(record["label"]), size=13, color=MUTED).pack(
                 side="right", anchor="s", pady=(0, 6))
 
-            # skill breakdown bar
-            draw_bar(inner, record.get("breakdown", {}), record["total_min"])
-
-            # skill pct list
-            skill_list(inner, record.get("breakdown", {}), record["total_min"])
+            # skill breakdown bar + hover status
+            hero_status = mk_label(inner, "", size=11, color=MUTED)
+            draw_bar(inner, record.get("breakdown", {}), record["total_min"],
+                     status_lbl=hero_status)
+            hero_status.pack(anchor="w", pady=(4, 0))
 
             if session_count is not None:
                 mk_label(inner, f"{session_count} sessions", size=11,
-                         color=DIM).pack(anchor="w", pady=(6, 0))
+                         color=DIM).pack(anchor="w", pady=(2, 0))
             return card
 
         def compact_row(parent, rank: int, record: dict, is_skill=False,
