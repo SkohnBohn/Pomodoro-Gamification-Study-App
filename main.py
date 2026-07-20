@@ -70,7 +70,7 @@ _apply_palette("yellow")
 
 # Skill colors — warm heatmap-style palette, one distinct tone per skill
 _SKILL_COLORS = {
-    "SOZ":     "#1a1200",   # near-black (darkest)
+    "SOZ":     "#e8a020",   # warm orange-yellow
     "SUR":     "#92400e",   # dark brown
     "MATH":    "#d97706",   # amber
     "JOURNAL": "#f59e0b",   # golden yellow
