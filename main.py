@@ -2234,16 +2234,46 @@ class App(ctk.CTk):
             return f"{val:.1f}h"
 
         def fmt_date_short(label: str) -> str:
-            """Convert 'Sat, 14 Mar 2026' → '14.03.26'."""
+            """Convert any date label to compact form.
+            'Sat, 14 Mar 2026'      → '14.03.26'
+            '09 Mar – 15 Mar 2026'  → '09.03.26 – 15.03.26'
+            'March 2026'            → 'Mar 26'
+            """
             import re
-            # try parsing the full label format
-            for fmt in ("%a, %d %b %Y", "%d %b %Y"):
+            from datetime import datetime as _dtt
+
+            # range: "09 Mar – 15 Mar 2026" or "09 Mar – 15 Mar 2026"
+            range_m = re.match(
+                r"^(\d{1,2} \w{3})\s*[–-]\s*(\d{1,2} \w{3} \d{4})$", label.strip()
+            )
+            if range_m:
+                part1 = range_m.group(1)
+                part2 = range_m.group(2)
+                # extract year from part2
+                year_m = re.search(r"(\d{4})$", part2)
+                year = year_m.group(1) if year_m else ""
                 try:
-                    from datetime import datetime as _dtt
-                    return _dtt.strptime(label, fmt).strftime("%d.%m.%y")
+                    d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d.%m.%y")
+                    d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d.%m.%y")
+                    return f"{d1} – {d2}"
                 except Exception:
                     pass
-            # fallback: look for ISO date
+
+            # month label: "March 2026" or "Mar 2026"
+            for fmt in ("%B %Y", "%b %Y"):
+                try:
+                    return _dtt.strptime(label.strip(), fmt).strftime("%b %y")
+                except Exception:
+                    pass
+
+            # single date: "Sat, 14 Mar 2026" or "14 Mar 2026"
+            for fmt in ("%a, %d %b %Y", "%d %b %Y"):
+                try:
+                    return _dtt.strptime(label.strip(), fmt).strftime("%d.%m.%y")
+                except Exception:
+                    pass
+
+            # ISO date fallback
             m = re.search(r"(\d{4}-\d{2}-\d{2})", label)
             if m:
                 try:
@@ -2363,9 +2393,9 @@ class App(ctk.CTk):
             # top row: time + date
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, fmt_min(record["total_min"]), size=36,
+            mk_label(top, fmt_min_decimal(record["total_min"]), size=36,
                      weight="bold", color=DARK).pack(side="left")
-            mk_label(top, record["label"], size=13, color=MUTED).pack(
+            mk_label(top, fmt_date_short(record["label"]), size=13, color=MUTED).pack(
                 side="right", anchor="s", pady=(0, 6))
 
             # skill breakdown bar
@@ -2535,9 +2565,9 @@ class App(ctk.CTk):
             mk_label(inner, lbl.upper(), size=9, weight="bold", color=DIM).pack(anchor="w")
             if records:
                 r = records[0]
-                mk_label(inner, fmt_min(r["total_min"]), size=28,
+                mk_label(inner, fmt_min_decimal(r["total_min"]), size=28,
                          weight="bold", color=DARK).pack(anchor="w", pady=(4, 0))
-                mk_label(inner, r["label"], size=11, color=MUTED).pack(anchor="w")
+                mk_label(inner, fmt_date_short(r["label"]), size=11, color=MUTED).pack(anchor="w")
                 draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5)
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
@@ -2574,7 +2604,7 @@ class App(ctk.CTk):
                     from datetime import date as _date
                     d1 = _date.fromisoformat(s0["start_date"])
                     d2 = _date.fromisoformat(s0["end_date"])
-                    range_str = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+                    range_str = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
                 except Exception:
                     range_str = f"{s0['start_date']} – {s0['end_date']}"
                 mk_label(top, range_str, size=13, color=MUTED).pack(
@@ -2671,9 +2701,9 @@ class App(ctk.CTk):
                 inner.pack(fill="x", padx=20, pady=16)
                 top = ctk.CTkFrame(inner, fg_color="transparent")
                 top.pack(fill="x")
-                mk_label(top, fmt_min(r0["total_min"]), size=36,
+                mk_label(top, fmt_min_decimal(r0["total_min"]), size=36,
                          weight="bold", color=DARK).pack(side="left")
-                mk_label(top, r0["label"], size=13, color=MUTED).pack(
+                mk_label(top, fmt_date_short(r0["label"]), size=13, color=MUTED).pack(
                     side="right", anchor="s", pady=(0, 6))
 
                 # single-color bar for this skill
