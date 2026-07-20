@@ -321,12 +321,12 @@ class App(ctk.CTk):
 
         self._nav_btns: dict = {}
         for text, key in [
-            ("Timer",         "timer"),
-            ("Skilltree",     "skills"),
-            ("Achievements",  "achievements"),
-            ("Stats",         "stats"),
-            ("Records",       "records"),
-            ("Leaderboard",   "leaderboard"),
+            ("timer",         "timer"),
+            ("skilltree",     "skills"),
+            ("achievements",  "achievements"),
+            ("stats",         "stats"),
+            ("records",       "records"),
+            ("leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
                 self.sidebar, text=text, anchor="w",
@@ -1677,7 +1677,7 @@ class App(ctk.CTk):
                                      size=12, color=MUTED).pack(pady=(2, 0))
                         arrow_lbl = ctk.CTkLabel(d, text="⌄", font=("Helvetica", 28),
                                                  text_color="#888880", fg_color="transparent",
-                                                 cursor="hand2")
+                                                 cursor="")
                         arrow_lbl.pack(pady=(12, 18))
                         arrow_lbl.bind("<Button-1>", lambda e: d.destroy())
                         arrow_lbl.bind("<Enter>", lambda e: arrow_lbl.configure(text_color="#555550"))
@@ -2480,7 +2480,7 @@ class App(ctk.CTk):
         def collapse_btn(parent, callback):
             lbl = ctk.CTkLabel(parent, text="⌃", font=("Helvetica", 20),
                                text_color="#888880", fg_color="transparent",
-                               cursor="hand2")
+                               cursor="")
             lbl.pack(anchor="w", padx=32, pady=(2, 0))
             lbl.bind("<Button-1>", lambda e: callback())
             lbl.bind("<Enter>", lambda e: lbl.configure(text_color="#555550"))
