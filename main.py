@@ -2166,7 +2166,7 @@ class App(ctk.CTk):
         self._lb_period = _LbPeriod(self)
 
         self._lb_sum = mk_label(view, "", color=MUTED, size=12)
-        self._lb_sum.pack(anchor="center", pady=(4, 2))
+        self._lb_sum.pack(anchor="e", padx=22, pady=(4, 2))
 
         self._lb_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -2220,7 +2220,7 @@ class App(ctk.CTk):
 
         total = sum(d for d, *_ in filtered)
         self._lb_sum.configure(
-            text=f"Σ {total / 60:.1f} h · {len(filtered)} Sessions")
+            text=f"Σ {total / 60:.1f}h · {len(filtered)} sessions")
 
         filtered.sort(key=lambda x: x[0], reverse=True)
         medals  = ["🥇", "🥈", "🥉"]
