@@ -2353,29 +2353,34 @@ class App(ctk.CTk):
             return card
 
         def compact_row(parent, rank: int, record: dict, is_skill=False,
-                        single_skill: str = None):
-            """Minimal single-line row for ranks 2+."""
+                        single_skill: str = None, max_min: float = None):
+            """Minimal single-line row for ranks 2+, grid-aligned."""
             row = ctk.CTkFrame(parent, fg_color="transparent")
             row.pack(fill="x", padx=28, pady=1)
+            # col 0: rank (fixed), col 1: time (fixed), col 2: bar (expand), col 3: date (fixed)
+            row.columnconfigure(2, weight=1)
 
             mk_label(row, f"#{rank}", size=11, color=DIM,
-                     weight="bold").pack(side="left", padx=(0, 10))
+                     weight="bold").grid(row=0, column=0, sticky="w", padx=(0, 12))
             mk_label(row, fmt_min(record["total_min"]), size=13,
-                     color=TEXT).pack(side="left")
+                     color=TEXT).grid(row=0, column=1, sticky="w")
 
             lbl_text = record.get("label", "")
-            mk_label(row, lbl_text, size=11, color=DIM).pack(side="right", padx=(8, 0))
+            mk_label(row, lbl_text, size=11, color=DIM).grid(
+                row=0, column=3, sticky="e", padx=(12, 0))
 
-            # inline skill bar between time and date
+            # inline skill bar
             breakdown = record.get("breakdown")
             total_min = record["total_min"]
             if single_skill:
                 breakdown = {single_skill: total_min}
 
-            if breakdown and total_min > 0:
+            bar_max = max_min if (max_min and max_min > 0) else total_min
+
+            if breakdown and total_min > 0 and bar_max > 0:
                 bar_frame = ctk.CTkFrame(row, fg_color="transparent", height=14)
-                bar_frame.pack(side="left", fill="x", expand=True, padx=(10, 6))
-                bar_frame.pack_propagate(False)
+                bar_frame.grid(row=0, column=2, sticky="ew", padx=(12, 0))
+                bar_frame.grid_propagate(False)
                 bc = tk.Canvas(bar_frame, height=4, bg=BG, highlightthickness=0)
                 bc.place(relx=0, rely=0.5, relwidth=1, anchor="w", y=-2)
 
@@ -2383,21 +2388,23 @@ class App(ctk.CTk):
                 _tip = [None]
 
                 def _redraw_inline(event=None, c=bc, sk_list=skills_sorted,
-                                   tot=total_min):
+                                   tot=total_min, bmax=bar_max):
                     c.delete("all")
                     W = c.winfo_width()
                     if W < 2:
                         return
+                    # bar fills proportional fraction of available width
+                    bar_w = max(4, int(W * tot / bmax))
                     x = 0
                     segs = []
                     for sk, mins in sk_list:
                         if mins <= 0:
                             continue
-                        w = max(1, int(W * mins / tot))
-                        cid = c.create_rectangle(x, 0, x + w, 4,
-                                                 fill=skill_color(sk), outline="")
-                        segs.append((sk, mins, x, x + w))
-                        x += w
+                        sw = max(1, int(bar_w * mins / tot))
+                        c.create_rectangle(x, 0, x + sw, 4,
+                                           fill=skill_color(sk), outline="")
+                        segs.append((sk, mins, x, x + sw))
+                        x += sw
 
                     def _on_move(e, c=c, segs=segs, tot=tot):
                         hit = next(((sk, m) for sk, m, x0, x1 in segs
@@ -2473,8 +2480,9 @@ class App(ctk.CTk):
                     cnt = None
                 hero_card(container, r0, cnt, period)
 
+                max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
-                    compact_row(container, i + 1, records[i])
+                    compact_row(container, i + 1, records[i], max_min=max_m)
 
                 if n < len(records):
                     def _load(s=shown_state):
@@ -2581,14 +2589,16 @@ class App(ctk.CTk):
                 dot_c.after(60, _draw_dots)
 
                 # compact rows for 2+
+                max_streak = streaks[0]["length"]
                 for i in range(1, min(n, len(streaks))):
                     s = streaks[i]
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
                     row.pack(fill="x", padx=28, pady=1)
+                    row.columnconfigure(2, weight=1)
                     mk_label(row, f"#{i+1}", size=11, color=DIM,
-                             weight="bold").pack(side="left", padx=(0, 10))
+                             weight="bold").grid(row=0, column=0, sticky="w", padx=(0, 12))
                     mk_label(row, f"{s['length']} days", size=13,
-                             weight="bold", color=TEXT).pack(side="left")
+                             color=TEXT).grid(row=0, column=1, sticky="w")
                     try:
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
@@ -2596,7 +2606,10 @@ class App(ctk.CTk):
                         range_s = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
                     except Exception:
                         range_s = f"{s['start_date']} – {s['end_date']}"
-                    mk_label(row, range_s, size=11, color=DIM).pack(side="right")
+                    # spacer col 2 + date col 3
+                    ctk.CTkFrame(row, fg_color="transparent").grid(row=0, column=2, sticky="ew")
+                    mk_label(row, range_s, size=11, color=DIM).grid(
+                        row=0, column=3, sticky="e", padx=(12, 0))
 
                 if n < len(streaks):
                     def _load_s():
@@ -2656,9 +2669,10 @@ class App(ctk.CTk):
                 sk_canvas.bind("<Configure>", _draw_sk_bar)
                 sk_canvas.after(60, _draw_sk_bar)
 
+                max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
                     compact_row(cont, i + 1, records[i], is_skill=True,
-                                single_skill=skill)
+                                single_skill=skill, max_min=max_m)
 
                 if n < len(records):
                     def _load_sk(s=state, r=records, fn=_render_skill):
