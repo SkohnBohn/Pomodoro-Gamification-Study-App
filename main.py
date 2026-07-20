@@ -2221,10 +2221,37 @@ class App(ctk.CTk):
             m = int(m or 0)
             h, mn = divmod(m, 60)
             if h and mn:
-                return f"{h}h {mn}m"
+                return f"{h}h{mn}m"
             elif h:
                 return f"{h}h"
             return f"{mn}m"
+
+        def fmt_min_decimal(m):
+            """Compact decimal hours for compact rows: 20.5h"""
+            val = (m or 0) / 60
+            if val >= 10:
+                return f"{val:.0f}h"
+            return f"{val:.1f}h"
+
+        def fmt_date_short(label: str) -> str:
+            """Convert 'Sat, 14 Mar 2026' → '14.03.26'."""
+            import re
+            # try parsing the full label format
+            for fmt in ("%a, %d %b %Y", "%d %b %Y"):
+                try:
+                    from datetime import datetime as _dtt
+                    return _dtt.strptime(label, fmt).strftime("%d.%m.%y")
+                except Exception:
+                    pass
+            # fallback: look for ISO date
+            m = re.search(r"(\d{4}-\d{2}-\d{2})", label)
+            if m:
+                try:
+                    from datetime import date as _date
+                    return _date.fromisoformat(m.group(1)).strftime("%d.%m.%y")
+                except Exception:
+                    pass
+            return label
 
         def skill_color(sk):
             return _SKILL_COLORS.get(sk, "#bbbbbb")
@@ -2363,11 +2390,11 @@ class App(ctk.CTk):
 
             mk_label(row, f"#{rank}", size=11, color=DIM,
                      weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
-            mk_label(row, fmt_min(record["total_min"]), size=13,
-                     color=TEXT, width=80).grid(row=0, column=1, sticky="w")
+            mk_label(row, fmt_min_decimal(record["total_min"]), size=13,
+                     color=TEXT, width=60).grid(row=0, column=1, sticky="w")
 
-            lbl_text = record.get("label", "")
-            mk_label(row, lbl_text, size=11, color=DIM, width=130).grid(
+            lbl_text = fmt_date_short(record.get("label", ""))
+            mk_label(row, lbl_text, size=11, color=DIM, width=70).grid(
                 row=0, column=3, sticky="e", padx=(12, 0))
 
             # inline skill bar
