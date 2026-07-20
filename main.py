@@ -2477,6 +2477,15 @@ class App(ctk.CTk):
             b.pack(anchor="w", padx=28, pady=(4, 0))
             return b
 
+        def collapse_btn(parent, callback):
+            lbl = ctk.CTkLabel(parent, text="⌃", font=("Helvetica", 20),
+                               text_color="#888880", fg_color="transparent",
+                               cursor="hand2")
+            lbl.pack(anchor="w", padx=32, pady=(2, 0))
+            lbl.bind("<Button-1>", lambda e: callback())
+            lbl.bind("<Enter>", lambda e: lbl.configure(text_color="#555550"))
+            lbl.bind("<Leave>", lambda e: lbl.configure(text_color="#888880"))
+
         def render_period_section(title: str, period: str):
             records = get_best_periods(period)
             if not records:
@@ -2523,6 +2532,12 @@ class App(ctk.CTk):
                         s["n"] = min(s["n"] + 3, len(records))
                         _render()
                     load_more_btn(container, _load)
+
+                if n > 1:
+                    def _collapse(s=shown_state):
+                        s["n"] = 1
+                        _render()
+                    collapse_btn(container, _collapse)
 
             _render()
 
@@ -2654,6 +2669,12 @@ class App(ctk.CTk):
                         _render_streaks()
                     load_more_btn(streak_container, _load_s)
 
+                if n > 1:
+                    def _collapse_s():
+                        streak_state["n"] = 1
+                        _render_streaks()
+                    collapse_btn(streak_container, _collapse_s)
+
             _render_streaks()
 
         # ── Per-skill best days ───────────────────────────────────────────────
@@ -2720,6 +2741,12 @@ class App(ctk.CTk):
                         s["n"] = min(s["n"] + 3, len(r))
                         fn()
                     load_more_btn(cont, _load_sk)
+
+                if n > 1:
+                    def _collapse_sk(s=state, fn=_render_skill):
+                        s["n"] = 1
+                        fn()
+                    collapse_btn(cont, _collapse_sk)
 
             _render_skill()
 
