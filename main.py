@@ -1853,8 +1853,8 @@ class App(ctk.CTk):
 
         _opt_kw = dict(
             height=28, corner_radius=8,
-            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
-            text_color=TEXT, dropdown_fg_color=CARD,
+            fg_color="transparent", button_color="transparent", button_hover_color=BORDER,
+            text_color=MUTED, dropdown_fg_color=CARD,
             dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
             font=ctk.CTkFont(size=12),
         )
@@ -2020,8 +2020,8 @@ class App(ctk.CTk):
         opt = ctk.CTkOptionMenu(
             ctrl, values=skills_list, variable=line_skill,
             width=130, height=28, corner_radius=8,
-            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
-            text_color=TEXT, dropdown_fg_color=CARD,
+            fg_color="transparent", button_color="transparent", button_hover_color=BORDER,
+            text_color=MUTED, dropdown_fg_color=CARD,
             dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
             font=ctk.CTkFont(size=12),
         )
