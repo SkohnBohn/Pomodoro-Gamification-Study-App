@@ -330,5 +330,38 @@ def get_heatmap_data() -> dict:
     return {d: m for d, m in rows if d}
 
 
+def get_streak() -> int:
+    """Return current consecutive-day streak (days with ≥1 session ending today or yesterday)."""
+    from datetime import date, timedelta
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC")
+    rows = [r[0] for r in c.fetchall()]
+    conn.close()
+    if not rows:
+        return 0
+    today = date.today()
+    # Allow streak if last session was today or yesterday (don't break at midnight)
+    try:
+        last = date.fromisoformat(rows[0])
+    except ValueError:
+        return 0
+    if last < today - timedelta(days=1):
+        return 0
+    streak = 0
+    expected = last
+    for ds in rows:
+        try:
+            d = date.fromisoformat(ds)
+        except ValueError:
+            continue
+        if d == expected:
+            streak += 1
+            expected -= timedelta(days=1)
+        elif d < expected:
+            break
+    return streak
+
+
 # DB initialisieren beim Laden
 initialize_db()

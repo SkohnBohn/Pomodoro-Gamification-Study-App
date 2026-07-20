@@ -25,7 +25,7 @@ from data_manager import (
     get_user_skills, add_user_skill, delete_user_skill,
     get_heatmap_data,
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
-    get_first_session_date,
+    get_first_session_date, get_streak,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
@@ -341,6 +341,11 @@ class App(ctk.CTk):
         self._delta_lbl = mk_label(right_col, "", size=14, color="#4ade80", weight="bold")
         self._delta_lbl.pack(anchor="w", pady=(2, 0))
 
+        # Streak row
+        self._streak_lbl = mk_label(footer, "", size=13, color=MUTED)
+        self._streak_lbl.pack(anchor="w", padx=(4, 0), pady=(2, 0))
+        self._prev_streak = 0
+
         # Trophy overlay (placed dynamically over the sidebar footer)
         self._trophy_overlay = None
         self._trophy_after_ids: list = []
@@ -611,6 +616,29 @@ class App(ctk.CTk):
         else:
             self._total_lbl.configure(text=f"{total:.1f}")
         self._prev_total = total
+
+        # Streak
+        streak = get_streak()
+        prev_streak = getattr(self, "_prev_streak", streak)
+        if streak > 0:
+            self._streak_lbl.configure(text=f"🔥 {streak} day streak")
+        else:
+            self._streak_lbl.configure(text="")
+        if streak > prev_streak and prev_streak > 0:
+            self._animate_streak_bump()
+        self._prev_streak = streak
+
+    def _animate_streak_bump(self, step=0, steps=10):
+        if step > steps:
+            self._streak_lbl.configure(text_color=MUTED)
+            return
+        t = step / steps
+        # pulse: bright orange → MUTED
+        r = int(0xf9 - (0xf9 - 0x5c) * t)
+        g = int(0x73 - (0x73 - 0x43) * t)
+        b = int(0x10 - (0x10 - 0x00) * t)
+        self._streak_lbl.configure(text_color=f"#{r:02x}{g:02x}{b:02x}")
+        self.after(40, lambda: self._animate_streak_bump(step + 1, steps))
 
     def _show_trophy(self, delta_str: str):
         # Cancel any previous trophy
