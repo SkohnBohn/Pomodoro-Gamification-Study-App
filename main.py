@@ -2573,81 +2573,146 @@ class App(ctk.CTk):
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
-        # ── Detailed sections ─────────────────────────────────────────────────
-        render_period_section("Best Days", "day")
-        render_period_section("Best Weeks", "week")
-        render_period_section("Best Months", "month")
-
-        # ── Longest Streaks ───────────────────────────────────────────────────
+        # ── Longest Streak (always visible, right below top-3) ───────────────
         streaks = get_all_streaks()
         if streaks:
-            section_header(sc, "Longest Streaks")
+            section_header(sc, "Longest Streak")
+            s0 = streaks[0]
+            streak_hero = ctk.CTkFrame(sc, fg_color=PANEL, corner_radius=14)
+            streak_hero.pack(fill="x", padx=28, pady=(0, 4))
+            sh_inner = ctk.CTkFrame(streak_hero, fg_color="transparent")
+            sh_inner.pack(fill="x", padx=20, pady=16)
+            sh_top = ctk.CTkFrame(sh_inner, fg_color="transparent")
+            sh_top.pack(fill="x")
+            mk_label(sh_top, f"{s0['length']} days", size=36,
+                     weight="bold", color=DARK).pack(side="left")
+            try:
+                from datetime import date as _date
+                d1 = _date.fromisoformat(s0["start_date"])
+                d2 = _date.fromisoformat(s0["end_date"])
+                sh_range = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+            except Exception:
+                sh_range = f"{s0['start_date']} – {s0['end_date']}"
+            mk_label(sh_top, sh_range, size=13, color=MUTED).pack(
+                side="right", anchor="s", pady=(0, 6))
+            dot_row = ctk.CTkFrame(sh_inner, fg_color="transparent")
+            dot_row.pack(fill="x", pady=(10, 0))
+            dot_c = tk.Canvas(dot_row, height=10, bg=PANEL, highlightthickness=0)
+            dot_c.pack(fill="x")
+            def _draw_dots(event=None, s=s0):
+                dot_c.delete("all")
+                W = dot_c.winfo_width()
+                length = s["length"]
+                if length < 1 or W < 4:
+                    return
+                sz, gap = 7, 4
+                step = sz + gap
+                max_dots = min(length, W // step)
+                x0 = (W - max_dots * step + gap) // 2
+                for di in range(max_dots):
+                    x = x0 + di * step
+                    dot_c.create_oval(x, 1, x + sz, 1 + sz, fill=DARK, outline="")
+                if max_dots < length:
+                    dot_c.create_text(W - 2, 5, anchor="e",
+                                      text=f"+{length - max_dots}",
+                                      fill=MUTED, font=("Helvetica", 9))
+            dot_c.bind("<Configure>", _draw_dots)
+            dot_c.after(60, _draw_dots)
+
+        # ── Expand toggle arrow ───────────────────────────────────────────────
+        expand_state = {"open": False}
+        detail_container = ctk.CTkFrame(sc, fg_color="transparent")
+
+        toggle_lbl = ctk.CTkLabel(sc, text="⌄", font=("Helvetica", 22),
+                                  text_color="#888880", fg_color="transparent")
+        toggle_lbl.pack(anchor="center", pady=(10, 4))
+
+        def _toggle_details():
+            if expand_state["open"]:
+                detail_container.pack_forget()
+                toggle_lbl.configure(text="⌄")
+                expand_state["open"] = False
+            else:
+                detail_container.pack(fill="x")
+                toggle_lbl.configure(text="⌃")
+                expand_state["open"] = True
+
+        toggle_lbl.bind("<Button-1>", lambda e: _toggle_details())
+        toggle_lbl.bind("<Enter>", lambda e: toggle_lbl.configure(text_color="#555550"))
+        toggle_lbl.bind("<Leave>", lambda e: toggle_lbl.configure(text_color="#888880"))
+
+        # ── Detailed sections (hidden by default) ─────────────────────────────
+        def _render_period_in(parent, title: str, period: str):
+            records = get_best_periods(period)
+            if not records:
+                return
+            section_header(parent, title)
+            shown_state = {"n": 1}
+            container = ctk.CTkFrame(parent, fg_color="transparent")
+            container.pack(fill="x")
+            status_lbl = mk_label(parent, "", size=11, color=MUTED)
+            status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
+
+            def _render():
+                for w in container.winfo_children():
+                    w.destroy()
+                n = shown_state["n"]
+                if not records:
+                    return
+                r0 = records[0]
+                try:
+                    conn2 = sqlite3.connect(DB_FILE)
+                    c2 = conn2.cursor()
+                    if period == "day":
+                        cnt = c2.execute(
+                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
+                            (r0["dates"][0],)).fetchone()[0]
+                    else:
+                        placeholders = ",".join("?" * len(r0["dates"]))
+                        cnt = c2.execute(
+                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
+                            r0["dates"]).fetchone()[0]
+                    conn2.close()
+                except Exception:
+                    cnt = None
+                hero_card(container, r0, cnt, period)
+                max_m = records[0]["total_min"] if records else 1
+                for i in range(1, min(n, len(records))):
+                    compact_row(container, i + 1, records[i], max_min=max_m,
+                                status_lbl=status_lbl)
+                if n < len(records):
+                    def _load(s=shown_state):
+                        s["n"] = min(s["n"] + 3, len(records))
+                        _render()
+                    load_more_btn(container, _load)
+                if n > 1:
+                    def _collapse(s=shown_state):
+                        s["n"] = 1
+                        _render()
+                    collapse_btn(container, _collapse)
+            _render()
+
+        _render_period_in(detail_container, "Best Days", "day")
+        _render_period_in(detail_container, "Best Weeks", "week")
+        _render_period_in(detail_container, "Best Months", "month")
+
+        # longest streak extras
+        if streaks and len(streaks) > 1:
+            section_header(detail_container, "All Streaks")
             streak_state = {"n": 1}
-            streak_container = ctk.CTkFrame(sc, fg_color="transparent")
+            streak_container = ctk.CTkFrame(detail_container, fg_color="transparent")
             streak_container.pack(fill="x")
 
             def _render_streaks():
                 for w in streak_container.winfo_children():
                     w.destroy()
                 n = streak_state["n"]
-
-                # hero streak card
-                s0 = streaks[0]
-                card = ctk.CTkFrame(streak_container, fg_color=PANEL, corner_radius=14)
-                card.pack(fill="x", padx=28, pady=(0, 4))
-                inner = ctk.CTkFrame(card, fg_color="transparent")
-                inner.pack(fill="x", padx=20, pady=16)
-                top = ctk.CTkFrame(inner, fg_color="transparent")
-                top.pack(fill="x")
-                mk_label(top, f"{s0['length']} days", size=36,
-                         weight="bold", color=DARK).pack(side="left")
-                try:
-                    from datetime import date as _date
-                    d1 = _date.fromisoformat(s0["start_date"])
-                    d2 = _date.fromisoformat(s0["end_date"])
-                    range_str = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
-                except Exception:
-                    range_str = f"{s0['start_date']} – {s0['end_date']}"
-                mk_label(top, range_str, size=13, color=MUTED).pack(
-                    side="right", anchor="s", pady=(0, 6))
-
-                # dot strip
-                dot_row = ctk.CTkFrame(inner, fg_color="transparent")
-                dot_row.pack(fill="x", pady=(10, 0))
-                dot_c = tk.Canvas(dot_row, height=10, bg=PANEL, highlightthickness=0)
-                dot_c.pack(fill="x")
-
-                def _draw_dots(event=None, s=s0):
-                    dot_c.delete("all")
-                    W = dot_c.winfo_width()
-                    length = s["length"]
-                    if length < 1 or W < 4:
-                        return
-                    sz = 7
-                    gap = 4
-                    step = sz + gap
-                    max_dots = min(length, W // step)
-                    x0 = (W - max_dots * step + gap) // 2
-                    for di in range(max_dots):
-                        x = x0 + di * step
-                        dot_c.create_oval(x, 1, x + sz, 1 + sz,
-                                          fill=DARK, outline="")
-                    if max_dots < length:
-                        dot_c.create_text(W - 2, 5, anchor="e",
-                                          text=f"+{length - max_dots}",
-                                          fill=MUTED, font=("Helvetica", 9))
-
-                dot_c.bind("<Configure>", _draw_dots)
-                dot_c.after(60, _draw_dots)
-
-                # compact rows for 2+
-                max_streak = streaks[0]["length"]
-                for i in range(1, min(n, len(streaks))):
-                    s = streaks[i]
+                for i in range(0, min(n, len(streaks) - 1)):
+                    s = streaks[i + 1]
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
                     row.pack(fill="x", padx=28, pady=1)
                     row.columnconfigure(2, weight=1)
-                    mk_label(row, f"#{i+1}", size=11, color=DIM,
+                    mk_label(row, f"#{i+2}", size=11, color=DIM,
                              weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
                     mk_label(row, f"{s['length']} days", size=13,
                              color=TEXT, width=80).grid(row=0, column=1, sticky="w")
@@ -2655,26 +2720,22 @@ class App(ctk.CTk):
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
                         d2 = _date.fromisoformat(s["end_date"])
-                        range_s = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+                        range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
                     except Exception:
                         range_s = f"{s['start_date']} – {s['end_date']}"
-                    # spacer col 2 + date col 3
                     ctk.CTkFrame(row, fg_color="transparent").grid(row=0, column=2, sticky="ew")
                     mk_label(row, range_s, size=11, color=DIM).grid(
                         row=0, column=3, sticky="e", padx=(12, 0))
-
-                if n < len(streaks):
+                if n < len(streaks) - 1:
                     def _load_s():
-                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks))
+                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
                         _render_streaks()
                     load_more_btn(streak_container, _load_s)
-
                 if n > 1:
                     def _collapse_s():
                         streak_state["n"] = 1
                         _render_streaks()
                     collapse_btn(streak_container, _collapse_s)
-
             _render_streaks()
 
         # ── Per-skill best days ───────────────────────────────────────────────
@@ -2687,11 +2748,11 @@ class App(ctk.CTk):
             skill_records = get_best_days_for_skill(skill)
             if not skill_records:
                 continue
-            section_header(sc, f"Best Day — {skill}")
+            section_header(detail_container, f"Best Day — {skill}")
             sk_state = {"n": 1}
-            sk_container = ctk.CTkFrame(sc, fg_color="transparent")
+            sk_container = ctk.CTkFrame(detail_container, fg_color="transparent")
             sk_container.pack(fill="x")
-            sk_status_lbl = mk_label(sc, "", size=11, color=MUTED)
+            sk_status_lbl = mk_label(detail_container, "", size=11, color=MUTED)
             sk_status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
 
             def _render_skill(skill=skill, records=skill_records,
@@ -2750,8 +2811,8 @@ class App(ctk.CTk):
 
             _render_skill()
 
-        # bottom padding
-        ctk.CTkFrame(sc, fg_color="transparent", height=40).pack()
+        ctk.CTkFrame(detail_container, fg_color="transparent", height=40).pack()
+        ctk.CTkFrame(sc, fg_color="transparent", height=20).pack()
 
     def _build_leaderboard_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
