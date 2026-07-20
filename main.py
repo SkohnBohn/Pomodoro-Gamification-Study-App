@@ -1997,6 +1997,7 @@ class App(ctk.CTk):
         # ── Heatmap ───────────────────────────────────────────────────────────
         hm_card = mk_card(self._stats_scroll)
         hm_card.pack(fill="x", pady=5, padx=6)
+        ctk.CTkFrame(hm_card, height=14, fg_color="transparent").pack()
         self._draw_heatmap(hm_card)
 
         # ── Bar chart (last 60 days) ───────────────────────────────────────────
