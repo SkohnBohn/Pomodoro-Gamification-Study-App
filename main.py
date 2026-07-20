@@ -2696,11 +2696,10 @@ class App(ctk.CTk):
         _render_period_in(detail_container, "Best Weeks", "week")
         _render_period_in(detail_container, "Best Months", "month")
 
-        # longest streak extras
+        # longest streak extras — always visible, directly below streak hero
         if streaks and len(streaks) > 1:
-            section_header(detail_container, "All Streaks")
             streak_state = {"n": 1}
-            streak_container = ctk.CTkFrame(detail_container, fg_color="transparent")
+            streak_container = ctk.CTkFrame(sc, fg_color="transparent")
             streak_container.pack(fill="x")
 
             def _render_streaks():
