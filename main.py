@@ -2352,17 +2352,80 @@ class App(ctk.CTk):
                          color=DIM).pack(anchor="w", pady=(6, 0))
             return card
 
-        def compact_row(parent, rank: int, record: dict, is_skill=False):
+        def compact_row(parent, rank: int, record: dict, is_skill=False,
+                        single_skill: str = None):
             """Minimal single-line row for ranks 2+."""
             row = ctk.CTkFrame(parent, fg_color="transparent")
             row.pack(fill="x", padx=28, pady=1)
-            mk_label(row, f"#{rank}", size=11, color=DIM, weight="bold").pack(side="left",
-                                                                               padx=(0, 10))
+
+            mk_label(row, f"#{rank}", size=11, color=DIM,
+                     weight="bold").pack(side="left", padx=(0, 10))
             mk_label(row, fmt_min(record["total_min"]), size=13,
-                     weight="bold", color=TEXT).pack(side="left")
-            lbl_key = "date_s" if is_skill else "label"
+                     color=TEXT).pack(side="left")
+
             lbl_text = record.get("label", "")
-            mk_label(row, lbl_text, size=11, color=DIM).pack(side="right")
+            mk_label(row, lbl_text, size=11, color=DIM).pack(side="right", padx=(8, 0))
+
+            # inline skill bar between time and date
+            breakdown = record.get("breakdown")
+            total_min = record["total_min"]
+            if single_skill:
+                breakdown = {single_skill: total_min}
+
+            if breakdown and total_min > 0:
+                bar_frame = ctk.CTkFrame(row, fg_color="transparent", height=14)
+                bar_frame.pack(side="left", fill="x", expand=True, padx=(10, 6))
+                bar_frame.pack_propagate(False)
+                bc = tk.Canvas(bar_frame, height=4, bg=BG, highlightthickness=0)
+                bc.place(relx=0, rely=0.5, relwidth=1, anchor="w", y=-2)
+
+                skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
+                _tip = [None]
+
+                def _redraw_inline(event=None, c=bc, sk_list=skills_sorted,
+                                   tot=total_min):
+                    c.delete("all")
+                    W = c.winfo_width()
+                    if W < 2:
+                        return
+                    x = 0
+                    segs = []
+                    for sk, mins in sk_list:
+                        if mins <= 0:
+                            continue
+                        w = max(1, int(W * mins / tot))
+                        cid = c.create_rectangle(x, 0, x + w, 4,
+                                                 fill=skill_color(sk), outline="")
+                        segs.append((sk, mins, x, x + w))
+                        x += w
+
+                    def _on_move(e, c=c, segs=segs, tot=tot):
+                        hit = next(((sk, m) for sk, m, x0, x1 in segs
+                                    if x0 <= e.x <= x1), None)
+                        if hit:
+                            pct = int(hit[1] / tot * 100 + 0.5)
+                            txt = f"{hit[0]} {pct}%"
+                            if _tip[0] is None:
+                                _tip[0] = tk.Label(c, text=txt, bg=DARK, fg=BG,
+                                                   font=("Helvetica", 9),
+                                                   padx=5, pady=1, relief="flat", bd=0)
+                            else:
+                                _tip[0].configure(text=txt)
+                            tx = min(e.x + 6, c.winfo_width() - 60)
+                            _tip[0].place(x=tx, y=-16)
+                        else:
+                            if _tip[0]:
+                                _tip[0].place_forget()
+
+                    def _on_leave(e):
+                        if _tip[0]:
+                            _tip[0].place_forget()
+
+                    c.bind("<Motion>", _on_move)
+                    c.bind("<Leave>", _on_leave)
+
+                bc.bind("<Configure>", _redraw_inline)
+                bc.after(60, _redraw_inline)
 
         def load_more_btn(parent, callback):
             b = ctk.CTkButton(
@@ -2594,7 +2657,8 @@ class App(ctk.CTk):
                 sk_canvas.after(60, _draw_sk_bar)
 
                 for i in range(1, min(n, len(records))):
-                    compact_row(cont, i + 1, records[i], is_skill=True)
+                    compact_row(cont, i + 1, records[i], is_skill=True,
+                                single_skill=skill)
 
                 if n < len(records):
                     def _load_sk(s=state, r=records, fn=_render_skill):
