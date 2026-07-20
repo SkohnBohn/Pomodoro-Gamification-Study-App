@@ -68,16 +68,16 @@ _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
 
-# Skill colors for breakdown bars — clearly distinct hues
+# Skill colors — warm heatmap-style palette, one distinct tone per skill
 _SKILL_COLORS = {
-    "SOZ":     "#5b9bd5",   # strong blue
-    "SUR":     "#e06b8b",   # rose pink
-    "MATH":    "#4caf82",   # teal green
-    "JOURNAL": "#e8a838",   # amber
-    "TECH":    "#7c6fc4",   # purple
-    "UNI":     "#3ab0b0",   # cyan
-    "DESIGN":  "#d45f3c",   # terracotta
-    "ORGA":    "#8faa44",   # olive green
+    "SOZ":     "#1a1200",   # near-black (darkest)
+    "SUR":     "#92400e",   # dark brown
+    "MATH":    "#d97706",   # amber
+    "JOURNAL": "#f59e0b",   # golden yellow
+    "TECH":    "#b45309",   # medium brown
+    "UNI":     "#78350f",   # deep brown
+    "DESIGN":  "#fbbf24",   # bright yellow
+    "ORGA":    "#6b4226",   # muted sienna
 }
 
 # (bg, border, text)  — one entry per level 0-15, smooth gradient
@@ -2551,7 +2551,10 @@ class App(ctk.CTk):
                 mk_label(inner, fmt_min_decimal(r["total_min"]), size=28,
                          weight="bold", color=DARK).pack(anchor="w", pady=(4, 0))
                 mk_label(inner, fmt_date_short(r["label"]), size=11, color=MUTED).pack(anchor="w")
-                draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5)
+                top_status = mk_label(inner, "", size=11, color=MUTED)
+                draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5,
+                         status_lbl=top_status)
+                top_status.pack(anchor="w", pady=(3, 0))
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
