@@ -2699,8 +2699,8 @@ class App(ctk.CTk):
         # longest streak extras — button visible by default, entries hidden until clicked
         if streaks and len(streaks) > 1:
             streak_state = {"n": 0}
-            streak_container = ctk.CTkFrame(sc, fg_color="transparent")
-            streak_container.pack(fill="x")
+            streak_container = ctk.CTkFrame(sh_inner, fg_color="transparent")
+            streak_container.pack(fill="x", pady=(8, 0))
 
             def _render_streaks():
                 for w in streak_container.winfo_children():
@@ -2709,7 +2709,7 @@ class App(ctk.CTk):
                 for i in range(0, min(n, len(streaks) - 1)):
                     s = streaks[i + 1]
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
-                    row.pack(fill="x", padx=28, pady=1)
+                    row.pack(fill="x", pady=1)
                     row.columnconfigure(2, weight=1)
                     mk_label(row, f"#{i+2}", size=11, color=DIM,
                              weight="bold", width=32).grid(row=0, column=0, sticky="w", padx=(0, 4))
