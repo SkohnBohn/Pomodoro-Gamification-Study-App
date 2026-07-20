@@ -70,7 +70,7 @@ _apply_palette("yellow")
 
 # Skill colors — warm heatmap-style palette, one distinct tone per skill
 _SKILL_COLORS = {
-    "SOZ":     "#e8a020",   # warm orange-yellow
+    "SOZ":     "#c0392b",   # red
     "SUR":     "#92400e",   # dark brown
     "MATH":    "#d97706",   # amber
     "JOURNAL": "#f59e0b",   # golden yellow
@@ -332,7 +332,7 @@ class App(ctk.CTk):
                 self.sidebar, text=text, anchor="w",
                 height=42, corner_radius=10,
                 fg_color="transparent", hover_color=BORDER,
-                text_color=MUTED, border_width=0,
+                text_color=DIM, border_width=0,
                 font=ctk.CTkFont(size=14),
                 command=lambda k=key: self._nav(k),
             )
@@ -391,7 +391,7 @@ class App(ctk.CTk):
             if k == key:
                 b.configure(fg_color=BORDER, text_color=TEXT)
             else:
-                b.configure(fg_color="transparent", text_color=MUTED)
+                b.configure(fg_color="transparent", text_color=DIM)
 
         if self._active_view and self._active_view in self._views:
             self._views[self._active_view].pack_forget()
