@@ -548,8 +548,23 @@ class App(ctk.CTk):
         )
         light_btn.pack(side="left", padx=(0, 2), pady=2)
 
-        mk_btn(dlg, "Open Log", lambda: (self._open_log(), dlg.destroy()),
-               width=200, height=36).pack(padx=20, pady=(16, 0))
+        log_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        log_row.pack(padx=20, pady=(16, 0))
+        mk_btn(log_row, "Open Log", lambda: (self._open_log(), dlg.destroy()),
+               width=200, height=36).pack(side="left")
+
+        info_lbl = ctk.CTkLabel(
+            log_row, text="ⓘ", width=20, height=20,
+            fg_color="transparent", text_color=DIM,
+            font=ctk.CTkFont(size=12),
+        )
+        info_lbl.pack(side="left", padx=(6, 0))
+
+        tip_lbl = mk_label(dlg, "", size=10, color=DIM)
+        tip_lbl.pack(anchor="w", padx=20)
+
+        info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log."))
+        info_lbl.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
 
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
