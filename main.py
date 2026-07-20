@@ -2597,24 +2597,46 @@ class App(ctk.CTk):
                 side="right", anchor="s", pady=(0, 6))
             dot_row = ctk.CTkFrame(sh_inner, fg_color="transparent")
             dot_row.pack(fill="x", pady=(10, 0))
-            dot_c = tk.Canvas(dot_row, height=10, bg=PANEL, highlightthickness=0)
+            dot_c = tk.Canvas(dot_row, height=12, bg=PANEL, highlightthickness=0)
             dot_c.pack(fill="x")
+            _CIRCLE_CLR = "#5a4800"
+            _SEP_CLR    = "#7a6510"
             def _draw_dots(event=None, s=s0):
                 dot_c.delete("all")
                 W = dot_c.winfo_width()
                 length = s["length"]
                 if length < 1 or W < 4:
                     return
-                sz, gap = 7, 4
-                step = sz + gap
-                max_dots = min(length, W // step)
-                x0 = (W - max_dots * step + gap) // 2
-                for di in range(max_dots):
-                    x = x0 + di * step
-                    dot_c.create_oval(x, 1, x + sz, 1 + sz, fill=DARK, outline="")
-                if max_dots < length:
-                    dot_c.create_text(W - 2, 5, anchor="e",
-                                      text=f"+{length - max_dots}",
+                sz, gap, sep_w, sep_gap = 8, 4, 1, 6
+                # step per circle; after every 7 add a separator slot
+                circle_step = sz + gap
+                # estimate how many circles fit (rough: ignore separators first)
+                max_circles = min(length, (W - 20) // circle_step)
+                # build list of elements: each is ("circle", week_index) or "sep"
+                elements = []
+                for di in range(max_circles):
+                    elements.append("circle")
+                    if (di + 1) % 7 == 0 and di + 1 < max_circles:
+                        elements.append("sep")
+                # total width
+                total_w = (elements.count("circle") * circle_step
+                           + elements.count("sep") * (sep_w + sep_gap * 2))
+                x = (W - total_w) // 2
+                cy = 6
+                for el in elements:
+                    if el == "circle":
+                        dot_c.create_oval(x, cy - sz // 2, x + sz, cy + sz // 2,
+                                          fill="", outline=_CIRCLE_CLR, width=1.5)
+                        x += circle_step
+                    else:
+                        x += sep_gap
+                        dot_c.create_line(x, cy - 4, x, cy + 4,
+                                          fill=_SEP_CLR, width=sep_w)
+                        x += sep_w + sep_gap
+                remaining = length - elements.count("circle")
+                if remaining > 0:
+                    dot_c.create_text(W - 2, cy, anchor="e",
+                                      text=f"+{remaining}",
                                       fill=MUTED, font=("Helvetica", 9))
             dot_c.bind("<Configure>", _draw_dots)
             dot_c.after(60, _draw_dots)
