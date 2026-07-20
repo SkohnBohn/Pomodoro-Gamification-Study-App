@@ -2859,16 +2859,17 @@ class App(ctk.CTk):
                                 single_skill=skill, max_min=max_m,
                                 status_lbl=slbl)
 
+                _self_render = _render_skill
                 if n < len(records):
-                    def _load_sk(s=state, r=records, fn=_render_skill):
+                    def _load_sk(s=state, r=records, fn=_self_render):
                         s["n"] = min(s["n"] + 3, len(r))
-                        fn()
+                        cont.after(0, fn)
                     load_more_btn(cont, _load_sk)
 
                 if n > 1:
-                    def _collapse_sk(s=state, fn=_render_skill):
+                    def _collapse_sk(s=state, fn=_self_render):
                         s["n"] = 1
-                        fn()
+                        cont.after(0, fn)
                     collapse_btn(cont, _collapse_sk)
 
             _render_skill()
