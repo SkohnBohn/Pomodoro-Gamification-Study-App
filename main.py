@@ -1815,12 +1815,12 @@ class App(ctk.CTk):
         # Legend
         leg = ctk.CTkFrame(parent, fg_color="transparent")
         leg.pack(anchor="w", padx=14, pady=(0, 14))
-        mk_label(leg, "Wenig", size=10, color=MUTED).pack(side="left", padx=(0, 4))
+        mk_label(leg, "Less", size=10, color=MUTED).pack(side="left", padx=(0, 4))
         for col_val in [CARD, "#fbbf24", "#d97706", "#92400e", DARK]:
             c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
                           highlightthickness=0)
             c.pack(side="left", padx=1)
-        mk_label(leg, "Viel", size=10, color=MUTED).pack(side="left", padx=(4, 0))
+        mk_label(leg, "More", size=10, color=MUTED).pack(side="left", padx=(4, 0))
 
     # ── Stat level-up dialog ─────────────────────────────────────────────────
     def _stat_levelup_dialog(self, stat_name: str, level: int):
@@ -1844,8 +1844,8 @@ class App(ctk.CTk):
         ctrl.pack(fill="x", padx=16, pady=(14, 6))
 
 
-        skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
-        chart_skill  = ctk.StringVar(value="Alle")
+        skills_list = ["All"] + [name for name, _ in get_user_skills()]
+        chart_skill  = ctk.StringVar(value="All")
         chart_period = ctk.StringVar(value="30 days")
 
         _opt_kw = dict(
@@ -1888,7 +1888,7 @@ class App(ctk.CTk):
         draw_w = canvas_w - LM - RM
         draw_h = canvas_h - TM - BM
 
-        data = get_chart_data(skill if skill != "Alle" else None)
+        data = get_chart_data(skill if skill != "All" else None)
 
         today_d = date.today()
         if period == "30 days":
@@ -1994,8 +1994,6 @@ class App(ctk.CTk):
         # ── Heatmap ───────────────────────────────────────────────────────────
         hm_card = mk_card(self._stats_scroll)
         hm_card.pack(fill="x", pady=5, padx=6)
-        mk_label(hm_card, "Aktivität", size=13, weight="bold",
-                 color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
         self._draw_heatmap(hm_card)
 
         # ── Bar chart (last 60 days) ───────────────────────────────────────────
@@ -2012,11 +2010,8 @@ class App(ctk.CTk):
     def _draw_line_graph(self, parent):
         ctrl = ctk.CTkFrame(parent, fg_color="transparent")
         ctrl.pack(fill="x", padx=16, pady=(14, 6))
-        mk_label(ctrl, "Verlauf (gesamt)", size=13, weight="bold",
-                 color=TEXT).pack(side="left")
-
-        skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
-        line_skill = ctk.StringVar(value="Alle")
+        skills_list = ["All"] + [name for name, _ in get_user_skills()]
+        line_skill = ctk.StringVar(value="All")
         opt = ctk.CTkOptionMenu(
             ctrl, values=skills_list, variable=line_skill,
             width=130, height=28, corner_radius=8,
@@ -2056,7 +2051,7 @@ class App(ctk.CTk):
                                font=("Helvetica", 13))
             return
 
-        data = get_chart_data(skill if skill != "Alle" else None)
+        data = get_chart_data(skill if skill != "All" else None)
 
         start_d = datetime.strptime(first, "%Y-%m-%d").date()
         today_d = date.today()
