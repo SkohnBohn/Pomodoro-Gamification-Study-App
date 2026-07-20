@@ -1845,16 +1845,25 @@ class App(ctk.CTk):
 
 
         skills_list = ["Alle"] + [name for name, _ in get_user_skills()]
-        chart_skill = ctk.StringVar(value="Alle")
-        opt = ctk.CTkOptionMenu(
-            ctrl, values=skills_list, variable=chart_skill,
-            width=130, height=28, corner_radius=8,
+        chart_skill  = ctk.StringVar(value="Alle")
+        chart_period = ctk.StringVar(value="30 days")
+
+        _opt_kw = dict(
+            height=28, corner_radius=8,
             fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
             text_color=TEXT, dropdown_fg_color=CARD,
             dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
             font=ctk.CTkFont(size=12),
         )
-        opt.pack(side="right")
+        ctk.CTkOptionMenu(
+            ctrl, values=skills_list, variable=chart_skill,
+            width=130, **_opt_kw,
+        ).pack(side="right", padx=(6, 0))
+
+        ctk.CTkOptionMenu(
+            ctrl, values=["30 days", "90 days", "1 year", "All time"],
+            variable=chart_period, width=110, **_opt_kw,
+        ).pack(side="right")
 
         canvas = tk.Canvas(parent, height=170, bg=PANEL, highlightthickness=0)
         canvas.pack(fill="x", padx=16, pady=(0, 4))
@@ -1866,12 +1875,13 @@ class App(ctk.CTk):
             w = canvas.winfo_width()
             if w < 50:
                 return
-            self._draw_bars(canvas, chart_skill.get(), w, tip)
+            self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, tip)
 
         canvas.bind("<Configure>", lambda _: _redraw())
         chart_skill.trace_add("write", lambda *_: _redraw())
+        chart_period.trace_add("write", lambda *_: _redraw())
 
-    def _draw_bars(self, canvas, skill: str, canvas_w: int, tip_lbl):
+    def _draw_bars(self, canvas, skill: str, period: str, canvas_w: int, tip_lbl):
         canvas.delete("all")
         canvas_h = 170
         LM, BM, TM, RM = 44, 32, 10, 10
@@ -1881,8 +1891,18 @@ class App(ctk.CTk):
         data = get_chart_data(skill if skill != "Alle" else None)
 
         today_d = date.today()
-        days    = [(today_d - timedelta(days=59 - i)) for i in range(60)]
-        values  = [data.get(d.strftime("%Y-%m-%d"), 0.0) for d in days]
+        if period == "30 days":
+            n_days = 30
+        elif period == "90 days":
+            n_days = 90
+        elif period == "1 year":
+            n_days = 365
+        else:  # All time
+            first = get_first_session_date()
+            n_days = (today_d - first).days + 1 if first else 365
+
+        days   = [(today_d - timedelta(days=n_days - 1 - i)) for i in range(n_days)]
+        values = [data.get(d.strftime("%Y-%m-%d"), 0.0) for d in days]
 
         max_h = max(values) if any(v > 0 for v in values) else 0.0
         if max_h == 0:
@@ -1912,8 +1932,8 @@ class App(ctk.CTk):
                                anchor="e", fill=MUTED, font=("Helvetica", 8))
 
         # Bars
-        bar_total_w = draw_w / 60
-        bar_w = max(2.0, bar_total_w * 0.75)
+        bar_total_w = draw_w / n_days
+        bar_w = max(1.5, bar_total_w * 0.75)
 
         for i, (d, val) in enumerate(zip(days, values)):
             if val <= 0:
@@ -1927,9 +1947,10 @@ class App(ctk.CTk):
             fill = DARK if ratio >= 0.75 else (DARK2 if ratio >= 0.4 else BORDER)
             canvas.create_rectangle(x0, y0, x0 + bar_w, y1, fill=fill, outline="")
 
-        # X-axis date labels every 10 days
+        # X-axis date labels: interval scales with range
+        label_every = max(1, n_days // 6)
         for i, d in enumerate(days):
-            if i % 10 == 0:
+            if i % label_every == 0:
                 x = LM + (i + 0.5) * bar_total_w
                 canvas.create_text(x, TM + draw_h + 6, text=d.strftime("%d.%m"),
                                   fill=MUTED, font=("Helvetica", 8), anchor="n")
@@ -1939,7 +1960,7 @@ class App(ctk.CTk):
 
         def _hover(event):
             idx = int((event.x - LM) / btw)
-            if 0 <= idx < len(days):
+            if 0 <= idx < n_days:
                 d = days[idx]
                 val = values[idx]
                 ds = d.strftime("%Y-%m-%d")
