@@ -1849,7 +1849,7 @@ class App(ctk.CTk):
 
         skills_list = ["All"] + [name for name, _ in get_user_skills()]
         chart_skill  = ctk.StringVar(value="All")
-        chart_period = ctk.StringVar(value="30 days")
+        chart_period = ctk.StringVar(value="30d")
 
         _opt_kw = dict(
             height=28, corner_radius=8,
@@ -1864,8 +1864,8 @@ class App(ctk.CTk):
         ).pack(side="right", padx=(6, 0))
 
         ctk.CTkOptionMenu(
-            ctrl, values=["30 days", "90 days", "1 year", "All time"],
-            variable=chart_period, width=110, **_opt_kw,
+            ctrl, values=["30d", "90d", "1y", "All"],
+            variable=chart_period, width=90, **_opt_kw,
         ).pack(side="right")
 
         canvas = tk.Canvas(parent, height=170, bg=PANEL, highlightthickness=0)
@@ -1894,11 +1894,11 @@ class App(ctk.CTk):
         data = get_chart_data(skill if skill != "All" else None)
 
         today_d = date.today()
-        if period == "30 days":
+        if period == "30d":
             n_days = 30
-        elif period == "90 days":
+        elif period == "90d":
             n_days = 90
-        elif period == "1 year":
+        elif period == "1y":
             n_days = 365
         else:  # All time
             first = get_first_session_date()
