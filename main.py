@@ -563,7 +563,7 @@ class App(ctk.CTk):
         tip_lbl = mk_label(dlg, "", size=10, color=DIM)
         tip_lbl.pack(anchor="w", padx=20)
 
-        info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log."))
+        info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log"))
         info_lbl.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
 
 
