@@ -341,9 +341,6 @@ class App(ctk.CTk):
         self._delta_lbl = mk_label(right_col, "", size=14, color="#4ade80", weight="bold")
         self._delta_lbl.pack(anchor="w", pady=(2, 0))
 
-        # Streak row
-        self._streak_lbl = mk_label(footer, "", size=13, color=MUTED)
-        self._streak_lbl.pack(anchor="w", padx=(4, 0), pady=(2, 0))
         self._prev_streak = 0
 
         # Trophy overlay (placed dynamically over the sidebar footer)
@@ -365,6 +362,10 @@ class App(ctk.CTk):
         self._lvl_bar = progress_bar(footer)
         self._lvl_bar.pack(fill="x", pady=(4, 0))
         self._lvl_bar.set(0)
+
+        self._streak_lbl = mk_label(footer, "", size=11, color=MUTED)
+        self._streak_lbl.pack(anchor="center", pady=(4, 0))
+        self._prev_streak = 0
 
         self._prev_total = 0.0  # for delta calculation
 
@@ -620,7 +621,7 @@ class App(ctk.CTk):
         # Streak
         streak = get_streak()
         prev_streak = getattr(self, "_prev_streak", streak)
-        self._streak_lbl.configure(text=f"🔥 {streak} day streak")
+        self._streak_lbl.configure(text=f"🔥{streak}d streak")
         if streak > prev_streak and prev_streak > 0:
             self._animate_streak_bump()
         self._prev_streak = streak
