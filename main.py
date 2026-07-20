@@ -1659,8 +1659,13 @@ class App(ctk.CTk):
                             threshold_h = LEVEL_THRESHOLDS[badge_i - 1]
                             mk_label(d, f"≥{threshold_h}h",
                                      size=12, color=MUTED).pack(pady=(2, 0))
-                        mk_btn(d, "Close", d.destroy,
-                               width=130, height=36, primary=True).pack(pady=18)
+                        arrow_lbl = ctk.CTkLabel(d, text="⌄", font=("Helvetica", 28),
+                                                 text_color="#888880", fg_color="transparent",
+                                                 cursor="hand2")
+                        arrow_lbl.pack(pady=(12, 18))
+                        arrow_lbl.bind("<Button-1>", lambda e: d.destroy())
+                        arrow_lbl.bind("<Enter>", lambda e: arrow_lbl.configure(text_color="#555550"))
+                        arrow_lbl.bind("<Leave>", lambda e: arrow_lbl.configure(text_color="#888880"))
 
                     btn = ctk.CTkButton(
                         badge_frame, image=ci, text="", width=64, height=64,
