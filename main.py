@@ -549,14 +549,8 @@ class App(ctk.CTk):
                                text_color=BG  if fills  else MUTED)
             emp_btn.configure( fg_color=DARK if not fills else "transparent",
                                text_color=BG  if not fills else MUTED)
-            btn = fill_btn if fills else emp_btn
-            def _blink(n=0):
-                if n >= 4:
-                    btn.configure(fg_color=DARK)
-                    return
-                btn.configure(fg_color=BORDER if n % 2 == 0 else DARK)
-                dlg.after(80, lambda: _blink(n + 1))
-            _blink()
+            dir_pill.configure(fg_color=BORDER)
+            dlg.after(180, lambda: dir_pill.configure(fg_color=CARD))
 
         fill_btn = ctk.CTkButton(
             dir_pill, text="Fill", width=86, height=32, corner_radius=12,
