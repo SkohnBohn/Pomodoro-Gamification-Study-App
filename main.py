@@ -2860,6 +2860,13 @@ class App(ctk.CTk):
         all_skill_records = {sk: get_best_days_for_skill(sk)
                              for sk in active_skills}
         active_skills = [sk for sk in active_skills if all_skill_records[sk]]
+        # sort pills desc by each skill's best day
+        active_skills.sort(key=lambda sk: all_skill_records[sk][0]["total_min"], reverse=True)
+        # global max for relative bar scaling across all skills
+        global_max_m = max(
+            (all_skill_records[sk][0]["total_min"] for sk in active_skills),
+            default=1,
+        )
 
         if active_skills:
             section_header(detail_container, "Best Day per Skill")
@@ -2905,18 +2912,19 @@ class App(ctk.CTk):
                 sk_canvas = tk.Canvas(bar_host, height=6, bg=PANEL, highlightthickness=0)
                 sk_canvas.pack(fill="x", expand=True)
 
-                def _draw_sk_bar(event=None, c=sk_canvas, sk=skill):
+                def _draw_sk_bar(event=None, c=sk_canvas, sk=skill,
+                                 val=r0["total_min"], gmax=global_max_m):
                     c.delete("all")
                     W = c.winfo_width()
                     if W > 2:
-                        c.create_rectangle(0, 0, W, 6, fill=skill_color(sk), outline="")
+                        bar_w = max(2, int(W * val / gmax))
+                        c.create_rectangle(0, 0, bar_w, 6, fill=skill_color(sk), outline="")
                 sk_canvas.bind("<Configure>", _draw_sk_bar)
                 sk_canvas.after(60, _draw_sk_bar)
 
-                max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
                     compact_row(sk_content, i + 1, records[i], is_skill=True,
-                                single_skill=skill, max_min=max_m,
+                                single_skill=skill, max_min=global_max_m,
                                 status_lbl=sk_status_lbl)
 
                 if n < len(records):
