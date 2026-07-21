@@ -352,20 +352,21 @@ class App(ctk.CTk):
         hero.pack(fill="x")
         self._total_lbl = mk_label(hero, "0.0", size=46, weight="bold", color=DARK)
         self._total_lbl.pack(side="left", padx=(4, 0))
+        right_col = ctk.CTkFrame(hero, fg_color="transparent")
+        right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
+        mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")
+
+        self._delta_lbl = mk_label(footer, "", size=13, color="#4ade80", weight="bold")
+        self._delta_lbl.pack(anchor="w", padx=(4, 0), pady=(0, 2))
 
         def _show_last_session(_e=None):
             dur = get_last_session_duration()
             if dur:
-                self._delta_lbl.configure(text=f"+{dur/60:.1f}h")
+                self._delta_lbl.configure(text=f"+{dur/60:.1f}h letzte Session")
         def _hide_last_session(_e=None):
             self._delta_lbl.configure(text="")
         self._total_lbl.bind("<Enter>", _show_last_session)
         self._total_lbl.bind("<Leave>", _hide_last_session)
-        right_col = ctk.CTkFrame(hero, fg_color="transparent")
-        right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
-        mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")
-        self._delta_lbl = mk_label(right_col, "", size=14, color="#4ade80", weight="bold")
-        self._delta_lbl.pack(anchor="w", pady=(2, 0))
 
         self._prev_streak = 0
 
