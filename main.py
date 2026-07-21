@@ -29,6 +29,7 @@ from data_manager import (
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
     get_first_session_date, get_streak,
     get_best_periods, get_all_streaks, get_best_days_for_skill,
+    get_last_session_duration,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
@@ -351,6 +352,15 @@ class App(ctk.CTk):
         hero.pack(fill="x")
         self._total_lbl = mk_label(hero, "0.0", size=46, weight="bold", color=DARK)
         self._total_lbl.pack(side="left", padx=(4, 0))
+
+        def _show_last_session(_e=None):
+            dur = get_last_session_duration()
+            if dur:
+                self._delta_lbl.configure(text=f"+{dur/60:.1f}h")
+        def _hide_last_session(_e=None):
+            self._delta_lbl.configure(text="")
+        self._total_lbl.bind("<Enter>", _show_last_session)
+        self._total_lbl.bind("<Leave>", _hide_last_session)
         right_col = ctk.CTkFrame(hero, fg_color="transparent")
         right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
         mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")

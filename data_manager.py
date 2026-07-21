@@ -311,6 +311,16 @@ def get_chart_data(skill: str = None) -> dict:
 
 # ── First session date ─────────────────────────────────────────────────────────
 
+def get_last_session_duration() -> float | None:
+    """Return duration (minutes) of the most recent session, or None."""
+    conn = sqlite3.connect(config.DB_FILE)
+    row = conn.execute(
+        "SELECT duration FROM pomodoro_session ORDER BY rowid DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 def get_first_session_date() -> str | None:
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
