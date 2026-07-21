@@ -398,6 +398,9 @@ def get_best_periods(period: str = "day") -> list:
         result = []
         for date_s, total in rows:
             bd = _skill_breakdown(conn, [date_s])
+            cnt = c.execute(
+                "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
+                (date_s,)).fetchone()[0]
             try:
                 from datetime import date as _date
                 d = _date.fromisoformat(date_s)
@@ -405,7 +408,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = date_s
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": [date_s]})
+                           "breakdown": bd, "dates": [date_s],
+                           "session_count": cnt})
 
     elif period == "week":
         c.execute(
@@ -422,6 +426,10 @@ def get_best_periods(period: str = "day") -> list:
                 " WHERE strftime('%Y-W%W', date)=?", (wk,)
             ).fetchall()]
             bd = _skill_breakdown(conn, dates)
+            ph = ",".join("?" * len(dates))
+            cnt = c2.execute(
+                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
+                dates).fetchone()[0]
             try:
                 from datetime import date as _date
                 d1 = _date.fromisoformat(dmin)
@@ -430,7 +438,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = wk
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates})
+                           "breakdown": bd, "dates": dates,
+                           "session_count": cnt})
 
     else:  # month
         c.execute(
@@ -446,6 +455,10 @@ def get_best_periods(period: str = "day") -> list:
                 " WHERE strftime('%Y-%m', date)=?", (mo,)
             ).fetchall()]
             bd = _skill_breakdown(conn, dates)
+            ph = ",".join("?" * len(dates))
+            cnt = c2.execute(
+                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
+                dates).fetchone()[0]
             try:
                 from datetime import date as _date
                 d = _date.fromisoformat(dmin)
@@ -453,7 +466,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = mo
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates})
+                           "breakdown": bd, "dates": dates,
+                           "session_count": cnt})
 
     conn.close()
     return result

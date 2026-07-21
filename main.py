@@ -2459,20 +2459,9 @@ class App(ctk.CTk):
                      color=TEXT, width=60).grid(row=0, column=1, sticky="w")
 
             lbl_text = fmt_date_short(record.get("label", ""))
-            dates = record.get("dates", [])
-            if dates:
-                try:
-                    _conn_cr = sqlite3.connect(DB_FILE)
-                    _c_cr = _conn_cr.cursor()
-                    _ph = ",".join("?" * len(dates))
-                    _cnt = _conn_cr.execute(
-                        f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({_ph})",
-                        dates,
-                    ).fetchone()[0]
-                    _conn_cr.close()
-                    lbl_text = f"{_cnt}S {lbl_text}"
-                except Exception:
-                    pass
+            sc = record.get("session_count")
+            if sc is not None:
+                lbl_text = f"{sc}S {lbl_text}"
             mk_label(row, lbl_text, size=11, color=DIM, width=90).grid(
                 row=0, column=3, sticky="e", padx=(12, 0))
 
