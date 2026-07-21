@@ -2852,32 +2852,44 @@ class App(ctk.CTk):
         _render_period_in(detail_container, "Best Weeks", "week")
         _render_period_in(detail_container, "Best Months", "month")
 
-        # ── Per-skill best days ───────────────────────────────────────────────
+        # ── Best Day per Skill — pill selector ───────────────────────────────
         try:
             active_skills = [sk for sk, _ in get_user_skills()]
         except Exception:
             active_skills = []
 
-        for skill in active_skills:
-            skill_records = get_best_days_for_skill(skill)
-            if not skill_records:
-                continue
-            section_header(detail_container, f"Best Day — {skill}")
-            sk_state = {"n": 1}
-            sk_container = ctk.CTkFrame(detail_container, fg_color="transparent")
-            sk_container.pack(fill="x")
+        all_skill_records = {sk: get_best_days_for_skill(sk)
+                             for sk in active_skills}
+        active_skills = [sk for sk in active_skills if all_skill_records[sk]]
+
+        if active_skills:
+            section_header(detail_container, "Best Day per Skill")
+
+            # pill bar
+            pill_wrap = ctk.CTkFrame(detail_container, fg_color=CARD, corner_radius=14)
+            pill_wrap.pack(fill="x", padx=28, pady=(0, 10))
+
+            sk_pill_btns = {}
+            sk_sel_state = {"skill": active_skills[0], "n": 1}
+
+            # content area below pills
+            sk_content = ctk.CTkFrame(detail_container, fg_color="transparent")
+            sk_content.pack(fill="x")
             sk_status_lbl = mk_label(detail_container, "", size=11, color=MUTED)
             sk_status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
 
-            def _render_skill(skill=skill, records=skill_records,
-                              state=sk_state, cont=sk_container,
-                              slbl=sk_status_lbl):
-                for w in cont.winfo_children():
+            def _render_sk_content():
+                for w in sk_content.winfo_children():
                     w.destroy()
-                n = state["n"]
+                sk_status_lbl.configure(text="")
+                skill  = sk_sel_state["skill"]
+                n      = sk_sel_state["n"]
+                records = all_skill_records[skill]
+                if not records:
+                    return
                 r0 = records[0]
 
-                card = ctk.CTkFrame(cont, fg_color=PANEL, corner_radius=14)
+                card = ctk.CTkFrame(sk_content, fg_color=PANEL, corner_radius=14)
                 card.pack(fill="x", padx=28, pady=(0, 4))
                 inner = ctk.CTkFrame(card, fg_color="transparent")
                 inner.pack(fill="x", padx=20, pady=16)
@@ -2888,43 +2900,64 @@ class App(ctk.CTk):
                 mk_label(top, fmt_date_short(r0["label"]), size=13, color=MUTED).pack(
                     side="right", anchor="s", pady=(0, 6))
 
-                # single-color bar for this skill
                 bar_host = ctk.CTkFrame(inner, fg_color="transparent", height=10)
                 bar_host.pack(fill="x", pady=(8, 0))
                 bar_host.pack_propagate(False)
-                sk_canvas = tk.Canvas(bar_host, height=6, bg=PANEL,
-                                      highlightthickness=0)
+                sk_canvas = tk.Canvas(bar_host, height=6, bg=PANEL, highlightthickness=0)
                 sk_canvas.pack(fill="x", expand=True)
 
                 def _draw_sk_bar(event=None, c=sk_canvas, sk=skill):
                     c.delete("all")
                     W = c.winfo_width()
                     if W > 2:
-                        c.create_rectangle(0, 0, W, 6,
-                                           fill=skill_color(sk), outline="")
+                        c.create_rectangle(0, 0, W, 6, fill=skill_color(sk), outline="")
                 sk_canvas.bind("<Configure>", _draw_sk_bar)
                 sk_canvas.after(60, _draw_sk_bar)
 
                 max_m = records[0]["total_min"] if records else 1
                 for i in range(1, min(n, len(records))):
-                    compact_row(cont, i + 1, records[i], is_skill=True,
+                    compact_row(sk_content, i + 1, records[i], is_skill=True,
                                 single_skill=skill, max_min=max_m,
-                                status_lbl=slbl)
+                                status_lbl=sk_status_lbl)
 
-                _self_render = _render_skill
                 if n < len(records):
-                    def _load_sk(s=state, r=records, fn=_self_render):
-                        s["n"] = min(s["n"] + 3, len(r))
-                        cont.after(0, fn)
-                    load_more_btn(cont, _load_sk)
+                    def _load_sk():
+                        sk_sel_state["n"] = min(sk_sel_state["n"] + 3, len(records))
+                        _render_sk_content()
+                    load_more_btn(sk_content, _load_sk)
 
                 if n > 1:
-                    def _collapse_sk(s=state, fn=_self_render):
-                        s["n"] = 1
-                        cont.after(0, fn)
-                    collapse_btn(cont, _collapse_sk)
+                    def _collapse_sk():
+                        sk_sel_state["n"] = 1
+                        _render_sk_content()
+                    collapse_btn(sk_content, _collapse_sk)
 
-            _render_skill()
+            def _select_skill(skill):
+                # reset n so loaded entries are cleared on skill switch
+                sk_sel_state["skill"] = skill
+                sk_sel_state["n"] = 1
+                for sk, btn in sk_pill_btns.items():
+                    active = sk == skill
+                    btn.configure(
+                        fg_color=DARK if active else "transparent",
+                        text_color=BG if active else MUTED,
+                    )
+                _render_sk_content()
+
+            for sk in active_skills:
+                is_first = sk == active_skills[0]
+                b = ctk.CTkButton(
+                    pill_wrap, text=sk, height=28, corner_radius=12,
+                    fg_color=DARK if is_first else "transparent",
+                    hover_color=DARK2,
+                    text_color=BG if is_first else MUTED,
+                    font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+                    command=lambda s=sk: _select_skill(s),
+                )
+                b.pack(side="left", padx=2, pady=2)
+                sk_pill_btns[sk] = b
+
+            _render_sk_content()
 
         ctk.CTkFrame(detail_container, fg_color="transparent", height=40).pack()
         ctk.CTkFrame(sc, fg_color="transparent", height=20).pack()
