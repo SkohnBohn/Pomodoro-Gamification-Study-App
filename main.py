@@ -353,12 +353,25 @@ class App(ctk.CTk):
         self._total_lbl = mk_label(hero, "0.0", size=46, weight="bold", color=DARK)
         self._total_lbl.pack(side="left", padx=(4, 0))
 
-        def _show_last_session(_e=None):
+        self._last_session_tip = None
+
+        def _show_last_session(e):
             dur = get_last_session_duration()
-            if dur:
-                self._delta_lbl.configure(text=f"+{dur/60:.1f}h")
+            if not dur:
+                return
+            tip = tk.Label(self.sidebar, text=f"+{dur/60:.1f}h",
+                           fg="#4ade80", bg=PANEL,
+                           font=("Helvetica", 13, "bold"),
+                           bd=0, highlightthickness=0)
+            tip.place(x=e.x_root - self.sidebar.winfo_rootx() + 10,
+                      y=e.y_root - self.sidebar.winfo_rooty() - 24)
+            self._last_session_tip = tip
+
         def _hide_last_session(_e=None):
-            self._delta_lbl.configure(text="")
+            if self._last_session_tip:
+                self._last_session_tip.destroy()
+                self._last_session_tip = None
+
         self._total_lbl.bind("<Enter>", _show_last_session)
         self._total_lbl.bind("<Leave>", _hide_last_session)
         right_col = ctk.CTkFrame(hero, fg_color="transparent")
