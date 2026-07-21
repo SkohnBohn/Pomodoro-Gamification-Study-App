@@ -359,12 +359,14 @@ class App(ctk.CTk):
             dur = get_last_session_duration()
             if not dur:
                 return
+            self.sidebar.update_idletasks()
+            x = self._delta_lbl.winfo_rootx() - self.sidebar.winfo_rootx()
+            y = self._delta_lbl.winfo_rooty() - self.sidebar.winfo_rooty()
             tip = tk.Label(self.sidebar, text=f"+{dur/60:.1f}h",
                            fg="#4ade80", bg=PANEL,
                            font=("Helvetica", 13, "bold"),
-                           bd=0, highlightthickness=0)
-            tip.place(x=e.x_root - self.sidebar.winfo_rootx() + 10,
-                      y=e.y_root - self.sidebar.winfo_rooty() - 24)
+                           bd=0, highlightthickness=0, relief="flat")
+            tip.place(x=x, y=y)
             self._last_session_tip = tip
 
         def _hide_last_session(_e=None):
