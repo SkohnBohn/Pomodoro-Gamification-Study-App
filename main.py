@@ -2459,10 +2459,7 @@ class App(ctk.CTk):
                      color=TEXT, width=60).grid(row=0, column=1, sticky="w")
 
             lbl_text = fmt_date_short(record.get("label", ""))
-            sc = record.get("session_count")
-            if sc is not None:
-                lbl_text = f"{sc}S | {lbl_text}"
-            mk_label(row, lbl_text, size=11, color=DIM, width=90).grid(
+            mk_label(row, lbl_text, size=11, color=DIM, width=70).grid(
                 row=0, column=3, sticky="e", padx=(12, 0))
 
             # inline skill bar
