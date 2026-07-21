@@ -2778,10 +2778,9 @@ class App(ctk.CTk):
         expand_state = {"open": False}
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
 
-        ctk.CTkFrame(sc, height=1, fg_color=BORDER).pack(fill="x", padx=28, pady=(14, 0))
         toggle_lbl = ctk.CTkLabel(sc, text="⌄", font=("Helvetica", 22),
                                   text_color="#888880", fg_color="transparent")
-        toggle_lbl.pack(anchor="center", pady=(4, 4))
+        toggle_lbl.pack(anchor="center", pady=(10, 4))
 
         def _toggle_details():
             if expand_state["open"]:
