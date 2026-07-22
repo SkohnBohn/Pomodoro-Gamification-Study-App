@@ -1631,7 +1631,13 @@ class App(ctk.CTk):
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
-                def _collect(sk=skill, lv=next_collect, card=c):
+                pending = lvl - conf_lvl
+                if pending > 1:
+                    btn_text = f"⭐  LVL {next_collect}–{lvl} einsammeln! ({pending}×)"
+                else:
+                    btn_text = f"⭐  LVL {next_collect} einsammeln!"
+
+                def _collect(sk=skill, lv=lvl, card=c):
                     play_skill_levelup()
                     self._animate_collect(card)
                     confirm_skill_level(sk, lv)
@@ -1639,7 +1645,7 @@ class App(ctk.CTk):
                     self.after(650, lambda s=sk, l=lv: self._skill_levelup_dialog(s, l))
 
                 ctk.CTkButton(
-                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
+                    inner, text=btn_text,
                     height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
@@ -1826,7 +1832,13 @@ class App(ctk.CTk):
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
-                def _collect_stat(k=key, lv=next_collect, n=name, card=c):
+                pending_s = lvl_s - conf_lvl
+                if pending_s > 1:
+                    btn_text_s = f"⭐  LVL {next_collect}–{lvl_s} einsammeln! ({pending_s}×)"
+                else:
+                    btn_text_s = f"⭐  LVL {next_collect} einsammeln!"
+
+                def _collect_stat(k=key, lv=lvl_s, n=name, card=c):
                     play_stat_levelup()
                     confirm_stat_level(k, lv)
                     self._animate_collect(card)
@@ -1834,7 +1846,7 @@ class App(ctk.CTk):
                     self.after(650, lambda nn=n, ll=lv: self._stat_levelup_dialog(nn, ll))
 
                 ctk.CTkButton(
-                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
+                    inner, text=btn_text_s,
                     height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
