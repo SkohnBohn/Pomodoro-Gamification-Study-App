@@ -3218,12 +3218,11 @@ class App(ctk.CTk):
             mk_label(left, f"Rekord: {d['best_day_min']/60:.1f}h", size=10, color=DIM).pack(anchor="w")
 
         if d["percentile"] is not None:
-            top_pct = max(1, 100 - d["percentile"])
+            top_pct = max(0.01, 100 - d["percentile"])
             right = ctk.CTkFrame(inner, fg_color="transparent")
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             col = SUCCESS if d["percentile"] >= 75 else MUTED
-            mk_label(right, f"top {top_pct}%", size=20, weight="bold", color=col).pack(anchor="e")
-            mk_label(right, "deiner Tage", size=10, color=DIM).pack(anchor="e")
+            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color=col).pack(anchor="e")
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
@@ -3231,27 +3230,31 @@ class App(ctk.CTk):
         row2.columnconfigure(0, weight=1)
         row2.columnconfigure(1, weight=1)
 
+        # Streak card — centered
         s_card = mk_card(row2)
         s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         s_in = ctk.CTkFrame(s_card, fg_color="transparent")
-        s_in.pack(padx=16, pady=14, anchor="w")
-        mk_label(s_in, "🔥", size=24).pack(anchor="w")
-        mk_label(s_in, str(streak), size=28, weight="bold", color=DARK).pack(anchor="w")
-        mk_label(s_in, "Tage in Folge", size=11, color=MUTED).pack(anchor="w")
+        s_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
+        mk_label(s_in, "Tage in Folge", size=11, color=MUTED).pack(pady=(4, 0))
 
+        # Sessions card — centered number, meta row below
         ss_card = mk_card(row2)
         ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
-        ss_in.pack(padx=16, pady=14, anchor="w")
-        mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack(anchor="w")
-        mk_label(ss_in, "Sessions heute", size=11, color=MUTED).pack(anchor="w")
+        ss_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
+        meta_row = ctk.CTkFrame(ss_in, fg_color="transparent")
+        meta_row.pack(fill="x", pady=(4, 0))
+        mk_label(meta_row, "Sessions", size=11, color=MUTED).pack(side="left")
         if d["longest_min"]:
-            mk_label(ss_in, f"längste: {int(d['longest_min'])}min", size=11, color=DIM).pack(anchor="w", pady=(4, 0))
+            mk_label(meta_row, f"longest: {int(d['longest_min'])}min",
+                     size=11, color=DIM).pack(side="right")
 
         # ── Timeline canvas ───────────────────────────────────────────────────
         tl_card = mk_card(sc)
         tl_card.pack(fill="x", padx=16, pady=(0, 8))
-        sec_title(tl_card, "Verlauf")
+        sec_title(tl_card, "Timeline")
         tl_canvas = tk.Canvas(tl_card, height=28, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
@@ -3259,9 +3262,11 @@ class App(ctk.CTk):
         for t in ["0h", "6h", "12h", "18h", "24h"]:
             mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
         snapshot = d["timeline"]
+        blocks: list = []
 
         def _draw_tl(event=None):
             tl_canvas.delete("all")
+            blocks.clear()
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
@@ -3283,8 +3288,43 @@ class App(ctk.CTk):
                 x1 = max(x0 + 4, int((start + dur) / DAY * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                            fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+
+        _tl_tip: list = [None]
+
+        def _tl_motion(e):
+            hit = next(
+                ((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
+                 if x0 <= e.x <= x1 and y0 <= e.y <= y1),
+                None,
+            )
+            if hit:
+                dur, sk = hit
+                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                cx, cy = tl_canvas.winfo_x(), tl_canvas.winfo_y()
+                tx = cx + e.x + 10
+                ty = max(0, cy + e.y - 28)
+                if _tl_tip[0] is None or not _tl_tip[0].winfo_exists():
+                    tip = tk.Label(tl_card, text=txt, fg=TEXT, bg=PANEL,
+                                   font=("Helvetica", 11, "bold"),
+                                   bd=0, highlightthickness=0, relief="flat")
+                    _tl_tip[0] = tip
+                _tl_tip[0].configure(text=txt)
+                _tl_tip[0].lift()
+                _tl_tip[0].place(x=tx, y=ty)
+            else:
+                if _tl_tip[0] and _tl_tip[0].winfo_exists():
+                    _tl_tip[0].destroy()
+                _tl_tip[0] = None
+
+        def _tl_leave(_e=None):
+            if _tl_tip[0] and _tl_tip[0].winfo_exists():
+                _tl_tip[0].destroy()
+            _tl_tip[0] = None
 
         tl_canvas.bind("<Configure>", _draw_tl)
+        tl_canvas.bind("<Motion>", _tl_motion)
+        tl_canvas.bind("<Leave>", _tl_leave)
         tl_canvas.after(80, _draw_tl)
 
         # ── Skill pills ───────────────────────────────────────────────────────
@@ -3308,9 +3348,11 @@ class App(ctk.CTk):
         if d["avg_min"] > 0:
             delta = d["total_min"] - d["avg_min"]
             dh = abs(delta) / 60
+            avg_h = d["avg_min"] / 60
             above = delta >= 0
-            txt = (f"+{dh:.1f}h über deinem Tagesdurchschnitt"
-                   if above else f"−{dh:.1f}h unter deinem Tagesdurchschnitt")
+            sign = "+" if above else "−"
+            direction = "above" if above else "below"
+            txt = f"{sign}{dh:.1f}h {direction} daily average  (ø {avg_h:.1f}h)"
             avg_card = mk_card(sc)
             avg_card.pack(fill="x", padx=16, pady=(0, 16))
             mk_label(avg_card, txt, size=13, weight="bold",

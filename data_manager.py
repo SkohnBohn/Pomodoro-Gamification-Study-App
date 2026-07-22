@@ -363,7 +363,7 @@ def get_today_stats() -> dict:
     # Percentile: what % of days were worse than today
     if total_min > 0 and all_days:
         rank = sum(1 for d in all_days if d <= total_min)
-        percentile = round(rank / len(all_days) * 100)
+        percentile = round(rank / len(all_days) * 100, 2)
     else:
         percentile = None
 
