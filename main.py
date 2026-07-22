@@ -1548,16 +1548,17 @@ class App(ctk.CTk):
 
     # ── Open log ──────────────────────────────────────────────────────────────
     def _open_log(self):
-        if not os.path.exists(DB_FILE):
+        path = config.DB_FILE
+        if not os.path.exists(path):
             return
         try:
             plat = platform.system()
             if plat == "Darwin":
-                subprocess.call(("open", DB_FILE))
+                subprocess.call(("open", path))
             elif plat == "Windows":
-                os.startfile(DB_FILE)
+                os.startfile(path)
             else:
-                subprocess.call(("xdg-open", DB_FILE))
+                subprocess.call(("xdg-open", path))
         except Exception:
             pass
 
