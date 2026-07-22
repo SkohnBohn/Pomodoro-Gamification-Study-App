@@ -3248,7 +3248,7 @@ class App(ctk.CTk):
         mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
         meta_row = ctk.CTkFrame(ss_in, fg_color="transparent")
         meta_row.pack(fill="x", pady=(4, 0))
-        mk_label(meta_row, "Sessions", size=11, color=MUTED).pack(side="left")
+        mk_label(meta_row, "sessions", size=11, color=MUTED).pack(side="left", padx=(10, 0))
         if d["longest_min"]:
             mk_label(meta_row, f"longest: {int(d['longest_min'])}min",
                      size=11, color=DIM).pack(side="right")
