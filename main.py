@@ -1569,7 +1569,7 @@ class App(ctk.CTk):
         total_all = 0.0
         last      = None
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute(
                 "SELECT skill, SUM(duration) FROM pomodoro_session GROUP BY skill")
@@ -1692,7 +1692,7 @@ class App(ctk.CTk):
 
         total_h = calculate_total_time()
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute("SELECT SUM(duration) FROM pomodoro_session")
             total_min = cur.fetchone()[0] or 0
@@ -2585,7 +2585,7 @@ class App(ctk.CTk):
                     return
                 r0 = records[0]
                 try:
-                    conn2 = sqlite3.connect(DB_FILE)
+                    conn2 = sqlite3.connect(config.DB_FILE)
                     c2 = conn2.cursor()
                     if period == "day":
                         cnt = c2.execute(
@@ -2843,7 +2843,7 @@ class App(ctk.CTk):
                     return
                 r0 = records[0]
                 try:
-                    conn2 = sqlite3.connect(DB_FILE)
+                    conn2 = sqlite3.connect(config.DB_FILE)
                     c2 = conn2.cursor()
                     if period == "day":
                         cnt = c2.execute(
@@ -3069,7 +3069,7 @@ class App(ctk.CTk):
             date_filter = ""
 
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute(
                 f"SELECT duration, date, time, skill, intention "
