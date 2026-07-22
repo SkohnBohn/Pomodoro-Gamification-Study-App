@@ -311,6 +311,75 @@ def get_chart_data(skill: str = None) -> dict:
 
 # ── First session date ─────────────────────────────────────────────────────────
 
+def get_today_stats() -> dict:
+    """All data needed for the Today tab in one DB connection."""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+
+    conn = sqlite3.connect(config.DB_FILE)
+    c = conn.cursor()
+
+    # Today's total and session list
+    c.execute(
+        "SELECT time, duration, skill FROM pomodoro_session"
+        " WHERE date=? ORDER BY time",
+        (today,),
+    )
+    today_rows = c.fetchall()
+    total_min = sum(r[1] for r in today_rows if r[1])
+    sessions  = len(today_rows)
+    longest   = max((r[1] for r in today_rows), default=0)
+
+    skill_breakdown: dict = {}
+    for _, dur, sk in today_rows:
+        if sk and dur:
+            skill_breakdown[sk] = skill_breakdown.get(sk, 0) + dur
+
+    timeline = [
+        {"time": r[0], "duration": r[1], "skill": r[2]}
+        for r in today_rows if r[0]
+    ]
+
+    # All days for percentile + average
+    c.execute(
+        "SELECT SUM(duration) FROM pomodoro_session"
+        " WHERE date != ? AND date IS NOT NULL GROUP BY date",
+        (today,),
+    )
+    other_days = [r[0] for r in c.fetchall() if r[0]]
+    all_days   = sorted(other_days + ([total_min] if total_min > 0 else []), reverse=True)
+    avg_min    = (sum(other_days) / len(other_days)) if other_days else 0
+
+    # Best day ever
+    c.execute(
+        "SELECT MAX(daily) FROM"
+        " (SELECT SUM(duration) as daily FROM pomodoro_session"
+        "  WHERE date IS NOT NULL GROUP BY date)"
+    )
+    best_day_min = c.fetchone()[0] or 0
+
+    conn.close()
+
+    # Percentile: what % of days were worse than today
+    if total_min > 0 and all_days:
+        rank = sum(1 for d in all_days if d <= total_min)
+        percentile = round(rank / len(all_days) * 100)
+    else:
+        percentile = None
+
+    return {
+        "today":           today,
+        "total_min":       total_min,
+        "sessions":        sessions,
+        "longest_min":     longest,
+        "skill_breakdown": skill_breakdown,
+        "timeline":        timeline,
+        "best_day_min":    best_day_min,
+        "avg_min":         avg_min,
+        "percentile":      percentile,
+    }
+
+
 def get_last_session_duration() -> float | None:
     """Return duration (minutes) of the most recent session, or None."""
     conn = sqlite3.connect(config.DB_FILE)

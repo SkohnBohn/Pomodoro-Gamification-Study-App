@@ -30,6 +30,7 @@ from data_manager import (
     get_first_session_date, get_streak,
     get_best_periods, get_all_streaks, get_best_days_for_skill,
     get_last_session_duration,
+    get_today_stats,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
@@ -325,6 +326,7 @@ class App(ctk.CTk):
         self._nav_btns: dict = {}
         for text, key in [
             ("Timer",         "timer"),
+            ("Today",         "today"),
             ("Skilltree",     "skills"),
             ("Achievements",  "achievements"),
             ("Stats",         "stats"),
@@ -426,6 +428,7 @@ class App(ctk.CTk):
         if key not in self._views:
             builders = {
                 "timer":        self._build_timer_view,
+                "today":        self._build_today_view,
                 "skills":       self._build_skills_view,
                 "achievements": self._build_achievements_view,
                 "stats":        self._build_stats_view,
@@ -439,6 +442,7 @@ class App(ctk.CTk):
 
         if key == "skills":         self._refresh_skills()
         elif key == "achievements": self._refresh_achievements()
+        elif key == "today":        self._refresh_today()
         elif key == "stats":        self._refresh_stats()
         elif key == "records":      self._refresh_records()
         elif key == "leaderboard":  self._refresh_leaderboard()
@@ -699,6 +703,8 @@ class App(ctk.CTk):
         if streak > prev_streak and prev_streak > 0:
             self._animate_streak_bump()
         self._prev_streak = streak
+        if self._active_view == "today":
+            self._refresh_today()
 
     def _animate_streak_bump(self, step=0, steps=10):
         if step > steps:
@@ -3170,6 +3176,145 @@ class App(ctk.CTk):
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
+
+
+    # ── Today tab ─────────────────────────────────────────────────────────────
+    def _build_today_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+        self._today_scroll = ctk.CTkScrollableFrame(
+            view, fg_color=BG,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
+        )
+        self._today_scroll.pack(fill="both", expand=True)
+        return view
+
+    def _refresh_today(self):
+        if not hasattr(self, "_today_scroll"):
+            return
+        for w in self._today_scroll.winfo_children():
+            w.destroy()
+        sc = self._today_scroll
+        d = get_today_stats()
+        streak = get_streak()
+
+        # ── Hero card ─────────────────────────────────────────────────────────
+        hero = mk_card(sc)
+        hero.pack(fill="x", padx=16, pady=(16, 8))
+        inner = ctk.CTkFrame(hero, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=18)
+        inner.columnconfigure(0, weight=1)
+        inner.columnconfigure(1, weight=0)
+
+        left = ctk.CTkFrame(inner, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="ew")
+        total_h = d["total_min"] / 60
+        mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
+        mk_label(left, "heute", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
+        if d["best_day_min"] > 0:
+            bar = progress_bar(left, color=DARK)
+            bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
+            bar.pack(fill="x", pady=(0, 4))
+            mk_label(left, f"Rekord: {d['best_day_min']/60:.1f}h", size=10, color=DIM).pack(anchor="w")
+
+        if d["percentile"] is not None:
+            top_pct = max(1, 100 - d["percentile"])
+            right = ctk.CTkFrame(inner, fg_color="transparent")
+            right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
+            col = SUCCESS if d["percentile"] >= 75 else MUTED
+            mk_label(right, f"top {top_pct}%", size=20, weight="bold", color=col).pack(anchor="e")
+            mk_label(right, "deiner Tage", size=10, color=DIM).pack(anchor="e")
+
+        # ── Streak + Sessions row ─────────────────────────────────────────────
+        row2 = ctk.CTkFrame(sc, fg_color="transparent")
+        row2.pack(fill="x", padx=16, pady=(0, 8))
+        row2.columnconfigure(0, weight=1)
+        row2.columnconfigure(1, weight=1)
+
+        s_card = mk_card(row2)
+        s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        s_in = ctk.CTkFrame(s_card, fg_color="transparent")
+        s_in.pack(padx=16, pady=14, anchor="w")
+        mk_label(s_in, "🔥", size=24).pack(anchor="w")
+        mk_label(s_in, str(streak), size=28, weight="bold", color=DARK).pack(anchor="w")
+        mk_label(s_in, "Tage in Folge", size=11, color=MUTED).pack(anchor="w")
+
+        ss_card = mk_card(row2)
+        ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
+        ss_in.pack(padx=16, pady=14, anchor="w")
+        mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack(anchor="w")
+        mk_label(ss_in, "Sessions heute", size=11, color=MUTED).pack(anchor="w")
+        if d["longest_min"]:
+            mk_label(ss_in, f"längste: {int(d['longest_min'])}min", size=11, color=DIM).pack(anchor="w", pady=(4, 0))
+
+        # ── Timeline canvas ───────────────────────────────────────────────────
+        tl_card = mk_card(sc)
+        tl_card.pack(fill="x", padx=16, pady=(0, 8))
+        sec_title(tl_card, "Verlauf")
+        tl_canvas = tk.Canvas(tl_card, height=28, bg=PANEL, highlightthickness=0)
+        tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
+        lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
+        lbl_row.pack(fill="x", padx=14, pady=(0, 12))
+        for t in ["0h", "6h", "12h", "18h", "24h"]:
+            mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
+        snapshot = d["timeline"]
+
+        def _draw_tl(event=None):
+            tl_canvas.delete("all")
+            W = tl_canvas.winfo_width()
+            if W < 4:
+                return
+            H, DAY = 28, 24 * 60
+            yc = H // 2
+            tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for item in snapshot:
+                t_str = item.get("time") or ""
+                dur = item.get("duration") or 0
+                sk = item.get("skill") or ""
+                if not t_str or not dur:
+                    continue
+                try:
+                    p = t_str.split(":")
+                    start = int(p[0]) * 60 + int(p[1])
+                except Exception:
+                    continue
+                x0 = int(start / DAY * W)
+                x1 = max(x0 + 4, int((start + dur) / DAY * W))
+                tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
+
+        tl_canvas.bind("<Configure>", _draw_tl)
+        tl_canvas.after(80, _draw_tl)
+
+        # ── Skill pills ───────────────────────────────────────────────────────
+        if d["skill_breakdown"]:
+            sk_card = mk_card(sc)
+            sk_card.pack(fill="x", padx=16, pady=(0, 8))
+            sec_title(sk_card, "Skills")
+            pills = ctk.CTkFrame(sk_card, fg_color="transparent")
+            pills.pack(fill="x", padx=14, pady=(0, 14))
+            for sk, mins in sorted(d["skill_breakdown"].items(), key=lambda x: -x[1]):
+                pill = ctk.CTkFrame(pills, fg_color=CARD, corner_radius=12)
+                pill.pack(side="left", padx=(0, 6), pady=2)
+                ctk.CTkLabel(
+                    pill,
+                    text=f"{sk}  {mins/60:.1f}h",
+                    text_color=_SKILL_COLORS.get(sk, DARK),
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                ).pack(padx=10, pady=5)
+
+        # ── Average comparison ────────────────────────────────────────────────
+        if d["avg_min"] > 0:
+            delta = d["total_min"] - d["avg_min"]
+            dh = abs(delta) / 60
+            above = delta >= 0
+            txt = (f"+{dh:.1f}h über deinem Tagesdurchschnitt"
+                   if above else f"−{dh:.1f}h unter deinem Tagesdurchschnitt")
+            avg_card = mk_card(sc)
+            avg_card.pack(fill="x", padx=16, pady=(0, 16))
+            mk_label(avg_card, txt, size=13, weight="bold",
+                     color=SUCCESS if above else DANGER).pack(padx=18, pady=14)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
