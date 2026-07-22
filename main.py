@@ -3332,7 +3332,12 @@ class App(ctk.CTk):
                     font=ctk.CTkFont(size=12, weight="bold"),
                 ).pack(padx=10, pady=5)
 
-        # ── Average comparison ────────────────────────────────────────────────
+        # ── Average comparison + percentile milestones ────────────────────────
+        avg_card = mk_card(sc)
+        avg_card.pack(fill="x", padx=16, pady=(0, 16))
+        body = ctk.CTkFrame(avg_card, fg_color="transparent")
+        body.pack(fill="x", padx=18, pady=(14, 14))
+
         if d["avg_min"] > 0:
             delta = d["total_min"] - d["avg_min"]
             dh = abs(delta) / 60
@@ -3341,10 +3346,23 @@ class App(ctk.CTk):
             sign = "+" if above else "−"
             direction = "above" if above else "below"
             txt = f"{sign}{dh:.1f}h {direction} daily avg  ({avg_h:.1f}h)"
-            avg_card = mk_card(sc)
-            avg_card.pack(fill="x", padx=16, pady=(0, 16))
-            mk_label(avg_card, txt, size=13, weight="bold",
-                     color=SUCCESS if above else DANGER).pack(padx=18, pady=14)
+            mk_label(body, txt, size=13, weight="bold",
+                     color=SUCCESS if above else DANGER).pack(anchor="w")
+
+        thresholds = d.get("thresholds", {})
+        if thresholds:
+            sep = ctk.CTkFrame(body, fg_color=BORDER, height=1)
+            sep.pack(fill="x", pady=(10, 8))
+            for top_pct, need_min in thresholds.items():
+                row = ctk.CTkFrame(body, fg_color="transparent")
+                row.pack(fill="x", pady=2)
+                mk_label(row, f"top {top_pct:>2}%", size=11, color=DIM).pack(side="left")
+                if d["total_min"] >= need_min:
+                    mk_label(row, "✓", size=11, color=SUCCESS).pack(side="right")
+                else:
+                    delta_h = (need_min - d["total_min"]) / 60
+                    mk_label(row, f"+{delta_h:.1f}h", size=11,
+                             weight="bold", color=DARK).pack(side="right")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

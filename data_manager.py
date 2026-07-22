@@ -367,6 +367,15 @@ def get_today_stats() -> dict:
     else:
         percentile = None
 
+    # Thresholds: minutes needed today to reach top X% of all days
+    thresholds: dict = {}
+    if other_days:
+        asc = sorted(other_days)
+        n = len(asc)
+        for top_pct in [50, 20, 10, 5, 2, 1]:
+            idx = min(int((100 - top_pct) / 100 * n), n - 1)
+            thresholds[top_pct] = asc[idx]
+
     return {
         "today":           today,
         "total_min":       total_min,
@@ -377,6 +386,7 @@ def get_today_stats() -> dict:
         "best_day_min":    best_day_min,
         "avg_min":         avg_min,
         "percentile":      percentile,
+        "thresholds":      thresholds,
     }
 
 
