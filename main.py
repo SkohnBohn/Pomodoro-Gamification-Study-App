@@ -685,10 +685,9 @@ class App(ctk.CTk):
                 delta_str = f"+{delta:.2f}h"
             else:
                 delta_str = "+0 min"
-            self._delta_lbl.configure(text=delta_str)
-            self.after(3000, lambda: self._delta_lbl.configure(text=""))
             self._animate_odometer(prev, total, steps=24, delay=35)
             self._show_trophy(delta_str)
+            self._flash_delta(delta_str)
         else:
             self._total_lbl.configure(text=f"{total:.1f}")
         self._prev_total = total
@@ -712,6 +711,21 @@ class App(ctk.CTk):
         b = int(0x10 - (0x10 - 0x00) * t)
         self._streak_lbl.configure(text_color=f"#{r:02x}{g:02x}{b:02x}")
         self.after(40, lambda: self._animate_streak_bump(step + 1, steps))
+
+    def _flash_delta(self, text: str):
+        if getattr(self, "_last_session_tip", None):
+            self._last_session_tip.destroy()
+            self._last_session_tip = None
+        self.sidebar.update_idletasks()
+        x = self._delta_lbl.winfo_rootx() - self.sidebar.winfo_rootx()
+        y = self._delta_lbl.winfo_rooty() - self.sidebar.winfo_rooty()
+        tip = tk.Label(self.sidebar, text=text,
+                       fg="#4ade80", bg=PANEL,
+                       font=("Helvetica", 13, "bold"),
+                       bd=0, highlightthickness=0, relief="flat")
+        tip.place(x=x, y=y)
+        self._last_session_tip = tip
+        self.after(3000, lambda: tip.destroy() if tip.winfo_exists() else None)
 
     def _show_trophy(self, delta_str: str):
         # Cancel any previous trophy
