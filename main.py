@@ -1401,7 +1401,7 @@ class App(ctk.CTk):
         max_s = self._pomo_max_mins * 60
         laps  = int(elapsed / max_s)
         pos   = (elapsed % max_s) / max_s  # position within current lap 0→1
-        frac  = pos if self._timer_fills else (1.0 - pos)
+        frac  = pos  # Open Timer always fills
         self.ring.update_ring(frac, ts)
         # Lap badge
         if laps >= 1:
