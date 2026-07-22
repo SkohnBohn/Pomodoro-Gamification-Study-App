@@ -3221,8 +3221,7 @@ class App(ctk.CTk):
             top_pct = max(0.01, 100 - d["percentile"])
             right = ctk.CTkFrame(inner, fg_color="transparent")
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
-            col = SUCCESS if d["percentile"] >= 75 else MUTED
-            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color=col).pack(anchor="e")
+            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
@@ -3236,7 +3235,7 @@ class App(ctk.CTk):
         s_in = ctk.CTkFrame(s_card, fg_color="transparent")
         s_in.pack(expand=True, fill="both", padx=10, pady=18)
         mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
-        mk_label(s_in, "Tage in Folge", size=11, color=MUTED).pack(pady=(4, 0))
+        mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
 
         # Sessions card — centered number, meta row below
         ss_card = mk_card(row2)
@@ -3306,7 +3305,7 @@ class App(ctk.CTk):
                 ty = max(0, cy + e.y - 28)
                 if _tl_tip[0] is None or not _tl_tip[0].winfo_exists():
                     tip = tk.Label(tl_card, text=txt, fg=TEXT, bg=PANEL,
-                                   font=("Helvetica", 11, "bold"),
+                                   font=("Helvetica", 11),
                                    bd=0, highlightthickness=0, relief="flat")
                     _tl_tip[0] = tip
                 _tl_tip[0].configure(text=txt)
