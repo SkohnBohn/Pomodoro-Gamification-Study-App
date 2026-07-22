@@ -3210,12 +3210,15 @@ class App(ctk.CTk):
         left.grid(row=0, column=0, sticky="ew")
         total_h = d["total_min"] / 60
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
-        mk_label(left, "heute", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
+        mk_label(left, "today", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
         if d["best_day_min"] > 0:
             bar = progress_bar(left, color=DARK)
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
             bar.pack(fill="x", pady=(0, 4))
-            mk_label(left, f"Rekord: {d['best_day_min']/60:.1f}h", size=10, color=DIM).pack(anchor="w")
+            pct_of_rec = d["total_min"] / d["best_day_min"] * 100
+            mk_label(left,
+                     f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
+                     size=10, color=DIM).pack(anchor="w")
 
         if d["percentile"] is not None:
             top_pct = max(0.01, 100 - d["percentile"])
@@ -3254,7 +3257,7 @@ class App(ctk.CTk):
         tl_card = mk_card(sc)
         tl_card.pack(fill="x", padx=16, pady=(0, 8))
         sec_title(tl_card, "Timeline")
-        tl_canvas = tk.Canvas(tl_card, height=28, bg=PANEL, highlightthickness=0)
+        tl_canvas = tk.Canvas(tl_card, height=42, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
         lbl_row.pack(fill="x", padx=14, pady=(0, 12))
@@ -3269,8 +3272,8 @@ class App(ctk.CTk):
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
-            H, DAY = 28, 24 * 60
-            yc = H // 2
+            DAY = 24 * 60
+            yc = 32  # blocks sit in lower portion; top 16px reserved for tooltip text
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
             for item in snapshot:
                 t_str = item.get("time") or ""
@@ -3289,9 +3292,8 @@ class App(ctk.CTk):
                                            fill=_SKILL_COLORS.get(sk, DARK), outline="")
                 blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
 
-        _tl_tip: list = [None]
-
         def _tl_motion(e):
+            tl_canvas.delete("tl_tip")
             hit = next(
                 ((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
                  if x0 <= e.x <= x1 and y0 <= e.y <= y1),
@@ -3300,26 +3302,13 @@ class App(ctk.CTk):
             if hit:
                 dur, sk = hit
                 txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                cx, cy = tl_canvas.winfo_x(), tl_canvas.winfo_y()
-                tx = cx + e.x + 10
-                ty = max(0, cy + e.y - 28)
-                if _tl_tip[0] is None or not _tl_tip[0].winfo_exists():
-                    tip = tk.Label(tl_card, text=txt, fg=TEXT, bg=PANEL,
-                                   font=("Helvetica", 11),
-                                   bd=0, highlightthickness=0, relief="flat")
-                    _tl_tip[0] = tip
-                _tl_tip[0].configure(text=txt)
-                _tl_tip[0].lift()
-                _tl_tip[0].place(x=tx, y=ty)
-            else:
-                if _tl_tip[0] and _tl_tip[0].winfo_exists():
-                    _tl_tip[0].destroy()
-                _tl_tip[0] = None
+                W = tl_canvas.winfo_width()
+                tl_canvas.create_text(min(e.x + 8, W - 4), 4, text=txt,
+                                      fill=TEXT, font=("Helvetica", 10),
+                                      anchor="nw", tags="tl_tip")
 
         def _tl_leave(_e=None):
-            if _tl_tip[0] and _tl_tip[0].winfo_exists():
-                _tl_tip[0].destroy()
-            _tl_tip[0] = None
+            tl_canvas.delete("tl_tip")
 
         tl_canvas.bind("<Configure>", _draw_tl)
         tl_canvas.bind("<Motion>", _tl_motion)
@@ -3351,7 +3340,7 @@ class App(ctk.CTk):
             above = delta >= 0
             sign = "+" if above else "−"
             direction = "above" if above else "below"
-            txt = f"{sign}{dh:.1f}h {direction} daily average  (ø {avg_h:.1f}h)"
+            txt = f"{sign}{dh:.1f}h {direction} daily avg  ({avg_h:.1f}h)"
             avg_card = mk_card(sc)
             avg_card.pack(fill="x", padx=16, pady=(0, 16))
             mk_label(avg_card, txt, size=13, weight="bold",
