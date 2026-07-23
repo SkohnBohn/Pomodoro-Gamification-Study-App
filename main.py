@@ -1509,7 +1509,7 @@ class App(ctk.CTk):
                 return
             old_lvl = calculate_level(calculate_total_time())
             save_session(duration, self.intention_text, result,
-                         skill=self.selected_skill)
+                         skill=self.selected_skill or "POMO")
             new_lvl = calculate_level(calculate_total_time())
             dlg.destroy()
             self._reset_timer()

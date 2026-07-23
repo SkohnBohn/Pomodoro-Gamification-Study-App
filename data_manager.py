@@ -94,7 +94,7 @@ def calculate_total_time():
     return 0.0 if result is None else result / 60.0
 
 
-def save_session(duration, intention, result, skill="Pomodoro"):
+def save_session(duration, intention, result, skill="POMO"):
     now = datetime.now()
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
