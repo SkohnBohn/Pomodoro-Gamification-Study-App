@@ -319,8 +319,9 @@ class App(ctk.CTk):
         self.sidebar.pack_propagate(False)
 
         # Header: title · settings · collapse
-        hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        self._sidebar_hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._sidebar_hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        hdr = self._sidebar_hdr
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
         self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
         self._collapse_btn.pack(side="right")
@@ -426,18 +427,19 @@ class App(ctk.CTk):
         self.content.pack(side="right", fill="both", expand=True)
 
     def _collapse_sidebar(self):
+        # Hide all content first so width change redraws an empty strip
+        self._sidebar_hdr.pack_forget()
         self._nav_frame.pack_forget()
         self._sidebar_footer.pack_forget()
-        self._collapse_btn.pack_forget()
-        self._expand_btn.pack(pady=(20, 0), padx=4)
         self.sidebar.configure(width=36)
+        self._expand_btn.pack(pady=(20, 0), padx=4)
 
     def _expand_sidebar(self):
         self._expand_btn.pack_forget()
+        self.sidebar.configure(width=self._sidebar_w)
+        self._sidebar_hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
         self._nav_frame.pack(fill="x")
         self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
-        self._collapse_btn.pack(side="right")
-        self.sidebar.configure(width=self._sidebar_w)
 
     def _nav(self, key: str):
         for k, b in self._nav_btns.items():
