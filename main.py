@@ -1483,8 +1483,10 @@ class App(ctk.CTk):
         dlg.grab_set()
         dlg.lift()
 
-        mk_label(dlg, f"{total_so_far:.0f} min  ·  {self.selected_skill}",
-                 size=15, weight="bold", color=DARK).pack(pady=(16, 4))
+        hdr = ctk.CTkFrame(dlg, fg_color="transparent")
+        hdr.pack(pady=(16, 4))
+        mk_label(hdr, f"{total_so_far:.0f} min  · ", size=15, weight="bold", color=DARK).pack(side="left")
+        mk_label(hdr, self.selected_skill, size=15, color=DARK).pack(side="left")
 
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
             fill="x", padx=22, pady=(0, 6))
@@ -1564,7 +1566,7 @@ class App(ctk.CTk):
         ctk.CTkButton(
             btn_row, text="✕", command=_discard,
             width=32, height=32, corner_radius=0,
-            fg_color="transparent", hover_color="transparent",
+            fg_color=PANEL, hover_color=PANEL,
             text_color=DIM, border_width=0,
             font=ctk.CTkFont(size=18),
         ).pack(side="left")
@@ -1572,7 +1574,7 @@ class App(ctk.CTk):
         ctk.CTkButton(
             btn_row, text="✓", command=_save,
             width=32, height=32, corner_radius=0,
-            fg_color="transparent", hover_color="transparent",
+            fg_color=PANEL, hover_color=PANEL,
             text_color=DARK, border_width=0,
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(side="right")
