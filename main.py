@@ -1477,7 +1477,7 @@ class App(ctk.CTk):
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("")
-        dlg.geometry("360x240")
+        dlg.geometry("360x270")
         dlg.resizable(False, False)
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
