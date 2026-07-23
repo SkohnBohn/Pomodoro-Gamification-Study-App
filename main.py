@@ -1474,7 +1474,7 @@ class App(ctk.CTk):
     def _result_dialog(self, duration: float):
         dlg = ctk.CTkToplevel(self)
         dlg.title("")
-        dlg.geometry("360x200")
+        dlg.geometry("360x240")
         dlg.resizable(False, False)
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
@@ -1494,8 +1494,20 @@ class App(ctk.CTk):
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
-        res.pack(fill="x", padx=22, pady=(0, 14))
+        res.pack(fill="x", padx=22, pady=(0, 10))
         res.focus()
+
+        ext_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        ext_row.pack(fill="x", padx=22, pady=(0, 12))
+        mk_label(ext_row, "+", size=13, color=DIM).pack(side="left", padx=(0, 6))
+        ext = ctk.CTkEntry(
+            ext_row, width=60, height=28, placeholder_text="0",
+            corner_radius=8, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
+            font=ctk.CTkFont(size=13),
+        )
+        ext.pack(side="left")
+        mk_label(ext_row, "min", size=13, color=DIM).pack(side="left", padx=(6, 0))
 
         def _discard():
             dlg.destroy()
@@ -1507,8 +1519,13 @@ class App(ctk.CTk):
                 res.configure(border_color=DANGER)
                 self.after(1400, lambda: res.configure(border_color=BORDER))
                 return
+            try:
+                extra = int(ext.get().strip() or "0")
+            except ValueError:
+                extra = 0
+            final_duration = duration + max(0, extra)
             old_lvl = calculate_level(calculate_total_time())
-            save_session(duration, self.intention_text, result,
+            save_session(final_duration, self.intention_text, result,
                          skill=self.selected_skill or "POMO")
             new_lvl = calculate_level(calculate_total_time())
             dlg.destroy()
