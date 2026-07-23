@@ -1484,15 +1484,13 @@ class App(ctk.CTk):
         dlg.lift()
 
         mk_label(dlg, f"{total_so_far:.0f} min  ·  {self.selected_skill}",
-                 size=15, weight="bold", color=DARK).pack(pady=(22, 2))
-        mk_label(dlg, "Was hast du erreicht?", size=12,
-                 color=MUTED).pack()
+                 size=15, weight="bold", color=DARK).pack(pady=(22, 4))
 
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
-            fill="x", padx=22, pady=(12, 8))
+            fill="x", padx=22, pady=(0, 8))
 
         res = ctk.CTkEntry(
-            dlg, height=36, placeholder_text="Ergebnis …",
+            dlg, height=36, placeholder_text="result …",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
