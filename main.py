@@ -1521,35 +1521,41 @@ class App(ctk.CTk):
             dlg.destroy()
             self._reset_timer()
 
+        def _extend():
+            try:
+                extra = max(0, int(ext.get().strip() or "0"))
+            except ValueError:
+                extra = 0
+            if extra <= 0:
+                ext.configure(border_color=DANGER)
+                self.after(1400, lambda: ext.configure(border_color=BORDER))
+                return
+            self._ext_accum = total_so_far
+            self._ext_result = getattr(self, "_ext_result", "")
+            dlg.destroy()
+            self._start_extension(extra)
+
         def _save():
             result = res.get().strip()
             if not result:
                 res.configure(border_color=DANGER)
                 self.after(1400, lambda: res.configure(border_color=BORDER))
                 return
-            try:
-                extra = max(0, int(ext.get().strip() or "0"))
-            except ValueError:
-                extra = 0
-            if extra > 0:
-                self._ext_accum = total_so_far
-                self._ext_result = result
-                dlg.destroy()
-                self._start_extension(extra)
-            else:
-                self._ext_accum = 0.0
-                self._ext_result = ""
-                old_lvl = calculate_level(calculate_total_time())
-                save_session(total_so_far, self.intention_text, result,
-                             skill=self.selected_skill or "POMO")
-                new_lvl = calculate_level(calculate_total_time())
-                dlg.destroy()
-                self._reset_timer()
-                self.intention_entry.delete(0, "end")
-                self._refresh_sidebar()
-                if new_lvl > old_lvl:
-                    play_main_levelup()
-                    self._levelup_dialog(new_lvl)
+            self._ext_accum = 0.0
+            self._ext_result = ""
+            old_lvl = calculate_level(calculate_total_time())
+            save_session(total_so_far, self.intention_text, result,
+                         skill=self.selected_skill or "POMO")
+            new_lvl = calculate_level(calculate_total_time())
+            dlg.destroy()
+            self._reset_timer()
+            self.intention_entry.delete(0, "end")
+            self._refresh_sidebar()
+            if new_lvl > old_lvl:
+                play_main_levelup()
+                self._levelup_dialog(new_lvl)
+
+        icon_btn(ext_row, "○", _extend, size=13).pack(side="left", padx=(8, 0))
 
         res.bind("<Return>", lambda _: _save())
         dlg.bind("<Escape>", lambda _: _discard())
