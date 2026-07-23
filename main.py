@@ -1490,7 +1490,7 @@ class App(ctk.CTk):
             fill="x", padx=22, pady=(0, 8))
 
         res = ctk.CTkEntry(
-            dlg, height=36, placeholder_text="result …",
+            dlg, height=36, placeholder_text="result…",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
