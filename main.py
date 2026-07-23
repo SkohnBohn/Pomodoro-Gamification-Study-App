@@ -1477,32 +1477,32 @@ class App(ctk.CTk):
 
         dlg = ctk.CTkToplevel(self)
         dlg.title("")
-        dlg.geometry("360x270")
+        dlg.geometry("360x220")
         dlg.resizable(False, False)
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
 
         mk_label(dlg, f"{total_so_far:.0f} min  ·  {self.selected_skill}",
-                 size=15, weight="bold", color=DARK).pack(pady=(22, 4))
+                 size=15, weight="bold", color=DARK).pack(pady=(16, 4))
 
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
-            fill="x", padx=22, pady=(0, 8))
+            fill="x", padx=22, pady=(0, 6))
 
         res = ctk.CTkEntry(
-            dlg, height=36, placeholder_text="result…",
+            dlg, height=34, placeholder_text="result…",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
-        res.pack(fill="x", padx=22, pady=(0, 10))
+        res.pack(fill="x", padx=22, pady=(0, 6))
         prior_result = getattr(self, "_ext_result", "")
         if prior_result:
             res.insert(0, prior_result)
         res.focus()
 
         ext_row = ctk.CTkFrame(dlg, fg_color="transparent")
-        ext_row.pack(fill="x", padx=22, pady=(0, 12))
+        ext_row.pack(fill="x", padx=22, pady=(0, 8))
         mk_label(ext_row, "+", size=13, color=DIM).pack(side="left", padx=(0, 6))
         ext = ctk.CTkEntry(
             ext_row, width=60, height=28, placeholder_text="0",
@@ -1559,7 +1559,7 @@ class App(ctk.CTk):
         dlg.bind("<Escape>", lambda _: _discard())
 
         btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
-        btn_row.pack(fill="x", padx=32, pady=(0, 18))
+        btn_row.pack(fill="x", padx=32, pady=(0, 12))
 
         ctk.CTkButton(
             btn_row, text="✕", command=_discard,
