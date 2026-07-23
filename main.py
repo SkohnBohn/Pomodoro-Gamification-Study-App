@@ -312,17 +312,23 @@ class App(ctk.CTk):
 
     # ── Layout ────────────────────────────────────────────────────────────────
     def _build_ui(self):
-        self.sidebar = ctk.CTkFrame(self, width=196, fg_color=PANEL,
+        self._sidebar_w = 196
+        self.sidebar = ctk.CTkFrame(self, width=self._sidebar_w, fg_color=PANEL,
                                     corner_radius=0, border_width=0)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        # Header with settings gear
+        # Header: title · settings · collapse
         hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
-        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right")
+        self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
+        self._collapse_btn.pack(side="right")
+        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right", padx=(0, 2))
 
+        # Nav buttons in a collapsible sub-frame
+        self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._nav_frame.pack(fill="x")
         self._nav_btns: dict = {}
         for text, key in [
             ("Timer",         "timer"),
@@ -334,7 +340,7 @@ class App(ctk.CTk):
             ("Leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
-                self.sidebar, text=text, anchor="w",
+                self._nav_frame, text=text, anchor="w",
                 height=42, corner_radius=10,
                 fg_color="transparent", hover_color=BORDER,
                 text_color=DIM, border_width=0,
@@ -344,8 +350,12 @@ class App(ctk.CTk):
             b.pack(padx=10, pady=2, fill="x")
             self._nav_btns[key] = b
 
-        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+        # Expand button — only shown when collapsed
+        self._expand_btn = icon_btn(self.sidebar, "›", self._expand_sidebar, size=13)
+
+        self._sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+        footer = self._sidebar_footer
 
         ctk.CTkFrame(footer, height=1, fg_color=BORDER).pack(fill="x", pady=(0, 16))
 
@@ -414,6 +424,20 @@ class App(ctk.CTk):
 
         self.content = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         self.content.pack(side="right", fill="both", expand=True)
+
+    def _collapse_sidebar(self):
+        self._nav_frame.pack_forget()
+        self._sidebar_footer.pack_forget()
+        self._collapse_btn.pack_forget()
+        self._expand_btn.pack(pady=(20, 0), padx=4)
+        self.sidebar.configure(width=36)
+
+    def _expand_sidebar(self):
+        self._expand_btn.pack_forget()
+        self._nav_frame.pack(fill="x")
+        self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+        self._collapse_btn.pack(side="right")
+        self.sidebar.configure(width=self._sidebar_w)
 
     def _nav(self, key: str):
         for k, b in self._nav_btns.items():
