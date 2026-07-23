@@ -1472,6 +1472,9 @@ class App(ctk.CTk):
 
     # ── Result dialog ─────────────────────────────────────────────────────────
     def _result_dialog(self, duration: float):
+        # duration = this chunk only; _ext_accum carries previous chunks
+        total_so_far = getattr(self, "_ext_accum", 0.0) + duration
+
         dlg = ctk.CTkToplevel(self)
         dlg.title("")
         dlg.geometry("360x240")
@@ -1480,7 +1483,7 @@ class App(ctk.CTk):
         dlg.grab_set()
         dlg.lift()
 
-        mk_label(dlg, f"{duration:.0f} min  ·  {self.selected_skill}",
+        mk_label(dlg, f"{total_so_far:.0f} min  ·  {self.selected_skill}",
                  size=15, weight="bold", color=DARK).pack(pady=(22, 2))
         mk_label(dlg, "Was hast du erreicht?", size=12,
                  color=MUTED).pack()
@@ -1495,6 +1498,9 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=13),
         )
         res.pack(fill="x", padx=22, pady=(0, 10))
+        prior_result = getattr(self, "_ext_result", "")
+        if prior_result:
+            res.insert(0, prior_result)
         res.focus()
 
         ext_row = ctk.CTkFrame(dlg, fg_color="transparent")
@@ -1510,6 +1516,8 @@ class App(ctk.CTk):
         mk_label(ext_row, "min", size=13, color=DIM).pack(side="left", padx=(6, 0))
 
         def _discard():
+            self._ext_accum = 0.0
+            self._ext_result = ""
             dlg.destroy()
             self._reset_timer()
 
@@ -1520,21 +1528,28 @@ class App(ctk.CTk):
                 self.after(1400, lambda: res.configure(border_color=BORDER))
                 return
             try:
-                extra = int(ext.get().strip() or "0")
+                extra = max(0, int(ext.get().strip() or "0"))
             except ValueError:
                 extra = 0
-            final_duration = duration + max(0, extra)
-            old_lvl = calculate_level(calculate_total_time())
-            save_session(final_duration, self.intention_text, result,
-                         skill=self.selected_skill or "POMO")
-            new_lvl = calculate_level(calculate_total_time())
-            dlg.destroy()
-            self._reset_timer()
-            self.intention_entry.delete(0, "end")
-            self._refresh_sidebar()
-            if new_lvl > old_lvl:
-                play_main_levelup()
-                self._levelup_dialog(new_lvl)
+            if extra > 0:
+                self._ext_accum = total_so_far
+                self._ext_result = result
+                dlg.destroy()
+                self._start_extension(extra)
+            else:
+                self._ext_accum = 0.0
+                self._ext_result = ""
+                old_lvl = calculate_level(calculate_total_time())
+                save_session(total_so_far, self.intention_text, result,
+                             skill=self.selected_skill or "POMO")
+                new_lvl = calculate_level(calculate_total_time())
+                dlg.destroy()
+                self._reset_timer()
+                self.intention_entry.delete(0, "end")
+                self._refresh_sidebar()
+                if new_lvl > old_lvl:
+                    play_main_levelup()
+                    self._levelup_dialog(new_lvl)
 
         res.bind("<Return>", lambda _: _save())
         dlg.bind("<Escape>", lambda _: _discard())
@@ -1557,6 +1572,16 @@ class App(ctk.CTk):
             border_width=0,
             font=ctk.CTkFont(size=22, weight="bold"),
         ).pack(side="left")
+
+    def _start_extension(self, extra_mins: int):
+        self.total_seconds = extra_mins * 60
+        self.seconds_left  = self.total_seconds
+        self._pomo_start_t = _time.monotonic()
+        self._pomo_pause_t = 0.0
+        self.running = True
+        self.paused  = False
+        self._btns_running()
+        self._tick_pomodoro()
 
     def _levelup_dialog(self, level: int):
         dlg = ctk.CTkToplevel(self)
