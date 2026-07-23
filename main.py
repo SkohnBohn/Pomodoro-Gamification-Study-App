@@ -1559,23 +1559,23 @@ class App(ctk.CTk):
         dlg.bind("<Escape>", lambda _: _discard())
 
         btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
-        btn_row.pack(padx=22)
+        btn_row.pack(fill="x", padx=32, pady=(0, 18))
 
         ctk.CTkButton(
             btn_row, text="✕", command=_discard,
-            width=56, height=48, corner_radius=12,
-            fg_color=CARD, hover_color=BORDER, text_color=MUTED,
-            border_width=1, border_color=BORDER,
-            font=ctk.CTkFont(size=20),
-        ).pack(side="left", padx=(0, 10))
+            width=32, height=32, corner_radius=0,
+            fg_color="transparent", hover_color="transparent",
+            text_color=DIM, border_width=0,
+            font=ctk.CTkFont(size=18),
+        ).pack(side="left")
 
         ctk.CTkButton(
             btn_row, text="✓", command=_save,
-            width=220, height=48, corner_radius=12,
-            fg_color=DARK, hover_color=DARK2, text_color=BG,
-            border_width=0,
+            width=32, height=32, corner_radius=0,
+            fg_color="transparent", hover_color="transparent",
+            text_color=DARK, border_width=0,
             font=ctk.CTkFont(size=22, weight="bold"),
-        ).pack(side="left")
+        ).pack(side="right")
 
     def _start_extension(self, extra_mins: int):
         self.total_seconds = extra_mins * 60
