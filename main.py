@@ -3257,13 +3257,29 @@ class App(ctk.CTk):
         # ── Timeline canvas ───────────────────────────────────────────────────
         tl_card = mk_card(sc)
         tl_card.pack(fill="x", padx=16, pady=(0, 8))
-        sec_title(tl_card, "Timeline")
+
+        # Header row: title + toggle button (configured after _toggle_full is defined)
+        tl_hdr = ctk.CTkFrame(tl_card, fg_color="transparent")
+        tl_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(tl_hdr, "TIMELINE", size=10, color=MUTED).pack(side="left")
+        toggle_btn = ctk.CTkButton(
+            tl_hdr, text="○", width=22, height=18, corner_radius=9,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=11),
+        )
+        toggle_btn.pack(side="left", padx=(6, 0))
+
+        # Main timeline: 8:00 → 1:00 (next day = 25h)
+        TL_START, TL_END = 8 * 60, 25 * 60
+        TL_WIDTH = TL_END - TL_START
+
         tl_canvas = tk.Canvas(tl_card, height=42, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
-        lbl_row.pack(fill="x", padx=14, pady=(0, 12))
-        for t in ["0h", "6h", "12h", "18h", "24h"]:
+        lbl_row.pack(fill="x", padx=14, pady=(0, 8))
+        for t in ["8h", "12h", "16h", "21h", "1h"]:
             mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
+
         snapshot = d["timeline"]
         blocks: list = []
 
@@ -3273,9 +3289,65 @@ class App(ctk.CTk):
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
-            DAY = 24 * 60
-            yc = 32  # blocks sit in lower portion; top 16px reserved for tooltip text
+            yc = 32
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for item in snapshot:
+                t_str = item.get("time") or ""
+                dur = item.get("duration") or 0
+                sk = item.get("skill") or ""
+                if not t_str or not dur:
+                    continue
+                try:
+                    p = t_str.split(":")
+                    start = int(p[0]) * 60 + int(p[1])
+                except Exception:
+                    continue
+                if start < TL_START or start >= TL_END:
+                    continue
+                end = min(start + dur, TL_END)
+                x0 = int((start - TL_START) / TL_WIDTH * W)
+                x1 = max(x0 + 4, int((end - TL_START) / TL_WIDTH * W))
+                tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+
+        def _tl_motion(e):
+            tl_canvas.delete("tl_tip")
+            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
+                        if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
+            if hit:
+                dur, sk = hit
+                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 4,
+                                      text=txt, fill=TEXT, font=("Helvetica", 10),
+                                      anchor="nw", tags="tl_tip")
+
+        def _tl_leave(_e=None):
+            tl_canvas.delete("tl_tip")
+
+        tl_canvas.bind("<Configure>", _draw_tl)
+        tl_canvas.bind("<Motion>", _tl_motion)
+        tl_canvas.bind("<Leave>", _tl_leave)
+        tl_canvas.after(80, _draw_tl)
+
+        # Full timeline (00:00–24:00), toggled by button
+        full_frame = ctk.CTkFrame(tl_card, fg_color="transparent")
+        full_blocks: list = []
+        full_canvas = tk.Canvas(full_frame, height=42, bg=PANEL, highlightthickness=0)
+        full_canvas.pack(fill="x", padx=16, pady=(4, 6))
+        full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
+        full_lbl.pack(fill="x", padx=14, pady=(0, 10))
+        for t in ["0h", "6h", "12h", "18h", "24h"]:
+            mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
+
+        def _draw_full(event=None):
+            full_canvas.delete("all")
+            full_blocks.clear()
+            W = full_canvas.winfo_width()
+            if W < 4:
+                return
+            DAY, yc = 24 * 60, 32
+            full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
@@ -3289,32 +3361,40 @@ class App(ctk.CTk):
                     continue
                 x0 = int(start / DAY * W)
                 x1 = max(x0 + 4, int((start + dur) / DAY * W))
-                tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+                full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                             fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
 
-        def _tl_motion(e):
-            tl_canvas.delete("tl_tip")
-            hit = next(
-                ((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
-                 if x0 <= e.x <= x1 and y0 <= e.y <= y1),
-                None,
-            )
+        def _full_motion(e):
+            full_canvas.delete("tl_tip")
+            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in full_blocks
+                        if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
                 dur, sk = hit
                 txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                W = tl_canvas.winfo_width()
-                tl_canvas.create_text(min(e.x + 8, W - 4), 4, text=txt,
-                                      fill=TEXT, font=("Helvetica", 10),
-                                      anchor="nw", tags="tl_tip")
+                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 4,
+                                        text=txt, fill=TEXT, font=("Helvetica", 10),
+                                        anchor="nw", tags="tl_tip")
 
-        def _tl_leave(_e=None):
-            tl_canvas.delete("tl_tip")
+        def _full_leave(_e=None):
+            full_canvas.delete("tl_tip")
 
-        tl_canvas.bind("<Configure>", _draw_tl)
-        tl_canvas.bind("<Motion>", _tl_motion)
-        tl_canvas.bind("<Leave>", _tl_leave)
-        tl_canvas.after(80, _draw_tl)
+        full_canvas.bind("<Configure>", _draw_full)
+        full_canvas.bind("<Motion>", _full_motion)
+        full_canvas.bind("<Leave>", _full_leave)
+
+        _full_shown = [False]
+
+        def _toggle_full():
+            if _full_shown[0]:
+                full_frame.pack_forget()
+                _full_shown[0] = False
+            else:
+                full_frame.pack(fill="x")
+                _full_shown[0] = True
+                full_canvas.after(50, _draw_full)
+
+        toggle_btn.configure(command=_toggle_full)
 
         # ── Skill pills ───────────────────────────────────────────────────────
         if d["skill_breakdown"]:
