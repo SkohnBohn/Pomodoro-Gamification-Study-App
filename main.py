@@ -3357,11 +3357,44 @@ class App(ctk.CTk):
         ).grid(row=0, column=0, sticky="w")
 
         is_today = (self._today_offset == 0)
-        if is_today:
-            nav_label = "today"
-        else:
-            nav_label = target_date.strftime("%d-%m-%y")
-        mk_label(nav, nav_label, size=12, color=MUTED).grid(row=0, column=1)
+        nav_label = "today" if is_today else target_date.strftime("%d-%m-%y")
+        date_lbl = mk_label(nav, nav_label, size=12, color=MUTED)
+        date_lbl.grid(row=0, column=1)
+
+        def _start_date_edit(_event=None):
+            date_lbl.grid_remove()
+            entry = ctk.CTkEntry(
+                nav, width=90, height=26, corner_radius=8,
+                fg_color=CARD, border_color=BORDER, text_color=TEXT,
+                font=ctk.CTkFont(size=12),
+            )
+            entry.grid(row=0, column=1)
+            entry.insert(0, target_date.strftime("%d-%m-%y"))
+            entry.select_range(0, "end")
+            entry.focus_set()
+
+            def _confirm(_event=None):
+                val = entry.get().strip()
+                try:
+                    from datetime import datetime as _dt
+                    picked = _dt.strptime(val, "%d-%m-%y").date()
+                    if picked > date.today():
+                        raise ValueError("future")
+                    self._today_offset = (picked - date.today()).days
+                    self._refresh_today()
+                except ValueError:
+                    entry.configure(border_color=DANGER)
+                    entry.after(600, lambda: entry.configure(border_color=BORDER))
+
+            def _cancel(_event=None):
+                self._refresh_today()
+
+            entry.bind("<Return>", _confirm)
+            entry.bind("<Escape>", _cancel)
+
+        date_lbl.bind("<Button-1>", _start_date_edit)
+        date_lbl.bind("<Enter>", lambda _: date_lbl.configure(text_color=DARK))
+        date_lbl.bind("<Leave>", lambda _: date_lbl.configure(text_color=MUTED))
 
         next_btn = ctk.CTkButton(
             nav, text="›", width=28, height=28, corner_radius=8,
