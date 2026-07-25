@@ -1,7 +1,46 @@
 import sqlite3
+import json
+import os
 import config
 from datetime import datetime
 from config import LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
+
+_SETTINGS_DEFAULTS = {
+    "db":             "main",
+    "timer_fills":    False,
+    "pomo_max_mins":  90.0,
+    "selected_skill": "TECH",
+    "timer_mode":     "Pomodoro",
+    "sound_click":    True,
+    "sound_levelup":  True,
+    "sound_finish":   True,
+}
+
+def load_settings() -> dict:
+    try:
+        with open(config.SETTINGS_FILE, "r") as f:
+            data = json.load(f)
+        return {**_SETTINGS_DEFAULTS, **data}
+    except FileNotFoundError:
+        return dict(_SETTINGS_DEFAULTS)
+    except Exception as e:
+        import sys
+        print(f"[settings] load failed: {e}", file=sys.stderr, flush=True)
+        return dict(_SETTINGS_DEFAULTS)
+
+def save_settings(key: str, value) -> None:
+    settings = load_settings()
+    settings[key] = value
+    path = config.SETTINGS_FILE
+    dir_ = os.path.dirname(path)
+    try:
+        if dir_:
+            os.makedirs(dir_, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        import sys
+        print(f"[settings] save failed ({path}): {e}", file=sys.stderr, flush=True)
 
 
 def initialize_db():
@@ -94,7 +133,7 @@ def calculate_total_time():
     return 0.0 if result is None else result / 60.0
 
 
-def save_session(duration, intention, result, skill="Pomodoro"):
+def save_session(duration, intention, result, skill="POMO"):
     now = datetime.now()
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
@@ -311,6 +350,95 @@ def get_chart_data(skill: str = None) -> dict:
 
 # ── First session date ─────────────────────────────────────────────────────────
 
+def get_today_stats() -> dict:
+    """All data needed for the Today tab in one DB connection."""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+
+    conn = sqlite3.connect(config.DB_FILE)
+    c = conn.cursor()
+
+    # Today's total and session list
+    c.execute(
+        "SELECT time, duration, skill FROM pomodoro_session"
+        " WHERE date=? ORDER BY time",
+        (today,),
+    )
+    today_rows = c.fetchall()
+    total_min = sum(r[1] for r in today_rows if r[1])
+    sessions  = len(today_rows)
+    longest   = max((r[1] for r in today_rows), default=0)
+
+    skill_breakdown: dict = {}
+    for _, dur, sk in today_rows:
+        if sk and dur:
+            skill_breakdown[sk] = skill_breakdown.get(sk, 0) + dur
+
+    timeline = [
+        {"time": r[0], "duration": r[1], "skill": r[2]}
+        for r in today_rows if r[0]
+    ]
+
+    # All days for percentile + average
+    c.execute(
+        "SELECT SUM(duration) FROM pomodoro_session"
+        " WHERE date != ? AND date IS NOT NULL GROUP BY date",
+        (today,),
+    )
+    other_days = [r[0] for r in c.fetchall() if r[0]]
+    all_days   = sorted(other_days + ([total_min] if total_min > 0 else []), reverse=True)
+    avg_min    = (sum(other_days) / len(other_days)) if other_days else 0
+
+    # Best day ever
+    c.execute(
+        "SELECT MAX(daily) FROM"
+        " (SELECT SUM(duration) as daily FROM pomodoro_session"
+        "  WHERE date IS NOT NULL GROUP BY date)"
+    )
+    best_day_min = c.fetchone()[0] or 0
+
+    conn.close()
+
+    # Percentile: what % of days were worse than today
+    if total_min > 0 and all_days:
+        rank = sum(1 for d in all_days if d <= total_min)
+        percentile = round(rank / len(all_days) * 100, 2)
+    else:
+        percentile = None
+
+    # Thresholds: minutes needed today to reach top X% of all days
+    thresholds: dict = {}
+    if other_days:
+        asc = sorted(other_days)
+        n = len(asc)
+        for top_pct in [50, 20, 10, 5, 2, 1]:
+            idx = min(int((100 - top_pct) / 100 * n), n - 1)
+            thresholds[top_pct] = asc[idx]
+
+    return {
+        "today":           today,
+        "total_min":       total_min,
+        "sessions":        sessions,
+        "longest_min":     longest,
+        "skill_breakdown": skill_breakdown,
+        "timeline":        timeline,
+        "best_day_min":    best_day_min,
+        "avg_min":         avg_min,
+        "percentile":      percentile,
+        "thresholds":      thresholds,
+    }
+
+
+def get_last_session_duration() -> float | None:
+    """Return duration (minutes) of the most recent session, or None."""
+    conn = sqlite3.connect(config.DB_FILE)
+    row = conn.execute(
+        "SELECT duration FROM pomodoro_session ORDER BY rowid DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 def get_first_session_date() -> str | None:
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
@@ -398,6 +526,9 @@ def get_best_periods(period: str = "day") -> list:
         result = []
         for date_s, total in rows:
             bd = _skill_breakdown(conn, [date_s])
+            cnt = c.execute(
+                "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
+                (date_s,)).fetchone()[0]
             try:
                 from datetime import date as _date
                 d = _date.fromisoformat(date_s)
@@ -405,7 +536,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = date_s
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": [date_s]})
+                           "breakdown": bd, "dates": [date_s],
+                           "session_count": cnt})
 
     elif period == "week":
         c.execute(
@@ -422,6 +554,10 @@ def get_best_periods(period: str = "day") -> list:
                 " WHERE strftime('%Y-W%W', date)=?", (wk,)
             ).fetchall()]
             bd = _skill_breakdown(conn, dates)
+            ph = ",".join("?" * len(dates))
+            cnt = c2.execute(
+                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
+                dates).fetchone()[0]
             try:
                 from datetime import date as _date
                 d1 = _date.fromisoformat(dmin)
@@ -430,7 +566,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = wk
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates})
+                           "breakdown": bd, "dates": dates,
+                           "session_count": cnt})
 
     else:  # month
         c.execute(
@@ -446,6 +583,10 @@ def get_best_periods(period: str = "day") -> list:
                 " WHERE strftime('%Y-%m', date)=?", (mo,)
             ).fetchall()]
             bd = _skill_breakdown(conn, dates)
+            ph = ",".join("?" * len(dates))
+            cnt = c2.execute(
+                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
+                dates).fetchone()[0]
             try:
                 from datetime import date as _date
                 d = _date.fromisoformat(dmin)
@@ -453,7 +594,8 @@ def get_best_periods(period: str = "day") -> list:
             except Exception:
                 label = mo
             result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates})
+                           "breakdown": bd, "dates": dates,
+                           "session_count": cnt})
 
     conn.close()
     return result

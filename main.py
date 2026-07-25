@@ -29,9 +29,13 @@ from data_manager import (
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
     get_first_session_date, get_streak,
     get_best_periods, get_all_streaks, get_best_days_for_skill,
+    get_last_session_duration,
+    get_today_stats,
+    load_settings, save_settings,
 )
 from utils import calculate_level, format_hours
-from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
+from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup, play_click
+import audio_manager as _audio
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("light")
@@ -134,11 +138,25 @@ def _stat_card_color(lvl: int):
     return _STAT_CARD_PALETTE[idx]
 
 
+def _fix_scroll(sf):
+    """bind_all so wheel events always reach the scroll canvas regardless of child widgets."""
+    try:
+        canvas = sf._parent_canvas
+    except AttributeError:
+        return
+    def _on_wheel(event):
+        lo, hi = canvas.yview()
+        if (event.delta < 0 and hi >= 1.0) or (event.delta > 0 and lo <= 0.0):
+            return
+        canvas.yview_scroll(int(-event.delta) or (-1 if event.delta < 0 else 1), "units")
+    sf.bind_all("<MouseWheel>", _on_wheel)
+
+
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
     if minutes < 30:   return "#fbbf24"
-    if minutes < 60:   return "#d97706"
-    if minutes < 120:  return "#92400e"
+    if minutes < 90:   return "#d97706"
+    if minutes < 240:  return "#92400e"
     return DARK
 
 
@@ -288,6 +306,12 @@ class App(ctk.CTk):
         self.configure(fg_color=BG)
         self.bind("<Control-q>", lambda _: self.destroy())
 
+        _s = load_settings()
+        if _s["db"] == "newui":
+            config.DB_FILE = DB_NEWUI
+        _audio.sound_click_enabled   = _s.get("sound_click",   True)
+        _audio.sound_levelup_enabled = _s.get("sound_levelup", True)
+        _audio.sound_finish_enabled  = _s.get("sound_finish",  True)
         initialize_db()
 
         self.running        = False
@@ -296,13 +320,14 @@ class App(ctk.CTk):
         self.total_seconds  = 0
         self.elapsed_secs   = 0
         self.intention_text = ""
-        self.selected_skill = "TECH"
-        self.timer_mode     = "Pomodoro"
+        self.selected_skill = _s["selected_skill"]
+        self.timer_mode     = _s["timer_mode"]
         self._skill_edit_mode = False
 
         self._views: dict = {}
         self._active_view = ""
         self._theme = "yellow"
+        self._startup_settings = _s
 
         self._build_ui()
         self._nav("timer")
@@ -310,20 +335,28 @@ class App(ctk.CTk):
 
     # ── Layout ────────────────────────────────────────────────────────────────
     def _build_ui(self):
-        self.sidebar = ctk.CTkFrame(self, width=196, fg_color=PANEL,
+        self._sidebar_w = 196
+        self.sidebar = ctk.CTkFrame(self, width=self._sidebar_w, fg_color=PANEL,
                                     corner_radius=0, border_width=0)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        # Header with settings gear
-        hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        # Header: title · settings · collapse
+        self._sidebar_hdr = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._sidebar_hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        hdr = self._sidebar_hdr
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
-        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right")
+        self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
+        self._collapse_btn.pack(side="right")
+        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right", padx=(0, 2))
 
+        # Nav buttons in a collapsible sub-frame
+        self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._nav_frame.pack(fill="x")
         self._nav_btns: dict = {}
         for text, key in [
             ("Timer",         "timer"),
+            ("Today",         "today"),
             ("Skilltree",     "skills"),
             ("Achievements",  "achievements"),
             ("Stats",         "stats"),
@@ -331,7 +364,7 @@ class App(ctk.CTk):
             ("Leaderboard",   "leaderboard"),
         ]:
             b = ctk.CTkButton(
-                self.sidebar, text=text, anchor="w",
+                self._nav_frame, text=text, anchor="w",
                 height=42, corner_radius=10,
                 fg_color="transparent", hover_color=BORDER,
                 text_color=DIM, border_width=0,
@@ -341,8 +374,12 @@ class App(ctk.CTk):
             b.pack(padx=10, pady=2, fill="x")
             self._nav_btns[key] = b
 
-        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+        # Expand button — only shown when collapsed
+        self._expand_btn = icon_btn(self.sidebar, "›", self._expand_sidebar, size=13)
+
+        self._sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+        footer = self._sidebar_footer
 
         ctk.CTkFrame(footer, height=1, fg_color=BORDER).pack(fill="x", pady=(0, 16))
 
@@ -351,6 +388,30 @@ class App(ctk.CTk):
         hero.pack(fill="x")
         self._total_lbl = mk_label(hero, "0.0", size=46, weight="bold", color=DARK)
         self._total_lbl.pack(side="left", padx=(4, 0))
+
+        self._last_session_tip = None
+
+        def _show_last_session(e):
+            dur = get_last_session_duration()
+            if not dur:
+                return
+            self.sidebar.update_idletasks()
+            x = self._delta_lbl.winfo_rootx() - self.sidebar.winfo_rootx()
+            y = self._delta_lbl.winfo_rooty() - self.sidebar.winfo_rooty()
+            tip = tk.Label(self.sidebar, text=f"+{dur/60:.1f}h",
+                           fg="#4ade80", bg=PANEL,
+                           font=("Helvetica", 13, "bold"),
+                           bd=0, highlightthickness=0, relief="flat")
+            tip.place(x=x, y=y)
+            self._last_session_tip = tip
+
+        def _hide_last_session(_e=None):
+            if self._last_session_tip:
+                self._last_session_tip.destroy()
+                self._last_session_tip = None
+
+        self._total_lbl.bind("<Enter>", _show_last_session)
+        self._total_lbl.bind("<Leave>", _hide_last_session)
         right_col = ctk.CTkFrame(hero, fg_color="transparent")
         right_col.pack(side="left", fill="y", padx=(6, 0), pady=(8, 0))
         mk_label(right_col, "h", size=18, weight="bold", color=DARK).pack(anchor="w")
@@ -388,7 +449,23 @@ class App(ctk.CTk):
         self.content = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         self.content.pack(side="right", fill="both", expand=True)
 
+    def _collapse_sidebar(self):
+        # Hide all content first so width change redraws an empty strip
+        self._sidebar_hdr.pack_forget()
+        self._nav_frame.pack_forget()
+        self._sidebar_footer.pack_forget()
+        self.sidebar.configure(width=36)
+        self._expand_btn.pack(pady=(20, 0), padx=4)
+
+    def _expand_sidebar(self):
+        self._expand_btn.pack_forget()
+        self.sidebar.configure(width=self._sidebar_w)
+        self._sidebar_hdr.pack(fill="x", padx=(20, 10), pady=(28, 30))
+        self._nav_frame.pack(fill="x")
+        self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
+
     def _nav(self, key: str):
+        play_click()
         for k, b in self._nav_btns.items():
             if k == key:
                 b.configure(fg_color=BORDER, text_color=TEXT)
@@ -401,6 +478,7 @@ class App(ctk.CTk):
         if key not in self._views:
             builders = {
                 "timer":        self._build_timer_view,
+                "today":        self._build_today_view,
                 "skills":       self._build_skills_view,
                 "achievements": self._build_achievements_view,
                 "stats":        self._build_stats_view,
@@ -414,15 +492,28 @@ class App(ctk.CTk):
 
         if key == "skills":         self._refresh_skills()
         elif key == "achievements": self._refresh_achievements()
+        elif key == "today":        self._refresh_today()
         elif key == "stats":        self._refresh_stats()
         elif key == "records":      self._refresh_records()
         elif key == "leaderboard":  self._refresh_leaderboard()
+
+        _scroll_frames = {
+            "skills":       "_sk_scroll",
+            "achievements": "_ach_scroll",
+            "today":        "_today_scroll",
+            "stats":        "_stats_scroll",
+            "records":      "_rec_scroll",
+            "leaderboard":  "_lb_scroll",
+        }
+        sf_attr = _scroll_frames.get(key)
+        if sf_attr and hasattr(self, sf_attr):
+            _fix_scroll(getattr(self, sf_attr))
 
     # ── Settings popup ────────────────────────────────────────────────────────
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("280x610")
+        dlg.geometry("280x670")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -449,6 +540,7 @@ class App(ctk.CTk):
 
         def _select_preset(v, deselect_custom=True):
             self._pomo_max_mins = float(v)
+            save_settings("pomo_max_mins", float(v))
             for val, btn in preset_btns.items():
                 btn.configure(
                     fg_color=DARK if val == v else "transparent",
@@ -520,10 +612,13 @@ class App(ctk.CTk):
 
         def _set_dir(fills: bool):
             self._timer_fills = fills
+            save_settings("timer_fills", fills)
             fill_btn.configure(fg_color=DARK if fills  else "transparent",
                                text_color=BG  if fills  else MUTED)
             emp_btn.configure( fg_color=DARK if not fills else "transparent",
                                text_color=BG  if not fills else MUTED)
+            dir_pill.configure(fg_color=BORDER)
+            dlg.after(180, lambda: dir_pill.configure(fg_color=CARD))
 
         fill_btn = ctk.CTkButton(
             dir_pill, text="Fill", width=86, height=32, corner_radius=12,
@@ -602,6 +697,42 @@ class App(ctk.CTk):
             b.pack(side="left", padx=2, pady=2)
             db_btns[key] = b
 
+        # ── Sounds ────────────────────────────────────────────────────────────
+        mk_label(dlg, "Sounds", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+        snd_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        snd_row.pack(anchor="w", padx=20, pady=(6, 0))
+
+        _snd_cfg = [
+            ("element click", "sound_click",   "sound_click_enabled"),
+            ("level up",      "sound_levelup",  "sound_levelup_enabled"),
+            ("finish",        "sound_finish",   "sound_finish_enabled"),
+        ]
+        for label, setting_key, attr in _snd_cfg:
+            cell = ctk.CTkFrame(snd_row, fg_color="transparent")
+            cell.pack(side="left", padx=(0, 14))
+
+            sq = tk.Canvas(cell, width=11, height=11, highlightthickness=0,
+                           bg=PANEL, cursor="hand2")
+            sq.pack(side="left", padx=(0, 5))
+
+            mk_label(cell, label, size=12, color=MUTED).pack(side="left")
+
+            def _draw(c=sq, a=attr):
+                c.delete("all")
+                val = getattr(_audio, a)
+                fill = DARK if val else PANEL
+                c.create_rectangle(0, 0, 11, 11, fill=fill,
+                                   outline=DARK, width=1)
+
+            _draw()
+
+            def _toggle(_, c=sq, a=attr, sk=setting_key, d=_draw):
+                setattr(_audio, a, not getattr(_audio, a))
+                save_settings(sk, getattr(_audio, a))
+                d()
+
+            sq.bind("<Button-1>", _toggle)
+
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
         mk_btn(log_row, "Open Log", lambda: (self._open_log(), dlg.destroy()),
@@ -658,10 +789,9 @@ class App(ctk.CTk):
                 delta_str = f"+{delta:.2f}h"
             else:
                 delta_str = "+0 min"
-            self._delta_lbl.configure(text=delta_str)
-            self.after(3000, lambda: self._delta_lbl.configure(text=""))
             self._animate_odometer(prev, total, steps=24, delay=35)
             self._show_trophy(delta_str)
+            self._flash_delta(delta_str)
         else:
             self._total_lbl.configure(text=f"{total:.1f}")
         self._prev_total = total
@@ -673,6 +803,8 @@ class App(ctk.CTk):
         if streak > prev_streak and prev_streak > 0:
             self._animate_streak_bump()
         self._prev_streak = streak
+        if self._active_view == "today":
+            self._refresh_today()
 
     def _animate_streak_bump(self, step=0, steps=10):
         if step > steps:
@@ -685,6 +817,21 @@ class App(ctk.CTk):
         b = int(0x10 - (0x10 - 0x00) * t)
         self._streak_lbl.configure(text_color=f"#{r:02x}{g:02x}{b:02x}")
         self.after(40, lambda: self._animate_streak_bump(step + 1, steps))
+
+    def _flash_delta(self, text: str):
+        if getattr(self, "_last_session_tip", None):
+            self._last_session_tip.destroy()
+            self._last_session_tip = None
+        self.sidebar.update_idletasks()
+        x = self._delta_lbl.winfo_rootx() - self.sidebar.winfo_rootx()
+        y = self._delta_lbl.winfo_rooty() - self.sidebar.winfo_rooty()
+        tip = tk.Label(self.sidebar, text=text,
+                       fg="#4ade80", bg=PANEL,
+                       font=("Helvetica", 13, "bold"),
+                       bd=0, highlightthickness=0, relief="flat")
+        tip.place(x=x, y=y)
+        self._last_session_tip = tip
+        self.after(3000, lambda: tip.destroy() if tip.winfo_exists() else None)
 
     def _show_trophy(self, delta_str: str):
         # Cancel any previous trophy
@@ -811,6 +958,7 @@ class App(ctk.CTk):
         if config.DB_FILE == new_path:
             return
         config.DB_FILE = new_path
+        save_settings("db", "newui" if new_path == DB_NEWUI else "main")
         from data_manager import initialize_db as _init
         _init()
         prev_view = self._active_view
@@ -887,8 +1035,8 @@ class App(ctk.CTk):
         # placed at top-right of the ring canvas; shown/hidden dynamically
 
         self._pomo_mins     = 25.0
-        self._pomo_max_mins = 90.0
-        self._timer_fills   = False  # False = countdown (full→empty), True = fill (empty→full)
+        self._pomo_max_mins = self._startup_settings.get("pomo_max_mins", 90.0)
+        self._timer_fills   = self._startup_settings.get("timer_fills", False)
         self._dragging      = False
 
         def _angle_to_mins(e):
@@ -1092,6 +1240,7 @@ class App(ctk.CTk):
 
     def _pick_skill(self, skill: str):
         self.selected_skill = skill
+        save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
             if sk == skill:
                 b.configure(fg_color=DARK, text_color=BG, border_color=DARK)
@@ -1100,6 +1249,7 @@ class App(ctk.CTk):
 
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
+        save_settings("timer_mode", mode)
         self._reset_timer()
 
     # ── Notes ─────────────────────────────────────────────────────────────────
@@ -1360,7 +1510,7 @@ class App(ctk.CTk):
         max_s = self._pomo_max_mins * 60
         laps  = int(elapsed / max_s)
         pos   = (elapsed % max_s) / max_s  # position within current lap 0→1
-        frac  = pos if self._timer_fills else (1.0 - pos)
+        frac  = pos  # Open Timer always fills
         self.ring.update_ring(frac, ts)
         # Lap badge
         if laps >= 1:
@@ -1399,34 +1549,68 @@ class App(ctk.CTk):
 
     # ── Result dialog ─────────────────────────────────────────────────────────
     def _result_dialog(self, duration: float):
+        # duration = this chunk only; _ext_accum carries previous chunks
+        total_so_far = getattr(self, "_ext_accum", 0.0) + duration
+
         dlg = ctk.CTkToplevel(self)
         dlg.title("")
-        dlg.geometry("360x200")
+        dlg.geometry("360x220")
         dlg.resizable(False, False)
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
 
-        mk_label(dlg, f"{duration:.0f} min  ·  {self.selected_skill}",
-                 size=15, weight="bold", color=DARK).pack(pady=(22, 2))
-        mk_label(dlg, "Was hast du erreicht?", size=12,
-                 color=MUTED).pack()
+        hdr = ctk.CTkFrame(dlg, fg_color="transparent")
+        hdr.pack(pady=(16, 4))
+        mk_label(hdr, f"{total_so_far:.0f} min  · ", size=15, weight="bold", color=DARK).pack(side="left")
+        mk_label(hdr, self.selected_skill, size=15, color=DARK).pack(side="left")
 
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
-            fill="x", padx=22, pady=(12, 8))
+            fill="x", padx=22, pady=(0, 6))
 
         res = ctk.CTkEntry(
-            dlg, height=36, placeholder_text="Ergebnis …",
+            dlg, height=34, placeholder_text="result…",
             corner_radius=10, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
-        res.pack(fill="x", padx=22, pady=(0, 14))
+        res.pack(fill="x", padx=22, pady=(0, 6))
+        prior_result = getattr(self, "_ext_result", "")
+        if prior_result:
+            res.insert(0, prior_result)
         res.focus()
 
+        ext_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        ext_row.pack(fill="x", padx=22, pady=(0, 8))
+        mk_label(ext_row, "+", size=13, color=DIM).pack(side="left", padx=(0, 6))
+        ext = ctk.CTkEntry(
+            ext_row, width=60, height=28, placeholder_text="0",
+            corner_radius=8, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
+            font=ctk.CTkFont(size=13),
+        )
+        ext.pack(side="left")
+        mk_label(ext_row, "min", size=13, color=DIM).pack(side="left", padx=(6, 0))
+
         def _discard():
+            self._ext_accum = 0.0
+            self._ext_result = ""
             dlg.destroy()
             self._reset_timer()
+
+        def _extend():
+            try:
+                extra = max(0, int(ext.get().strip() or "0"))
+            except ValueError:
+                extra = 0
+            if extra <= 0:
+                ext.configure(border_color=DANGER)
+                self.after(1400, lambda: ext.configure(border_color=BORDER))
+                return
+            self._ext_accum = total_so_far
+            self._ext_result = getattr(self, "_ext_result", "")
+            dlg.destroy()
+            self._start_extension(extra)
 
         def _save():
             result = res.get().strip()
@@ -1434,9 +1618,11 @@ class App(ctk.CTk):
                 res.configure(border_color=DANGER)
                 self.after(1400, lambda: res.configure(border_color=BORDER))
                 return
+            self._ext_accum = 0.0
+            self._ext_result = ""
             old_lvl = calculate_level(calculate_total_time())
-            save_session(duration, self.intention_text, result,
-                         skill=self.selected_skill)
+            save_session(total_so_far, self.intention_text, result,
+                         skill=self.selected_skill or "POMO")
             new_lvl = calculate_level(calculate_total_time())
             dlg.destroy()
             self._reset_timer()
@@ -1446,27 +1632,39 @@ class App(ctk.CTk):
                 play_main_levelup()
                 self._levelup_dialog(new_lvl)
 
+        icon_btn(ext_row, "○", _extend, size=13).pack(side="left", padx=(8, 0))
+
         res.bind("<Return>", lambda _: _save())
         dlg.bind("<Escape>", lambda _: _discard())
 
         btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
-        btn_row.pack(padx=22)
+        btn_row.pack(fill="x", padx=32, pady=(0, 12))
 
         ctk.CTkButton(
             btn_row, text="✕", command=_discard,
-            width=56, height=48, corner_radius=12,
-            fg_color=CARD, hover_color=BORDER, text_color=MUTED,
-            border_width=1, border_color=BORDER,
-            font=ctk.CTkFont(size=20),
-        ).pack(side="left", padx=(0, 10))
+            width=32, height=32, corner_radius=0,
+            fg_color=PANEL, hover_color=PANEL,
+            text_color=DIM, border_width=0,
+            font=ctk.CTkFont(size=18),
+        ).pack(side="left")
 
         ctk.CTkButton(
             btn_row, text="✓", command=_save,
-            width=220, height=48, corner_radius=12,
-            fg_color=DARK, hover_color=DARK2, text_color=BG,
-            border_width=0,
+            width=32, height=32, corner_radius=0,
+            fg_color=PANEL, hover_color=PANEL,
+            text_color=DARK, border_width=0,
             font=ctk.CTkFont(size=22, weight="bold"),
-        ).pack(side="left")
+        ).pack(side="right")
+
+    def _start_extension(self, extra_mins: int):
+        self.total_seconds = extra_mins * 60
+        self.seconds_left  = self.total_seconds
+        self._pomo_start_t = _time.monotonic()
+        self._pomo_pause_t = 0.0
+        self.running = True
+        self.paused  = False
+        self._btns_running()
+        self._tick_pomodoro()
 
     def _levelup_dialog(self, level: int):
         dlg = ctk.CTkToplevel(self)
@@ -1501,16 +1699,17 @@ class App(ctk.CTk):
 
     # ── Open log ──────────────────────────────────────────────────────────────
     def _open_log(self):
-        if not os.path.exists(DB_FILE):
+        path = config.DB_FILE
+        if not os.path.exists(path):
             return
         try:
             plat = platform.system()
             if plat == "Darwin":
-                subprocess.call(("open", DB_FILE))
+                subprocess.call(("open", path))
             elif plat == "Windows":
-                os.startfile(DB_FILE)
+                os.startfile(path)
             else:
-                subprocess.call(("xdg-open", DB_FILE))
+                subprocess.call(("xdg-open", path))
         except Exception:
             pass
 
@@ -1542,7 +1741,7 @@ class App(ctk.CTk):
         total_all = 0.0
         last      = None
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute(
                 "SELECT skill, SUM(duration) FROM pomodoro_session GROUP BY skill")
@@ -1604,7 +1803,13 @@ class App(ctk.CTk):
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
-                def _collect(sk=skill, lv=next_collect, card=c):
+                pending = lvl - conf_lvl
+                if pending > 1:
+                    btn_text = f"⭐  LVL {next_collect}–{lvl} einsammeln! ({pending}×)"
+                else:
+                    btn_text = f"⭐  LVL {next_collect} einsammeln!"
+
+                def _collect(sk=skill, lv=lvl, card=c):
                     play_skill_levelup()
                     self._animate_collect(card)
                     confirm_skill_level(sk, lv)
@@ -1612,7 +1817,7 @@ class App(ctk.CTk):
                     self.after(650, lambda s=sk, l=lv: self._skill_levelup_dialog(s, l))
 
                 ctk.CTkButton(
-                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
+                    inner, text=btn_text,
                     height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
@@ -1665,7 +1870,7 @@ class App(ctk.CTk):
 
         total_h = calculate_total_time()
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute("SELECT SUM(duration) FROM pomodoro_session")
             total_min = cur.fetchone()[0] or 0
@@ -1715,7 +1920,7 @@ class App(ctk.CTk):
                         if date_s and date_s != "Von Anfang an":
                             try:
                                 from datetime import datetime as _dt
-                                fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d.%m.%y")
+                                fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d-%m-%y")
                             except Exception:
                                 fmt = date_s
                             mk_label(d, f"unlocked on {fmt}",
@@ -1799,7 +2004,13 @@ class App(ctk.CTk):
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
-                def _collect_stat(k=key, lv=next_collect, n=name, card=c):
+                pending_s = lvl_s - conf_lvl
+                if pending_s > 1:
+                    btn_text_s = f"⭐  LVL {next_collect}–{lvl_s} einsammeln! ({pending_s}×)"
+                else:
+                    btn_text_s = f"⭐  LVL {next_collect} einsammeln!"
+
+                def _collect_stat(k=key, lv=lvl_s, n=name, card=c):
                     play_stat_levelup()
                     confirm_stat_level(k, lv)
                     self._animate_collect(card)
@@ -1807,7 +2018,7 @@ class App(ctk.CTk):
                     self.after(650, lambda nn=n, ll=lv: self._stat_levelup_dialog(nn, ll))
 
                 ctk.CTkButton(
-                    inner, text=f"⭐  LVL {next_collect} einsammeln!",
+                    inner, text=btn_text_s,
                     height=36, corner_radius=10,
                     fg_color=DARK, hover_color=DARK2, text_color=BG,
                     font=ctk.CTkFont(size=13, weight="bold"),
@@ -1908,12 +2119,11 @@ class App(ctk.CTk):
             info = cell_map.get((c, r))
             if info:
                 ds, mins = info
+                dd = datetime.strptime(ds, "%Y-%m-%d").strftime("%d-%m-%y")
                 if mins:
-                    h, m = divmod(int(mins), 60)
-                    ts = f"{h}h {m}min" if h else f"{m}min"
-                    tip.configure(text=f"{ds}  ·  {ts}")
+                    tip.configure(text=f"{dd}  ·  {mins / 60:.1f}h")
                 else:
-                    tip.configure(text=f"{ds}  ·  kein Eintrag")
+                    tip.configure(text=f"{dd}  ·  —")
             else:
                 tip.configure(text="")
 
@@ -1924,7 +2134,7 @@ class App(ctk.CTk):
         leg = ctk.CTkFrame(parent, fg_color="transparent")
         leg.pack(anchor="w", padx=14, pady=(0, 14))
         mk_label(leg, "Less", size=10, color=MUTED).pack(side="left", padx=(0, 4))
-        _legend_ranges = ["0h", "< 0.5h", "0.5–2h", "2–5h", "> 5h"]
+        _legend_ranges = ["0", "<30", "<90", "<240", ">240"]
         for col_val, rng in zip([CARD, "#fbbf24", "#d97706", "#92400e", DARK], _legend_ranges):
             c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
                           highlightthickness=0)
@@ -2076,8 +2286,8 @@ class App(ctk.CTk):
                 val = values[idx]
                 ds = d.strftime("%Y-%m-%d")
                 tip_lbl.configure(
-                    text=f"{ds}  ·  {val:.2f}h" if val > 0
-                    else f"{ds}  ·  kein Eintrag"
+                    text=f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h" if val > 0
+                    else f"{d.strftime('%d-%m-%y')}  ·  —"
                 )
             else:
                 tip_lbl.configure(text="")
@@ -2244,7 +2454,7 @@ class App(ctk.CTk):
             idx  = max(0, min(num_days - 1, round(frac * (num_days - 1))))
             d    = days[idx]
             val  = cumulative[idx]
-            tip_lbl.configure(text=f"{d.strftime('%Y-%m-%d')}  ·  {val:.1f}h gesamt")
+            tip_lbl.configure(text=f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h")
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
@@ -2305,8 +2515,8 @@ class App(ctk.CTk):
                 year_m = re.search(r"(\d{4})$", part2)
                 year = year_m.group(1) if year_m else ""
                 try:
-                    d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d.%m.%y")
-                    d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d.%m.%y")
+                    d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d-%m-%y")
+                    d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d-%m-%y")
                     return f"{d1} – {d2}"
                 except Exception:
                     pass
@@ -2321,7 +2531,7 @@ class App(ctk.CTk):
             # single date: "Sat, 14 Mar 2026" or "14 Mar 2026"
             for fmt in ("%a, %d %b %Y", "%d %b %Y"):
                 try:
-                    return _dtt.strptime(label.strip(), fmt).strftime("%d.%m.%y")
+                    return _dtt.strptime(label.strip(), fmt).strftime("%d-%m-%y")
                 except Exception:
                     pass
 
@@ -2330,7 +2540,7 @@ class App(ctk.CTk):
             if m:
                 try:
                     from datetime import date as _date
-                    return _date.fromisoformat(m.group(1)).strftime("%d.%m.%y")
+                    return _date.fromisoformat(m.group(1)).strftime("%d-%m-%y")
                 except Exception:
                     pass
             return label
@@ -2558,7 +2768,7 @@ class App(ctk.CTk):
                     return
                 r0 = records[0]
                 try:
-                    conn2 = sqlite3.connect(DB_FILE)
+                    conn2 = sqlite3.connect(config.DB_FILE)
                     c2 = conn2.cursor()
                     if period == "day":
                         cnt = c2.execute(
@@ -2642,9 +2852,9 @@ class App(ctk.CTk):
                 from datetime import date as _date
                 d1 = _date.fromisoformat(s0["start_date"])
                 d2 = _date.fromisoformat(s0["end_date"])
-                sh_range = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+                sh_range = f"{d1.strftime('%d-%m-%y')} to {d2.strftime('%d-%m-%y')}"
             except Exception:
-                sh_range = f"{s0['start_date']} – {s0['end_date']}"
+                sh_range = f"{s0['start_date']} to {s0['end_date']}"
             mk_label(sh_top, sh_range, size=13, color=MUTED).pack(
                 side="right", anchor="s", pady=(0, 6))
             dot_row = ctk.CTkFrame(sh_inner, fg_color="transparent")
@@ -2709,9 +2919,9 @@ class App(ctk.CTk):
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
                         d2 = _date.fromisoformat(s["end_date"])
-                        range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+                        range_s = f"{d1.strftime('%d-%m-%y')} to {d2.strftime('%d-%m-%y')}"
                     except Exception:
-                        range_s = f"{s['start_date']} – {s['end_date']}"
+                        range_s = f"{s['start_date']} to {s['end_date']}"
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
                     row.pack(fill="x", padx=28, pady=2)
                     row.columnconfigure(2, weight=1)
@@ -2774,29 +2984,9 @@ class App(ctk.CTk):
                     collapse_btn(streak_container, _collapse_s)
             _render_streaks()
 
-        # ── Expand toggle arrow ───────────────────────────────────────────────
-        expand_state = {"open": False}
+        # ── Detailed sections ─────────────────────────────────────────────────
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
-
-        toggle_lbl = ctk.CTkLabel(sc, text="⌄", font=("Helvetica", 22),
-                                  text_color="#888880", fg_color="transparent")
-        toggle_lbl.pack(anchor="center", pady=(10, 4))
-
-        def _toggle_details():
-            if expand_state["open"]:
-                detail_container.pack_forget()
-                toggle_lbl.configure(text="⌄")
-                expand_state["open"] = False
-            else:
-                detail_container.pack(fill="x")
-                toggle_lbl.configure(text="⌃")
-                expand_state["open"] = True
-
-        toggle_lbl.bind("<Button-1>", lambda e: _toggle_details())
-        toggle_lbl.bind("<Enter>", lambda e: toggle_lbl.configure(text_color="#555550"))
-        toggle_lbl.bind("<Leave>", lambda e: toggle_lbl.configure(text_color="#888880"))
-
-        # ── Detailed sections (hidden by default) ─────────────────────────────
+        detail_container.pack(fill="x")
         def _render_period_in(parent, title: str, period: str):
             records = get_best_periods(period)
             if not records:
@@ -2816,7 +3006,7 @@ class App(ctk.CTk):
                     return
                 r0 = records[0]
                 try:
-                    conn2 = sqlite3.connect(DB_FILE)
+                    conn2 = sqlite3.connect(config.DB_FILE)
                     c2 = conn2.cursor()
                     if period == "day":
                         cnt = c2.execute(
@@ -3042,7 +3232,7 @@ class App(ctk.CTk):
             date_filter = ""
 
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(config.DB_FILE)
             cur = conn.cursor()
             cur.execute(
                 f"SELECT duration, date, time, skill, intention "
@@ -3099,7 +3289,7 @@ class App(ctk.CTk):
             mk_label(top, f"  {dur:.0f} min", size=15, weight="bold",
                      color=rank_c if is_top else TEXT).pack(side="left")
 
-            meta = f"{dt.strftime('%d.%m.%Y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
+            meta = f"{dt.strftime('%d-%m-%y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
             mk_label(top, meta, size=11, color=DIM).pack(side="right")
 
             # intention below
@@ -3117,6 +3307,273 @@ class App(ctk.CTk):
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
+
+
+    # ── Today tab ─────────────────────────────────────────────────────────────
+    def _build_today_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+        self._today_scroll = ctk.CTkScrollableFrame(
+            view, fg_color=BG,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
+        )
+        self._today_scroll.pack(fill="both", expand=True)
+        return view
+
+    def _refresh_today(self):
+        if not hasattr(self, "_today_scroll"):
+            return
+        for w in self._today_scroll.winfo_children():
+            w.destroy()
+        sc = self._today_scroll
+        d = get_today_stats()
+        streak = get_streak()
+
+        # ── Hero card ─────────────────────────────────────────────────────────
+        hero = mk_card(sc)
+        hero.pack(fill="x", padx=16, pady=(16, 8))
+        inner = ctk.CTkFrame(hero, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=18)
+        inner.columnconfigure(0, weight=1)
+        inner.columnconfigure(1, weight=0)
+
+        left = ctk.CTkFrame(inner, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="ew")
+        total_h = d["total_min"] / 60
+        mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
+        mk_label(left, "today", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
+        if d["best_day_min"] > 0:
+            bar = progress_bar(left, color=DARK)
+            bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
+            bar.pack(fill="x", pady=(0, 4))
+            pct_of_rec = d["total_min"] / d["best_day_min"] * 100
+            mk_label(left,
+                     f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
+                     size=10, color=DIM).pack(anchor="w")
+
+        if d["percentile"] is not None:
+            top_pct = max(0.01, 100 - d["percentile"])
+            right = ctk.CTkFrame(inner, fg_color="transparent")
+            right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
+            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+
+        # ── Streak + Sessions row ─────────────────────────────────────────────
+        row2 = ctk.CTkFrame(sc, fg_color="transparent")
+        row2.pack(fill="x", padx=16, pady=(0, 8))
+        row2.columnconfigure(0, weight=1)
+        row2.columnconfigure(1, weight=1)
+
+        # Streak card — centered
+        s_card = mk_card(row2)
+        s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        s_in = ctk.CTkFrame(s_card, fg_color="transparent")
+        s_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
+        mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
+
+        # Sessions card — centered number, meta row below
+        ss_card = mk_card(row2)
+        ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
+        ss_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
+        meta_row = ctk.CTkFrame(ss_in, fg_color="transparent")
+        meta_row.pack(fill="x", pady=(4, 0))
+        mk_label(meta_row, "sessions", size=11, color=MUTED).pack(side="left", padx=(10, 0))
+        if d["longest_min"]:
+            mk_label(meta_row, f"longest: {int(d['longest_min'])}min",
+                     size=11, color=DIM).pack(side="right")
+
+        # ── Timeline canvas ───────────────────────────────────────────────────
+        tl_card = mk_card(sc)
+        tl_card.pack(fill="x", padx=16, pady=(0, 8))
+
+        # Header row: title + toggle button (configured after _toggle_full is defined)
+        tl_hdr = ctk.CTkFrame(tl_card, fg_color="transparent")
+        tl_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(tl_hdr, "TIMELINE", size=10, color=MUTED).pack(side="left")
+        toggle_btn = ctk.CTkButton(
+            tl_hdr, text="○", width=22, height=18, corner_radius=9,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=11),
+        )
+        toggle_btn.pack(side="left", padx=(6, 0))
+
+        # Main timeline: 8:00 → 1:00 (next day = 25h)
+        TL_START, TL_END = 8 * 60, 25 * 60
+        TL_WIDTH = TL_END - TL_START
+
+        tl_canvas = tk.Canvas(tl_card, height=42, bg=PANEL, highlightthickness=0)
+        tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
+        lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
+        lbl_row.pack(fill="x", padx=14, pady=(0, 8))
+        for t in ["8h", "12h", "16h", "21h", "1h"]:
+            mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
+
+        snapshot = d["timeline"]
+        blocks: list = []
+
+        def _draw_tl(event=None):
+            tl_canvas.delete("all")
+            blocks.clear()
+            W = tl_canvas.winfo_width()
+            if W < 4:
+                return
+            yc = 32
+            tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for item in snapshot:
+                t_str = item.get("time") or ""
+                dur = item.get("duration") or 0
+                sk = item.get("skill") or ""
+                if not t_str or not dur:
+                    continue
+                try:
+                    p = t_str.split(":")
+                    start = int(p[0]) * 60 + int(p[1])
+                except Exception:
+                    continue
+                if start < TL_START or start >= TL_END:
+                    continue
+                end = min(start + dur, TL_END)
+                x0 = int((start - TL_START) / TL_WIDTH * W)
+                x1 = max(x0 + 4, int((end - TL_START) / TL_WIDTH * W))
+                tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+
+        def _tl_motion(e):
+            tl_canvas.delete("tl_tip")
+            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
+                        if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
+            if hit:
+                dur, sk = hit
+                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 4,
+                                      text=txt, fill=TEXT, font=("Helvetica", 10),
+                                      anchor="nw", tags="tl_tip")
+
+        def _tl_leave(_e=None):
+            tl_canvas.delete("tl_tip")
+
+        tl_canvas.bind("<Configure>", _draw_tl)
+        tl_canvas.bind("<Motion>", _tl_motion)
+        tl_canvas.bind("<Leave>", _tl_leave)
+        tl_canvas.after(80, _draw_tl)
+
+        # Full timeline (00:00–24:00), toggled by button
+        full_frame = ctk.CTkFrame(tl_card, fg_color="transparent")
+        full_blocks: list = []
+        full_canvas = tk.Canvas(full_frame, height=42, bg=PANEL, highlightthickness=0)
+        full_canvas.pack(fill="x", padx=16, pady=(4, 6))
+        full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
+        full_lbl.pack(fill="x", padx=14, pady=(0, 10))
+        for t in ["0h", "6h", "12h", "18h", "24h"]:
+            mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
+
+        def _draw_full(event=None):
+            full_canvas.delete("all")
+            full_blocks.clear()
+            W = full_canvas.winfo_width()
+            if W < 4:
+                return
+            DAY, yc = 24 * 60, 32
+            full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for item in snapshot:
+                t_str = item.get("time") or ""
+                dur = item.get("duration") or 0
+                sk = item.get("skill") or ""
+                if not t_str or not dur:
+                    continue
+                try:
+                    p = t_str.split(":")
+                    start = int(p[0]) * 60 + int(p[1])
+                except Exception:
+                    continue
+                x0 = int(start / DAY * W)
+                x1 = max(x0 + 4, int((start + dur) / DAY * W))
+                full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                             fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+
+        def _full_motion(e):
+            full_canvas.delete("tl_tip")
+            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in full_blocks
+                        if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
+            if hit:
+                dur, sk = hit
+                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 4,
+                                        text=txt, fill=TEXT, font=("Helvetica", 10),
+                                        anchor="nw", tags="tl_tip")
+
+        def _full_leave(_e=None):
+            full_canvas.delete("tl_tip")
+
+        full_canvas.bind("<Configure>", _draw_full)
+        full_canvas.bind("<Motion>", _full_motion)
+        full_canvas.bind("<Leave>", _full_leave)
+
+        _full_shown = [False]
+
+        def _toggle_full():
+            if _full_shown[0]:
+                full_frame.pack_forget()
+                _full_shown[0] = False
+            else:
+                full_frame.pack(fill="x")
+                _full_shown[0] = True
+                full_canvas.after(50, _draw_full)
+
+        toggle_btn.configure(command=_toggle_full)
+
+        # ── Skill pills ───────────────────────────────────────────────────────
+        if d["skill_breakdown"]:
+            sk_card = mk_card(sc)
+            sk_card.pack(fill="x", padx=16, pady=(0, 8))
+            sec_title(sk_card, "Skills")
+            pills = ctk.CTkFrame(sk_card, fg_color="transparent")
+            pills.pack(fill="x", padx=14, pady=(0, 14))
+            for sk, mins in sorted(d["skill_breakdown"].items(), key=lambda x: -x[1]):
+                pill = ctk.CTkFrame(pills, fg_color=CARD, corner_radius=12)
+                pill.pack(side="left", padx=(0, 6), pady=2)
+                ctk.CTkLabel(
+                    pill,
+                    text=f"{sk}  {mins/60:.1f}h",
+                    text_color=_SKILL_COLORS.get(sk, DARK),
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                ).pack(padx=10, pady=5)
+
+        # ── Average comparison + percentile milestones ────────────────────────
+        avg_card = mk_card(sc)
+        avg_card.pack(fill="x", padx=16, pady=(0, 16))
+        body = ctk.CTkFrame(avg_card, fg_color="transparent")
+        body.pack(fill="x", padx=18, pady=(14, 14))
+
+        if d["avg_min"] > 0:
+            delta = d["total_min"] - d["avg_min"]
+            dh = abs(delta) / 60
+            avg_h = d["avg_min"] / 60
+            above = delta >= 0
+            sign = "+" if above else "−"
+            direction = "above" if above else "below"
+            txt = f"{sign}{dh:.1f}h {direction} daily avg  ({avg_h:.1f}h)"
+            mk_label(body, txt, size=13, weight="bold",
+                     color=SUCCESS if above else DANGER).pack(anchor="w")
+
+        thresholds = d.get("thresholds", {})
+        if thresholds:
+            sep = ctk.CTkFrame(body, fg_color=BORDER, height=1)
+            sep.pack(fill="x", pady=(10, 8))
+            for top_pct, need_min in thresholds.items():
+                row = ctk.CTkFrame(body, fg_color="transparent")
+                row.pack(fill="x", pady=2)
+                mk_label(row, f"top {top_pct:>2}%", size=11, color=DIM).pack(side="left")
+                if d["total_min"] >= need_min:
+                    mk_label(row, "✓", size=11, color=SUCCESS).pack(side="right")
+                else:
+                    delta_h = (need_min - d["total_min"]) / 60
+                    mk_label(row, f"+{delta_h:.1f}h", size=11,
+                             weight="bold", color=DARK).pack(side="right")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

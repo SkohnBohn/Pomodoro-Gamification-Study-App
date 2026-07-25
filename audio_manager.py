@@ -5,17 +5,37 @@ import threading
 import wave
 
 import pygame
-from config import ALARM_SOUND
+from config import ALARM_SOUND, SOUND_CLICK
+
+# ── Sound enable flags (toggled from settings) ─────────────────────────────────
+sound_click_enabled   = True
+sound_levelup_enabled = True
+sound_finish_enabled  = True
 
 # ── Alarm ─────────────────────────────────────────────────────────────────────
 
 def play_sound():
+    if not sound_finish_enabled:
+        return
     try:
         pygame.mixer.init()
         pygame.mixer.music.load(ALARM_SOUND)
         pygame.mixer.music.play()
     except Exception as e:
         print("Fehler beim Abspielen des Sounds:", e)
+
+
+def play_click():
+    if not sound_click_enabled:
+        return
+    def _go():
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.Sound(SOUND_CLICK).play()
+        except Exception as e:
+            print("Click sound error:", e)
+    threading.Thread(target=_go, daemon=True).start()
 
 
 # ── Reward sound synthesis ─────────────────────────────────────────────────────
@@ -111,15 +131,21 @@ def _play(wav_bytes: bytes):
 
 
 def play_main_levelup():
+    if not sound_levelup_enabled:
+        return
     _ensure()
     _play(_WAV_MAIN)
 
 
 def play_skill_levelup():
+    if not sound_levelup_enabled:
+        return
     _ensure()
     _play(_WAV_SKILL)
 
 
 def play_stat_levelup():
+    if not sound_levelup_enabled:
+        return
     _ensure()
     _play(_WAV_STAT)
