@@ -2905,15 +2905,11 @@ class App(ctk.CTk):
 
         # longest streak extras — button visible by default, entries hidden until clicked
         if streaks and len(streaks) > 1:
-            streak_state = {"n": 0}
             streak_container = ctk.CTkFrame(sc, fg_color="transparent")
             streak_container.pack(fill="x")
 
             def _render_streaks():
-                for w in streak_container.winfo_children():
-                    w.destroy()
-                n = streak_state["n"]
-                for i in range(0, min(n, len(streaks) - 1)):
+                for i in range(0, len(streaks) - 1):
                     s = streaks[i + 1]
                     try:
                         from datetime import date as _date
@@ -2972,90 +2968,42 @@ class App(ctk.CTk):
                     # col3: date range
                     mk_label(row, range_s, size=11, color=DIM,
                              width=120).grid(row=0, column=3, sticky="e")
-                if n < len(streaks) - 1:
-                    def _load_s():
-                        streak_state["n"] = min(streak_state["n"] + 3, len(streaks) - 1)
-                        _render_streaks()
-                    load_more_btn(streak_container, _load_s)
-                if n > 0:
-                    def _collapse_s():
-                        streak_state["n"] = 0
-                        _render_streaks()
-                    collapse_btn(streak_container, _collapse_s)
             _render_streaks()
 
-        # ── Expand toggle arrow ───────────────────────────────────────────────
-        expand_state = {"open": False}
+        # ── Detailed sections ─────────────────────────────────────────────────
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
-
-        toggle_lbl = ctk.CTkLabel(sc, text="⌄", font=("Helvetica", 22),
-                                  text_color="#888880", fg_color="transparent")
-        toggle_lbl.pack(anchor="center", pady=(10, 4))
-
-        def _toggle_details():
-            if expand_state["open"]:
-                detail_container.pack_forget()
-                toggle_lbl.configure(text="⌄")
-                expand_state["open"] = False
-            else:
-                detail_container.pack(fill="x")
-                toggle_lbl.configure(text="⌃")
-                expand_state["open"] = True
-
-        toggle_lbl.bind("<Button-1>", lambda e: _toggle_details())
-        toggle_lbl.bind("<Enter>", lambda e: toggle_lbl.configure(text_color="#555550"))
-        toggle_lbl.bind("<Leave>", lambda e: toggle_lbl.configure(text_color="#888880"))
-
-        # ── Detailed sections (hidden by default) ─────────────────────────────
+        detail_container.pack(fill="x")
         def _render_period_in(parent, title: str, period: str):
             records = get_best_periods(period)
             if not records:
                 return
             section_header(parent, title)
-            shown_state = {"n": 1}
             container = ctk.CTkFrame(parent, fg_color="transparent")
             container.pack(fill="x")
             status_lbl = mk_label(parent, "", size=11, color=MUTED)
             status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
 
-            def _render():
-                for w in container.winfo_children():
-                    w.destroy()
-                n = shown_state["n"]
-                if not records:
-                    return
-                r0 = records[0]
-                try:
-                    conn2 = sqlite3.connect(config.DB_FILE)
-                    c2 = conn2.cursor()
-                    if period == "day":
-                        cnt = c2.execute(
-                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                            (r0["dates"][0],)).fetchone()[0]
-                    else:
-                        placeholders = ",".join("?" * len(r0["dates"]))
-                        cnt = c2.execute(
-                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
-                            r0["dates"]).fetchone()[0]
-                    conn2.close()
-                except Exception:
-                    cnt = None
-                hero_card(container, r0, cnt, period)
-                max_m = records[0]["total_min"] if records else 1
-                for i in range(1, min(n, len(records))):
-                    compact_row(container, i + 1, records[i], max_min=max_m,
-                                status_lbl=status_lbl)
-                if n < len(records):
-                    def _load(s=shown_state):
-                        s["n"] = min(s["n"] + 3, len(records))
-                        _render()
-                    load_more_btn(container, _load)
-                if n > 1:
-                    def _collapse(s=shown_state):
-                        s["n"] = 1
-                        _render()
-                    collapse_btn(container, _collapse)
-            _render()
+            r0 = records[0]
+            try:
+                conn2 = sqlite3.connect(config.DB_FILE)
+                c2 = conn2.cursor()
+                if period == "day":
+                    cnt = c2.execute(
+                        "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
+                        (r0["dates"][0],)).fetchone()[0]
+                else:
+                    placeholders = ",".join("?" * len(r0["dates"]))
+                    cnt = c2.execute(
+                        f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
+                        r0["dates"]).fetchone()[0]
+                conn2.close()
+            except Exception:
+                cnt = None
+            hero_card(container, r0, cnt, period)
+            max_m = records[0]["total_min"] if records else 1
+            for i in range(1, len(records)):
+                compact_row(container, i + 1, records[i], max_min=max_m,
+                            status_lbl=status_lbl)
 
         _render_period_in(detail_container, "Best Days", "day")
         _render_period_in(detail_container, "Best Weeks", "week")
@@ -3086,7 +3034,7 @@ class App(ctk.CTk):
             pill_wrap.pack(fill="x", padx=28, pady=(0, 10))
 
             sk_pill_btns = {}
-            sk_sel_state = {"skill": active_skills[0], "n": 1}
+            sk_sel_state = {"skill": active_skills[0]}
 
             # content area below pills
             sk_content = ctk.CTkFrame(detail_container, fg_color="transparent")
@@ -3099,7 +3047,6 @@ class App(ctk.CTk):
                     w.destroy()
                 sk_status_lbl.configure(text="")
                 skill  = sk_sel_state["skill"]
-                n      = sk_sel_state["n"]
                 records = all_skill_records[skill]
                 if not records:
                     return
@@ -3132,27 +3079,13 @@ class App(ctk.CTk):
                 sk_canvas.bind("<Configure>", _draw_sk_bar)
                 sk_canvas.after(60, _draw_sk_bar)
 
-                for i in range(1, min(n, len(records))):
+                for i in range(1, len(records)):
                     compact_row(sk_content, i + 1, records[i], is_skill=True,
                                 single_skill=skill, max_min=global_max_m,
                                 status_lbl=sk_status_lbl)
 
-                if n < len(records):
-                    def _load_sk():
-                        sk_sel_state["n"] = min(sk_sel_state["n"] + 3, len(records))
-                        _render_sk_content()
-                    load_more_btn(sk_content, _load_sk)
-
-                if n > 1:
-                    def _collapse_sk():
-                        sk_sel_state["n"] = 1
-                        _render_sk_content()
-                    collapse_btn(sk_content, _collapse_sk)
-
             def _select_skill(skill):
-                # reset n so loaded entries are cleared on skill switch
                 sk_sel_state["skill"] = skill
-                sk_sel_state["n"] = 1
                 for sk, btn in sk_pill_btns.items():
                     active = sk == skill
                     btn.configure(
