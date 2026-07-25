@@ -350,19 +350,21 @@ def get_chart_data(skill: str = None) -> dict:
 
 # ── First session date ─────────────────────────────────────────────────────────
 
-def get_today_stats() -> dict:
+def get_today_stats(target_date=None) -> dict:
     """All data needed for the Today tab in one DB connection."""
     from datetime import date as _date
-    today = _date.today().isoformat()
+    if target_date is None:
+        target_date = _date.today()
+    day_str = target_date.isoformat()
 
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
 
-    # Today's total and session list
+    # Target day's total and session list
     c.execute(
         "SELECT time, duration, skill FROM pomodoro_session"
         " WHERE date=? ORDER BY time",
-        (today,),
+        (day_str,),
     )
     today_rows = c.fetchall()
     total_min = sum(r[1] for r in today_rows if r[1])
@@ -383,7 +385,7 @@ def get_today_stats() -> dict:
     c.execute(
         "SELECT SUM(duration) FROM pomodoro_session"
         " WHERE date != ? AND date IS NOT NULL GROUP BY date",
-        (today,),
+        (day_str,),
     )
     other_days = [r[0] for r in c.fetchall() if r[0]]
     all_days   = sorted(other_days + ([total_min] if total_min > 0 else []), reverse=True)
@@ -399,14 +401,14 @@ def get_today_stats() -> dict:
 
     conn.close()
 
-    # Percentile: what % of days were worse than today
+    # Percentile: what % of days were worse than the target day
     if total_min > 0 and all_days:
         rank = sum(1 for d in all_days if d <= total_min)
         percentile = round(rank / len(all_days) * 100, 2)
     else:
         percentile = None
 
-    # Thresholds: minutes needed today to reach top X% of all days
+    # Thresholds: minutes needed to reach top X% of all days
     thresholds: dict = {}
     if other_days:
         asc = sorted(other_days)
@@ -416,7 +418,7 @@ def get_today_stats() -> dict:
             thresholds[top_pct] = asc[idx]
 
     return {
-        "today":           today,
+        "today":           day_str,
         "total_min":       total_min,
         "sessions":        sessions,
         "longest_min":     longest,
@@ -459,9 +461,11 @@ def get_heatmap_data() -> dict:
     return {d: m for d, m in rows if d}
 
 
-def get_streak() -> int:
-    """Return current consecutive-day streak (days with ≥1 session ending today or yesterday)."""
+def get_streak(target_date=None) -> int:
+    """Return consecutive-day streak ending on or before target_date (default: today)."""
     from datetime import date, timedelta
+    if target_date is None:
+        target_date = date.today()
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC")
@@ -469,20 +473,34 @@ def get_streak() -> int:
     conn.close()
     if not rows:
         return 0
-    today = date.today()
-    # Allow streak if last session was today or yesterday (don't break at midnight)
-    try:
-        last = date.fromisoformat(rows[0])
-    except ValueError:
-        return 0
-    if last < today - timedelta(days=1):
-        return 0
-    streak = 0
-    expected = last
+    # Find the most recent session date that is <= target_date
+    anchor = None
     for ds in rows:
         try:
             d = date.fromisoformat(ds)
         except ValueError:
+            continue
+        if d <= target_date:
+            anchor = d
+            break
+    if anchor is None:
+        return 0
+    # For today-view: allow streak if last session was today or yesterday
+    # For past days: require the anchor to be exactly the target date
+    if target_date == date.today():
+        if anchor < target_date - timedelta(days=1):
+            return 0
+    else:
+        if anchor != target_date:
+            return 0
+    streak = 0
+    expected = anchor
+    for ds in rows:
+        try:
+            d = date.fromisoformat(ds)
+        except ValueError:
+            continue
+        if d > target_date:
             continue
         if d == expected:
             streak += 1

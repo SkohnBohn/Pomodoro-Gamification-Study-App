@@ -3306,6 +3306,7 @@ class App(ctk.CTk):
 
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
+        self._today_offset = 0
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._today_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -3318,15 +3319,63 @@ class App(ctk.CTk):
     def _refresh_today(self):
         if not hasattr(self, "_today_scroll"):
             return
+        if not hasattr(self, "_today_offset"):
+            self._today_offset = 0
         for w in self._today_scroll.winfo_children():
             w.destroy()
         sc = self._today_scroll
-        d = get_today_stats()
-        streak = get_streak()
+
+        target_date = date.today() + timedelta(days=self._today_offset)
+        if target_date > date.today():
+            self._today_offset = 0
+            target_date = date.today()
+
+        d = get_today_stats(target_date)
+        streak = get_streak(target_date)
+
+        # ── Day navigation row ────────────────────────────────────────────────
+        nav = ctk.CTkFrame(sc, fg_color="transparent")
+        nav.pack(fill="x", padx=16, pady=(12, 0))
+        nav.columnconfigure(0, weight=0)
+        nav.columnconfigure(1, weight=1)
+        nav.columnconfigure(2, weight=0)
+
+        def _go_prev():
+            self._today_offset -= 1
+            self._refresh_today()
+
+        def _go_next():
+            if self._today_offset < 0:
+                self._today_offset += 1
+                self._refresh_today()
+
+        ctk.CTkButton(
+            nav, text="‹", width=28, height=28, corner_radius=8,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=18),
+            command=_go_prev,
+        ).grid(row=0, column=0, sticky="w")
+
+        is_today = (self._today_offset == 0)
+        if is_today:
+            nav_label = "today"
+        else:
+            nav_label = target_date.strftime("%d-%m-%y")
+        mk_label(nav, nav_label, size=12, color=MUTED).grid(row=0, column=1)
+
+        next_btn = ctk.CTkButton(
+            nav, text="›", width=28, height=28, corner_radius=8,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=18),
+            command=_go_next,
+        )
+        next_btn.grid(row=0, column=2, sticky="e")
+        if is_today:
+            next_btn.configure(state="disabled", text_color=BORDER)
 
         # ── Hero card ─────────────────────────────────────────────────────────
         hero = mk_card(sc)
-        hero.pack(fill="x", padx=16, pady=(16, 8))
+        hero.pack(fill="x", padx=16, pady=(8, 8))
         inner = ctk.CTkFrame(hero, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=18)
         inner.columnconfigure(0, weight=1)
@@ -3336,11 +3385,10 @@ class App(ctk.CTk):
         left.grid(row=0, column=0, sticky="ew")
         total_h = d["total_min"] / 60
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
-        mk_label(left, "today", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
         if d["best_day_min"] > 0:
             bar = progress_bar(left, color=DARK)
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
-            bar.pack(fill="x", pady=(0, 4))
+            bar.pack(fill="x", pady=(8, 4))
             pct_of_rec = d["total_min"] / d["best_day_min"] * 100
             mk_label(left,
                      f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
