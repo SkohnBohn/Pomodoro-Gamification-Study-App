@@ -2853,9 +2853,9 @@ class App(ctk.CTk):
                 from datetime import date as _date
                 d1 = _date.fromisoformat(s0["start_date"])
                 d2 = _date.fromisoformat(s0["end_date"])
-                sh_range = f"{d1.strftime('%d-%m-%y')} – {d2.strftime('%d-%m-%y')}"
+                sh_range = f"{d1.strftime('%d-%m-%y')} to {d2.strftime('%d-%m-%y')}"
             except Exception:
-                sh_range = f"{s0['start_date']} – {s0['end_date']}"
+                sh_range = f"{s0['start_date']} to {s0['end_date']}"
             mk_label(sh_top, sh_range, size=13, color=MUTED).pack(
                 side="right", anchor="s", pady=(0, 6))
             dot_row = ctk.CTkFrame(sh_inner, fg_color="transparent")
@@ -2920,9 +2920,9 @@ class App(ctk.CTk):
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
                         d2 = _date.fromisoformat(s["end_date"])
-                        range_s = f"{d1.strftime('%d-%m-%y')} – {d2.strftime('%d-%m-%y')}"
+                        range_s = f"{d1.strftime('%d-%m-%y')} to {d2.strftime('%d-%m-%y')}"
                     except Exception:
-                        range_s = f"{s['start_date']} – {s['end_date']}"
+                        range_s = f"{s['start_date']} to {s['end_date']}"
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
                     row.pack(fill="x", padx=28, pady=2)
                     row.columnconfigure(2, weight=1)
