@@ -144,6 +144,9 @@ def _fix_scroll(sf):
     except AttributeError:
         return
     def _on_wheel(event):
+        lo, hi = canvas.yview()
+        if (event.delta < 0 and hi >= 1.0) or (event.delta > 0 and lo <= 0.0):
+            return
         canvas.yview_scroll(int(-1 * (event.delta / 60)), "units")
     def _bind(w):
         w.bind("<MouseWheel>", _on_wheel, add="+")
