@@ -711,10 +711,11 @@ class App(ctk.CTk):
             cell.pack(side="left", padx=(0, 14))
 
             sq = tk.Canvas(cell, width=11, height=11, highlightthickness=0,
-                           bg=PANEL, cursor="hand2")
+                           bg=PANEL)
             sq.pack(side="left", padx=(0, 5))
 
-            mk_label(cell, label, size=12, color=MUTED).pack(side="left")
+            lbl = mk_label(cell, label, size=12, color=MUTED)
+            lbl.pack(side="left")
 
             def _draw(c=sq, a=attr):
                 c.delete("all")
@@ -731,6 +732,7 @@ class App(ctk.CTk):
                 d()
 
             sq.bind("<Button-1>", _toggle)
+            lbl.bind("<Button-1>", _toggle)
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
