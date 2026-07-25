@@ -3371,7 +3371,13 @@ class App(ctk.CTk):
             entry.grid(row=0, column=1)
             entry.insert(0, target_date.strftime("%d-%m-%y"))
             entry.focus_set()
-            entry.after(1, lambda: entry._entry.selection_clear())
+            def _deselect():
+                try:
+                    entry._entry.selection_clear()
+                    entry._entry.icursor("end")
+                except Exception:
+                    pass
+            entry.after(50, _deselect)
 
             def _confirm(_event=None):
                 val = entry.get().strip()
