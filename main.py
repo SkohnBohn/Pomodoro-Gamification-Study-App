@@ -2183,7 +2183,7 @@ class App(ctk.CTk):
         ).pack(side="right", padx=(6, 0))
 
         ctk.CTkOptionMenu(
-            ctrl, values=["30d", "90d", "1y", "All"],
+            ctrl, values=["30d", "90d", "1y"],
             variable=chart_period, width=90, **_opt_kw,
         ).pack(side="right")
 
