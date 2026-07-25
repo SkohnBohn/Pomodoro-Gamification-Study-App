@@ -707,28 +707,35 @@ class App(ctk.CTk):
         snd_row.pack(anchor="w", padx=20, pady=(6, 0))
 
         _snd_cfg = [
-            ("element click", "sound_click",   "_audio.sound_click_enabled"),
-            ("level up",      "sound_levelup",  "_audio.sound_levelup_enabled"),
-            ("finish",        "sound_finish",   "_audio.sound_finish_enabled"),
+            ("element click", "sound_click",   "sound_click_enabled"),
+            ("level up",      "sound_levelup",  "sound_levelup_enabled"),
+            ("finish",        "sound_finish",   "sound_finish_enabled"),
         ]
-        for label, setting_key, attr_path in _snd_cfg:
-            mod, attr = attr_path.split(".")
-            cur = getattr(_audio, attr)
-            var = ctk.BooleanVar(value=cur)
+        for label, setting_key, attr in _snd_cfg:
+            cell = ctk.CTkFrame(snd_row, fg_color="transparent")
+            cell.pack(side="left", padx=(0, 14))
 
-            def _toggle(v=var, sk=setting_key, a=attr):
-                val = v.get()
-                setattr(_audio, a, val)
-                save_settings(sk, val)
+            sq = tk.Canvas(cell, width=11, height=11, highlightthickness=0,
+                           bg=PANEL, cursor="hand2")
+            sq.pack(side="left", padx=(0, 5))
 
-            cb = ctk.CTkCheckBox(
-                snd_row, text=label, variable=var, command=_toggle,
-                width=20, height=20, corner_radius=4,
-                fg_color=DARK, hover_color=DARK2,
-                border_color=BORDER, border_width=1,
-                text_color=TEXT, font=ctk.CTkFont(size=12),
-            )
-            cb.pack(side="left", padx=(0, 16))
+            mk_label(cell, label, size=12, color=MUTED).pack(side="left")
+
+            def _draw(c=sq, a=attr):
+                c.delete("all")
+                val = getattr(_audio, a)
+                fill = DARK if val else PANEL
+                c.create_rectangle(0, 0, 11, 11, fill=fill,
+                                   outline=DARK, width=1)
+
+            _draw()
+
+            def _toggle(_, c=sq, a=attr, sk=setting_key, d=_draw):
+                setattr(_audio, a, not getattr(_audio, a))
+                save_settings(sk, getattr(_audio, a))
+                d()
+
+            sq.bind("<Button-1>", _toggle)
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
