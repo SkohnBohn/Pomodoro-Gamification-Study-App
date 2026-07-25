@@ -766,7 +766,7 @@ class App(ctk.CTk):
             frac  = max(0.0, min((total - lower) / (upper - lower), 1.0))
             self._lvl_bar.set(frac)
             self._next_lbl.configure(
-                text=f"{format_hours(upper - total)} bis LVL {level + 1}")
+                text=f"{format_hours(upper - total)} to LVL {level + 1}")
 
         badge_path = os.path.join(BADGE_DIR, f"p{level}.png")
         if os.path.exists(badge_path):
@@ -875,7 +875,7 @@ class App(ctk.CTk):
         big.place(relx=0.5, rely=0.38, anchor="center")
 
         sub = tk.Label(
-            inner, text="gespeichert ✓",
+            inner, text="saved ✓",
             font=("", 11),
             fg="#86efac", bg=ov_inner,
             anchor="center",
@@ -1138,7 +1138,7 @@ class App(ctk.CTk):
         # Notes
         notes_card = mk_card(right)
         notes_card.pack(fill="both", expand=True)
-        sec_title(notes_card, "Notizen")
+        sec_title(notes_card, "Notes")
         self.notes_box = ctk.CTkTextbox(
             notes_card, corner_radius=10, fg_color=CARD,
             text_color=TEXT, font=ctk.CTkFont(size=13),
@@ -1262,14 +1262,14 @@ class App(ctk.CTk):
         auto_title = f"Note {len(get_notes(limit=10000)) + 1}"
 
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Speichern")
+        dlg.title("Save")
         dlg.geometry("360x156")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
         dlg.resizable(False, False)
 
-        mk_label(dlg, "Titel", size=12, color=MUTED).pack(
+        mk_label(dlg, "Title", size=12, color=MUTED).pack(
             padx=22, pady=(20, 4), anchor="w")
         entry = ctk.CTkEntry(
             dlg, height=38, fg_color=CARD, border_color=BORDER,
@@ -1289,12 +1289,12 @@ class App(ctk.CTk):
 
         dlg.bind("<Return>", lambda _: _do_save())
         dlg.bind("<Escape>", lambda _: dlg.destroy())
-        mk_btn(dlg, "Speichern", _do_save, height=36, primary=True).pack(
+        mk_btn(dlg, "Save", _do_save, height=36, primary=True).pack(
             fill="x", padx=22)
 
     def _load_notes_dialog(self):
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Notizen")
+        dlg.title("Notes")
         dlg.geometry("460x520")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
@@ -1305,7 +1305,7 @@ class App(ctk.CTk):
         notes = get_notes(limit=200)
 
         if not notes:
-            mk_label(dlg, "Noch nichts gespeichert.", size=13,
+            mk_label(dlg, "Nothing saved yet.", size=13,
                      color=MUTED).pack(pady=60)
             return
 
@@ -1675,7 +1675,7 @@ class App(ctk.CTk):
         mk_label(dlg, "✨ ⭐ ✨", size=32, color=DARK).pack(pady=(30, 4))
         mk_label(dlg, f"Level {level} erreicht!", size=18, weight="bold",
                  color=DARK).pack()
-        mk_btn(dlg, "✨  Weiter", dlg.destroy,
+        mk_btn(dlg, "✨  Continue", dlg.destroy,
                width=180, height=44, primary=True).pack(pady=24)
 
     def _skill_levelup_dialog(self, skill: str, level: int):
@@ -1798,15 +1798,15 @@ class App(ctk.CTk):
             stat.pack(fill="x")
             mk_label(stat, f"{hours:.1f}h", color=card_text, size=12).pack(side="left")
             if not at_cap:
-                mk_label(stat, f"→ {next_t}h für LVL {lvl + 1}",
+                mk_label(stat, f"→ {next_t}h LVL {lvl + 1}",
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 pending = lvl - conf_lvl
                 if pending > 1:
-                    btn_text = f"⭐  LVL {next_collect}–{lvl} einsammeln! ({pending}×)"
+                    btn_text = f"⭐  collect LVL {next_collect}–{lvl} ({pending}x)"
                 else:
-                    btn_text = f"⭐  LVL {next_collect} einsammeln!"
+                    btn_text = f"⭐  collect LVL {next_collect}"
 
                 def _collect(sk=skill, lv=lvl, card=c):
                     play_skill_levelup()
@@ -1999,15 +1999,15 @@ class App(ctk.CTk):
             mk_label(val_row, f"{val_s}{unit}", color=card_text, size=12).pack(side="left")
             if not at_cap:
                 next_s = str(int(next_t)) if next_t == int(next_t) else f"{next_t:.0f}"
-                mk_label(val_row, f"→ {next_s}{unit} für LVL {lvl_s + 1}",
+                mk_label(val_row, f"→ {next_s}{unit} LVL {lvl_s + 1}",
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 pending_s = lvl_s - conf_lvl
                 if pending_s > 1:
-                    btn_text_s = f"⭐  LVL {next_collect}–{lvl_s} einsammeln! ({pending_s}×)"
+                    btn_text_s = f"⭐  collect LVL {next_collect}–{lvl_s} ({pending_s}x)"
                 else:
-                    btn_text_s = f"⭐  LVL {next_collect} einsammeln!"
+                    btn_text_s = f"⭐  collect LVL {next_collect}"
 
                 def _collect_stat(k=key, lv=lvl_s, n=name, card=c):
                     play_stat_levelup()
@@ -2227,7 +2227,7 @@ class App(ctk.CTk):
         max_h = max(values) if any(v > 0 for v in values) else 0.0
         if max_h == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
@@ -2369,7 +2369,7 @@ class App(ctk.CTk):
         first = get_first_session_date()
         if not first:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
@@ -2393,7 +2393,7 @@ class App(ctk.CTk):
         total_h = cumulative[-1]
         if total_h == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
