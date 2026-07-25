@@ -139,7 +139,7 @@ def _stat_card_color(lvl: int):
 
 
 def _fix_scroll(sf):
-    """Use bind_all on enter/leave so wheel events always reach the scroll canvas."""
+    """bind_all so wheel events always reach the scroll canvas regardless of child widgets."""
     try:
         canvas = sf._parent_canvas
     except AttributeError:
@@ -149,8 +149,7 @@ def _fix_scroll(sf):
         if (event.delta < 0 and hi >= 1.0) or (event.delta > 0 and lo <= 0.0):
             return
         canvas.yview_scroll(int(-1 * (event.delta / 60)), "units")
-    sf.bind("<Enter>", lambda _: sf.bind_all("<MouseWheel>", _on_wheel), add="+")
-    sf.bind("<Leave>", lambda _: sf.unbind_all("<MouseWheel>"), add="+")
+    sf.bind_all("<MouseWheel>", _on_wheel)
 
 
 def _heatmap_color(minutes: float) -> str:
