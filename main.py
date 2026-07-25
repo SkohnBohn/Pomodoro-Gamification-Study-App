@@ -3529,9 +3529,9 @@ class App(ctk.CTk):
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
                 tip_x = min(e.x + 8, tl_canvas.winfo_width() - 4)
-                tl_canvas.create_text(tip_x, 4, text=line1, fill=TEXT,
+                tl_canvas.create_text(tip_x, 0, text=line1, fill=TEXT,
                                       font=("Helvetica", 10), anchor="nw", tags="tl_tip")
-                tl_canvas.create_text(tip_x, 17, text=line2, fill=TEXT,
+                tl_canvas.create_text(tip_x, 13, text=line2, fill=TEXT,
                                       font=("Helvetica", 10), anchor="nw", tags="tl_tip")
 
         def _tl_leave(_e=None):
