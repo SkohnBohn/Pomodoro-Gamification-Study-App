@@ -3690,36 +3690,54 @@ class App(ctk.CTk):
                     )
                     _tick_zones.append((tx, need_min, top_pct))
 
-                # today dot + label
+                # daily avg dot (drawn first so today dot renders on top)
+                if avg_min > 0:
+                    ax = _x(avg_min)
+                    ruler_canvas.create_oval(
+                        ax - 5, LINE_Y - 5, ax + 5, LINE_Y + 5,
+                        fill=DARK, outline=PANEL, width=2,
+                    )
+                    _avg_zone.append((ax, avg_min))
+
+                # today dot (no static label)
                 ruler_canvas.create_oval(
                     today_x - 5, LINE_Y - 5, today_x + 5, LINE_Y + 5,
                     fill=DARK, outline=PANEL, width=2,
                 )
-                today_h = total_min / 60
-                ruler_canvas.create_text(
-                    today_x, LINE_Y - 14, text=f"{today_h:.1f}h",
-                    fill=DARK, font=("Helvetica", 10, "bold"),
-                    anchor="center",
-                )
 
-                # daily avg dot — lighter, sits on the line
-                if avg_min > 0:
-                    ax = _x(avg_min)
-                    ruler_canvas.create_oval(
-                        ax - 4, LINE_Y - 4, ax + 4, LINE_Y + 4,
-                        fill=DIM, outline=PANEL, width=2,
-                    )
-                    _avg_zone.append((ax, avg_min))
+            OVERLAP_PX = 12  # px threshold to consider dots overlapping
 
             def _ruler_motion(e):
                 ruler_canvas.delete("ruler_tip")
                 RADIUS = 18
+                W = ruler_canvas.winfo_width()
 
-                # check avg dot first
-                for ax, am in _avg_zone:
-                    if abs(e.x - ax) <= RADIUS:
-                        tip = f"{am / 60:.1f}h daily avg"
-                        tip_x = min(max(ax, 30), ruler_canvas.winfo_width() - 30)
+                today_x_now = None
+                avg_x_now   = _avg_zone[0][0] if _avg_zone else None
+
+                # recompute today_x from current canvas width
+                rule_w_now = W - 24
+                if scale_max > 0:
+                    today_x_now = 12 + rule_w_now * min(total_min / scale_max, 1.0)
+
+                # today dot hover
+                if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
+                    tip = f"{total_min / 60:.1f}h"
+                    tip_x = min(max(today_x_now, 24), W - 24)
+                    ruler_canvas.create_text(
+                        tip_x, 6, text=tip,
+                        fill=DARK, font=("Helvetica", 10),
+                        anchor="center", tags="ruler_tip",
+                    )
+                    return
+
+                # avg dot hover — only if not overlapping with today
+                if avg_x_now is not None and abs(e.x - avg_x_now) <= RADIUS:
+                    overlapping = (today_x_now is not None and
+                                   abs(today_x_now - avg_x_now) < OVERLAP_PX)
+                    if not overlapping:
+                        tip = f"{avg_min / 60:.1f}h daily avg"
+                        tip_x = min(max(avg_x_now, 30), W - 30)
                         ruler_canvas.create_text(
                             tip_x, 6, text=tip,
                             fill=DARK, font=("Helvetica", 10),
@@ -3727,7 +3745,7 @@ class App(ctk.CTk):
                         )
                         return
 
-                # then threshold ticks
+                # threshold ticks
                 for tx, need_min, top_pct in _tick_zones:
                     if abs(e.x - tx) <= RADIUS:
                         if total_min >= need_min:
@@ -3735,7 +3753,7 @@ class App(ctk.CTk):
                         else:
                             gap_h = (need_min - total_min) / 60
                             tip = f"+{gap_h:.1f}h"
-                        tip_x = min(max(tx, 24), ruler_canvas.winfo_width() - 24)
+                        tip_x = min(max(tx, 24), W - 24)
                         ruler_canvas.create_text(
                             tip_x, 6, text=tip,
                             fill=DARK, font=("Helvetica", 10),
