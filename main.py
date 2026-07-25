@@ -2517,7 +2517,7 @@ class App(ctk.CTk):
                 try:
                     d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d-%m-%y")
                     d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d-%m-%y")
-                    return f"{d1} – {d2}"
+                    return f"{d1} to {d2}"
                 except Exception:
                     pass
 
