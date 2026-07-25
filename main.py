@@ -3258,7 +3258,7 @@ class App(ctk.CTk):
             rank_c = mcolors[i] if is_top else MUTED
 
             outer = ctk.CTkFrame(self._lb_scroll, fg_color=CARD, corner_radius=14)
-            outer.pack(fill="x", pady=3, padx=4)
+            outer.pack(fill="x", pady=2, padx=4)
 
             # left accent stripe
             stripe = ctk.CTkFrame(outer, fg_color=acc, corner_radius=0, width=4)
@@ -3266,23 +3266,26 @@ class App(ctk.CTk):
             stripe.pack_propagate(False)
 
             inner = ctk.CTkFrame(outer, fg_color="transparent")
-            inner.pack(side="left", fill="x", expand=True, padx=(12, 14), pady=10)
+            inner.pack(side="left", fill="x", expand=True, padx=(12, 14), pady=5)
 
             # top row: rank + duration on left, meta on right
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
 
             rank_s = medals[i] if is_top else f"#{i+1}"
-            mk_label(top, rank_s, size=13, color=rank_c).pack(side="left")
-            mk_label(top, f"  {dur:.0f} min", size=15, weight="bold",
+            mk_label(top, rank_s, size=12, color=rank_c).pack(side="left")
+            mk_label(top, f"  {dur:.0f} min", size=13, weight="bold",
                      color=rank_c if is_top else TEXT).pack(side="left")
 
             meta = f"{dt.strftime('%d-%m-%y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
             mk_label(top, meta, size=11, color=DIM).pack(side="right")
 
-            # intention below
+            # intention below — max 2 lines (~110 chars)
             if intention:
-                mk_label(inner, intention, size=12, color=MUTED).pack(anchor="w", pady=(2, 0))
+                _MAX = 110
+                txt = (intention[:_MAX].rstrip() + "…") if len(intention) > _MAX else intention
+                mk_label(inner, txt, size=11, color=MUTED,
+                         wraplength=800, justify="left").pack(anchor="w", pady=(1, 0))
 
         if not filtered:
             mk_label(self._lb_scroll, "No entries for this period.",
@@ -3291,7 +3294,7 @@ class App(ctk.CTk):
             remaining = len(filtered) - shown
             mk_btn(
                 self._lb_scroll,
-                f"Load 10  ({remaining} more)",
+                f"+ 10 more",
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
