@@ -3679,7 +3679,7 @@ class App(ctk.CTk):
                 for top_pct, need_min in thr_items:
                     tx = _x(need_min)
                     achieved = total_min >= need_min
-                    tick_color = SUCCESS if achieved else DIM
+                    tick_color = BORDER if achieved else DIM
                     ruler_canvas.create_line(
                         tx, LINE_Y - 6, tx, LINE_Y + 6,
                         fill=tick_color, width=1,
@@ -3708,14 +3708,14 @@ class App(ctk.CTk):
                 for tx, need_min, top_pct in _tick_zones:
                     if abs(e.x - tx) <= RADIUS:
                         if total_min >= need_min:
-                            tip = "✓"
+                            tip = f"{need_min / 60:.1f}h"
                         else:
                             gap_h = (need_min - total_min) / 60
                             tip = f"+{gap_h:.1f}h"
                         tip_x = min(max(tx, 24), ruler_canvas.winfo_width() - 24)
                         ruler_canvas.create_text(
                             tip_x, 6, text=tip,
-                            fill=DARK, font=("Helvetica", 10, "bold"),
+                            fill=DARK, font=("Helvetica", 10),
                             anchor="center", tags="ruler_tip",
                         )
                         break
