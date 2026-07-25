@@ -3424,40 +3424,20 @@ class App(ctk.CTk):
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
             bar.pack(fill="x", pady=(8, 4))
             pct_of_rec = d["total_min"] / d["best_day_min"] * 100
-            rec_row = ctk.CTkFrame(left, fg_color="transparent")
-            rec_row.pack(fill="x")
-            mk_label(rec_row,
+            mk_label(left,
                      f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
-                     size=10, color=DIM).pack(side="left")
-            if d.get("day_rank") is not None:
-                rank_lbl = mk_label(rec_row, f"#{d['day_rank']}", size=10, color=DIM)
-                rank_lbl.pack(side="right")
-                _tip_ref = [None]
-                def _show_tip(_e, lbl=rank_lbl, dr=d["day_rank"], td=d.get("total_days", "?")):
-                    if _tip_ref[0]:
-                        return
-                    root = lbl.winfo_toplevel()
-                    t = tk.Label(root, text=f"top {dr} of {td} days",
-                                 bg=BG, fg=DIM, font=("Helvetica", 10))
-                    x = lbl.winfo_rootx() - root.winfo_rootx()
-                    y = lbl.winfo_rooty() - root.winfo_rooty() - 22
-                    t.place(x=x, y=max(y, 4))
-                    t.lift()
-                    _tip_ref[0] = t
-                def _hide_tip(_e):
-                    if _tip_ref[0]:
-                        _tip_ref[0].destroy()
-                        _tip_ref[0] = None
-                for _w in (rank_lbl, getattr(rank_lbl, "_label", None)):
-                    if _w:
-                        _w.bind("<Enter>", _show_tip)
-                        _w.bind("<Leave>", _hide_tip)
+                     size=10, color=DIM).pack(anchor="w")
 
         if d["percentile"] is not None:
             top_pct = max(0.01, 100 - d["percentile"])
             right = ctk.CTkFrame(inner, fg_color="transparent")
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+            if d.get("day_rank") is not None:
+                mk_label(right, f"#{d['day_rank']}", size=11, color=DIM).pack(anchor="e", pady=(2, 0))
+                td = d.get("total_days", "?")
+                mk_label(right, f"top {d['day_rank']} of {td} days",
+                         size=10, color=DIM).pack(anchor="e", pady=(1, 0))
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
