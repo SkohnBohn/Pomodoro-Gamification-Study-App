@@ -3366,11 +3366,10 @@ class App(ctk.CTk):
             entry = ctk.CTkEntry(
                 nav, width=90, height=26, corner_radius=8,
                 fg_color=CARD, border_color=BORDER, text_color=TEXT,
-                font=ctk.CTkFont(size=12),
+                font=ctk.CTkFont(size=12), justify="center",
             )
             entry.grid(row=0, column=1)
             entry.insert(0, target_date.strftime("%d-%m-%y"))
-            entry.select_range(0, "end")
             entry.focus_set()
 
             def _confirm(_event=None):
