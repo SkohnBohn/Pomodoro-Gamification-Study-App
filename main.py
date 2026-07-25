@@ -3501,17 +3501,22 @@ class App(ctk.CTk):
                     continue
                 try:
                     p = t_str.split(":")
-                    start = int(p[0]) * 60 + int(p[1])
+                    end_m = int(p[0]) * 60 + int(p[1])
+                    # stored time is END; post-midnight hours (0-5) are next-day on timeline
+                    if int(p[0]) < 6:
+                        end_m += 24 * 60
+                    start_m = end_m - dur
                 except Exception:
                     continue
-                if start < TL_START or start >= TL_END:
+                if start_m >= TL_END or end_m <= TL_START:
                     continue
-                end = min(start + dur, TL_END)
-                x0 = int((start - TL_START) / TL_WIDTH * W)
-                x1 = max(x0 + 4, int((end - TL_START) / TL_WIDTH * W))
+                vis_s = max(start_m, TL_START)
+                vis_e = min(end_m, TL_END)
+                x0 = int((vis_s - TL_START) / TL_WIDTH * W)
+                x1 = max(x0 + 4, int((vis_e - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                            fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start))
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _tl_motion(e):
             tl_canvas.delete("tl_tip")
@@ -3520,7 +3525,7 @@ class App(ctk.CTk):
             if hit:
                 dur, sk, start_m = hit
                 end_m = start_m + int(dur)
-                fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
+                fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
                 tip_x = min(max(e.x, 35), tl_canvas.winfo_width() - 35)
@@ -3563,14 +3568,19 @@ class App(ctk.CTk):
                     continue
                 try:
                     p = t_str.split(":")
-                    start = int(p[0]) * 60 + int(p[1])
+                    end_m = int(p[0]) * 60 + int(p[1])
+                    start_m = end_m - dur
                 except Exception:
                     continue
-                x0 = int(start / DAY * W)
-                x1 = max(x0 + 4, int((start + dur) / DAY * W))
+                vis_s = max(start_m, 0)
+                vis_e = min(end_m, DAY)
+                if vis_s >= DAY or vis_e <= 0:
+                    continue
+                x0 = int(vis_s / DAY * W)
+                x1 = max(x0 + 4, int(vis_e / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                              fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start))
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
@@ -3579,7 +3589,7 @@ class App(ctk.CTk):
             if hit:
                 dur, sk, start_m = hit
                 end_m = start_m + int(dur)
-                fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
+                fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
                 tip_x = min(max(e.x, 35), full_canvas.winfo_width() - 35)
