@@ -148,7 +148,7 @@ def _fix_scroll(sf):
         lo, hi = canvas.yview()
         if (event.delta < 0 and hi >= 1.0) or (event.delta > 0 and lo <= 0.0):
             return
-        canvas.yview_scroll(int(-1 * (event.delta / 60)), "units")
+        canvas.yview_scroll(int(-event.delta) or (-1 if event.delta < 0 else 1), "units")
     sf.bind_all("<MouseWheel>", _on_wheel)
 
 
