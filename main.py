@@ -3620,41 +3620,37 @@ class App(ctk.CTk):
                     font=ctk.CTkFont(size=12, weight="bold"),
                 ).pack(padx=10, pady=5)
 
-        # ── Average comparison + percentile ruler ────────────────────────────
+        # ── Daily average + percentile ruler ─────────────────────────────────
         avg_card = mk_card(sc)
         avg_card.pack(fill="x", padx=16, pady=(0, 16))
-        body = ctk.CTkFrame(avg_card, fg_color="transparent")
-        body.pack(fill="x", padx=18, pady=(14, 16))
 
-        if d["avg_min"] > 0:
-            delta = d["total_min"] - d["avg_min"]
-            dh = abs(delta) / 60
-            avg_h = d["avg_min"] / 60
-            above = delta >= 0
-            sign = "+" if above else "−"
-            txt = f"daily avg {avg_h:.1f}h  ({sign}{dh:.1f}h)"
-            mk_label(body, txt, size=13, weight="bold",
-                     color=SUCCESS if above else DANGER).pack(anchor="w")
+        avg_hdr = ctk.CTkFrame(avg_card, fg_color="transparent")
+        avg_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(avg_hdr, "DAILY AVERAGE", size=10, color=MUTED).pack(side="left")
+
+        body = ctk.CTkFrame(avg_card, fg_color="transparent")
+        body.pack(fill="x", padx=18, pady=(0, 16))
 
         thresholds = d.get("thresholds", {})
+        avg_min = d["avg_min"]
         if thresholds:
             thr_items = list(thresholds.items())   # 50,20,10,5,2,1
             total_min = d["total_min"]
-            scale_max = max(thr_items[-1][1], total_min) * 1.08
+            scale_max = max(thr_items[-1][1], total_min, avg_min) * 1.08
 
-            # ── Horizontal ruler ──────────────────────────────────────────────
             RULER_H = 52
             ruler_canvas = tk.Canvas(
                 body, height=RULER_H, bg=PANEL, highlightthickness=0
             )
-            ruler_canvas.pack(fill="x", pady=(10, 2))
+            ruler_canvas.pack(fill="x", pady=(4, 2))
 
-            # store tick hit zones for hover: [(x, need_min, top_pct), ...]
-            _tick_zones: list = []
+            _tick_zones: list = []   # [(x, need_min, top_pct), ...]
+            _avg_zone:   list = []   # [(x, avg_min)]
 
             def _draw_ruler(event=None):
                 ruler_canvas.delete("all")
                 _tick_zones.clear()
+                _avg_zone.clear()
                 W = ruler_canvas.winfo_width()
                 if W < 4:
                     return
@@ -3665,17 +3661,20 @@ class App(ctk.CTk):
                 def _x(minutes):
                     return PAD_L + rule_w * min(minutes / scale_max, 1.0)
 
+                # baseline
                 ruler_canvas.create_line(
                     PAD_L, LINE_Y, W - PAD_R, LINE_Y,
                     fill=BORDER, width=1,
                 )
 
+                # filled portion to today
                 today_x = _x(total_min)
                 ruler_canvas.create_line(
                     PAD_L, LINE_Y, today_x, LINE_Y,
                     fill=DARK, width=3,
                 )
 
+                # threshold ticks
                 for top_pct, need_min in thr_items:
                     tx = _x(need_min)
                     achieved = total_min >= need_min
@@ -3691,6 +3690,7 @@ class App(ctk.CTk):
                     )
                     _tick_zones.append((tx, need_min, top_pct))
 
+                # today dot + label
                 ruler_canvas.create_oval(
                     today_x - 5, LINE_Y - 5, today_x + 5, LINE_Y + 5,
                     fill=DARK, outline=PANEL, width=2,
@@ -3702,9 +3702,32 @@ class App(ctk.CTk):
                     anchor="center",
                 )
 
+                # daily avg dot — lighter, sits on the line
+                if avg_min > 0:
+                    ax = _x(avg_min)
+                    ruler_canvas.create_oval(
+                        ax - 4, LINE_Y - 4, ax + 4, LINE_Y + 4,
+                        fill=DIM, outline=PANEL, width=2,
+                    )
+                    _avg_zone.append((ax, avg_min))
+
             def _ruler_motion(e):
                 ruler_canvas.delete("ruler_tip")
                 RADIUS = 18
+
+                # check avg dot first
+                for ax, am in _avg_zone:
+                    if abs(e.x - ax) <= RADIUS:
+                        tip = f"{am / 60:.1f}h daily avg"
+                        tip_x = min(max(ax, 30), ruler_canvas.winfo_width() - 30)
+                        ruler_canvas.create_text(
+                            tip_x, 6, text=tip,
+                            fill=DARK, font=("Helvetica", 10),
+                            anchor="center", tags="ruler_tip",
+                        )
+                        return
+
+                # then threshold ticks
                 for tx, need_min, top_pct in _tick_zones:
                     if abs(e.x - tx) <= RADIUS:
                         if total_min >= need_min:
