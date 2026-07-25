@@ -3440,8 +3440,9 @@ class App(ctk.CTk):
                     t = tk.Label(root, text=f"top {dr} of {td} days",
                                  bg=BG, fg=DIM, font=("Helvetica", 10))
                     x = lbl.winfo_rootx() - root.winfo_rootx()
-                    y = lbl.winfo_rooty() - root.winfo_rooty() - 20
-                    t.place(x=x, y=y)
+                    y = lbl.winfo_rooty() - root.winfo_rooty() - 22
+                    t.place(x=x, y=max(y, 4))
+                    t.lift()
                     _tip_ref[0] = t
                 def _hide_tip(_e):
                     if _tip_ref[0]:
