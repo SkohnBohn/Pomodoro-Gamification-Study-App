@@ -406,9 +406,11 @@ def get_today_stats(target_date=None) -> dict:
         rank = sum(1 for d in all_days if d <= total_min)
         percentile = round(rank / len(all_days) * 100, 2)
         day_rank = sum(1 for d in all_days if d > total_min) + 1
+        total_days = len(all_days)
     else:
         percentile = None
         day_rank = None
+        total_days = len(all_days) if all_days else 0
 
     # Thresholds: minutes needed to reach top X% of all days
     thresholds: dict = {}
@@ -430,6 +432,7 @@ def get_today_stats(target_date=None) -> dict:
         "avg_min":         avg_min,
         "percentile":      percentile,
         "day_rank":        day_rank,
+        "total_days":      total_days,
         "thresholds":      thresholds,
     }
 

@@ -3434,7 +3434,25 @@ class App(ctk.CTk):
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
             if d.get("day_rank") is not None:
-                mk_label(right, f"#{d['day_rank']}", size=11, color=DIM).pack(anchor="e", pady=(2, 0))
+                rank_lbl = mk_label(right, f"#{d['day_rank']}", size=11, color=DIM)
+                rank_lbl.pack(anchor="e", pady=(2, 0))
+                _tip_ref = [None]
+                def _show_tip(_e, lbl=rank_lbl, dr=d["day_rank"], td=d.get("total_days", "?")):
+                    if _tip_ref[0]:
+                        return
+                    root = lbl.winfo_toplevel()
+                    t = tk.Label(root, text=f"top {dr} of {td} days",
+                                 bg=BG, fg=DIM, font=("Helvetica", 10))
+                    x = lbl.winfo_rootx() - root.winfo_rootx()
+                    y = lbl.winfo_rooty() - root.winfo_rooty() - 20
+                    t.place(x=x, y=y)
+                    _tip_ref[0] = t
+                def _hide_tip(_e):
+                    if _tip_ref[0]:
+                        _tip_ref[0].destroy()
+                        _tip_ref[0] = None
+                rank_lbl.bind("<Enter>", _show_tip)
+                rank_lbl.bind("<Leave>", _hide_tip)
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
