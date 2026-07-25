@@ -2984,29 +2984,9 @@ class App(ctk.CTk):
                     collapse_btn(streak_container, _collapse_s)
             _render_streaks()
 
-        # ── Expand toggle arrow ───────────────────────────────────────────────
-        expand_state = {"open": False}
+        # ── Detailed sections ─────────────────────────────────────────────────
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
-
-        toggle_lbl = ctk.CTkLabel(sc, text="⌄", font=("Helvetica", 22),
-                                  text_color="#888880", fg_color="transparent")
-        toggle_lbl.pack(anchor="center", pady=(10, 4))
-
-        def _toggle_details():
-            if expand_state["open"]:
-                detail_container.pack_forget()
-                toggle_lbl.configure(text="⌄")
-                expand_state["open"] = False
-            else:
-                detail_container.pack(fill="x")
-                toggle_lbl.configure(text="⌃")
-                expand_state["open"] = True
-
-        toggle_lbl.bind("<Button-1>", lambda e: _toggle_details())
-        toggle_lbl.bind("<Enter>", lambda e: toggle_lbl.configure(text_color="#555550"))
-        toggle_lbl.bind("<Leave>", lambda e: toggle_lbl.configure(text_color="#888880"))
-
-        # ── Detailed sections (hidden by default) ─────────────────────────────
+        detail_container.pack(fill="x")
         def _render_period_in(parent, title: str, period: str):
             records = get_best_periods(period)
             if not records:
