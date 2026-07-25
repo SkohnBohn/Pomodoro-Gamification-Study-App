@@ -112,24 +112,17 @@ def _skill_card_color(lvl: int):
     return _SKILL_CARD_PALETTE[idx]
 
 
-# (bg, border, text) — smooth gradient white → mint → fresh green → dark forest
+def _grad(c1, c2, t):
+    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
+
+# (bg, border, text) — gradient: light sage green → soft plum (mirrors timeline palette)
 _STAT_CARD_PALETTE = [
-    ("#fffcf5", "#c6c4bf", DARK),        # 0  — warm white
-    ("#f1fbed", "#bbc3b8", DARK),        # 1
-    ("#e3fae6", "#b1c3b3", DARK),        # 2
-    ("#d6f9de", "#a6c2ad", DARK),        # 3
-    ("#c8f8d7", "#9cc1a7", DARK),        # 4
-    ("#bbf7d0", "#91c0a2", DARK),        # 5  — mint
-    ("#a4f2c0", "#7fbc95", DARK),        # 6
-    ("#8dedb0", "#6db889", DARK),        # 7
-    ("#77e8a0", "#5cb47c", DARK),        # 8
-    ("#60e390", "#4ab170", DARK),        # 9
-    ("#4ade80", "#39ad63", "#f0fdf4"),   # 10 — fresh green
-    ("#3fc26f", "#319756", "#f0fdf4"),   # 11
-    ("#34a65e", "#288149", "#f0fdf4"),   # 12
-    ("#298a4e", "#1f6b3c", "#f0fdf4"),   # 13
-    ("#1e6e3d", "#17552f", "#f0fdf4"),   # 14
-    ("#14532d", "#0f4023", "#f0fdf4"),   # 15 — dark forest
+    (_grad("#e8f4e8", "#9b7eb8", i / 15),
+     _grad("#c0d4c0", "#7a5e98", i / 15),
+     DARK if i < 9 else "#f0e8ff")
+    for i in range(16)
 ]
 
 
@@ -2547,7 +2540,7 @@ class App(ctk.CTk):
             return label
 
         def skill_color(sk):
-            return _SKILL_COLORS.get(sk, "#bbbbbb")
+            return _SKILL_COLORS.get(sk, DARK)
 
         def draw_bar(parent, breakdown: dict, total_min: float, height=6,
                      status_lbl=None):
