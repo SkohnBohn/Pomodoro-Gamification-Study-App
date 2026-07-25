@@ -3473,7 +3473,7 @@ class App(ctk.CTk):
         TL_START, TL_END = 8 * 60, 25 * 60
         TL_WIDTH = TL_END - TL_START
 
-        tl_canvas = tk.Canvas(tl_card, height=58, bg=PANEL, highlightthickness=0)
+        tl_canvas = tk.Canvas(tl_card, height=64, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
         lbl_row.pack(fill="x", padx=14, pady=(0, 8))
@@ -3489,7 +3489,7 @@ class App(ctk.CTk):
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
-            yc = 48
+            yc = 54
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
             for item in snapshot:
                 t_str = item.get("time") or ""
@@ -3538,7 +3538,7 @@ class App(ctk.CTk):
         # Full timeline (00:00–24:00), toggled by button
         full_frame = ctk.CTkFrame(tl_card, fg_color="transparent")
         full_blocks: list = []
-        full_canvas = tk.Canvas(full_frame, height=58, bg=PANEL, highlightthickness=0)
+        full_canvas = tk.Canvas(full_frame, height=64, bg=PANEL, highlightthickness=0)
         full_canvas.pack(fill="x", padx=16, pady=(4, 6))
         full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
         full_lbl.pack(fill="x", padx=14, pady=(0, 10))
@@ -3551,7 +3551,7 @@ class App(ctk.CTk):
             W = full_canvas.winfo_width()
             if W < 4:
                 return
-            DAY, yc = 24 * 60, 48
+            DAY, yc = 24 * 60, 54
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
             for item in snapshot:
                 t_str = item.get("time") or ""
