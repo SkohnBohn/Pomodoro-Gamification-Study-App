@@ -8,6 +8,9 @@ DB_MAIN  = os.path.expanduser("~/Desktop/Pomodoro/DB/pomodoro_sessions.db")
 DB_FILE       = DB_MAIN  # active DB — reassigned at runtime by _switch_db()
 BADGE_DIR     = os.path.expanduser("~/Desktop/Pomodoro/badges")
 SETTINGS_FILE = "/Users/sky/Desktop/Pomodoro/global_settings"
+
+SOUNDS_DIR    = os.path.join(os.path.dirname(__file__), "sounds")
+SOUND_CLICK   = os.path.join(SOUNDS_DIR, "click.mp3")
 ALARM_SOUND = os.path.join(BASE_DIR, "alarm.mp3")
 
 LEVEL_THRESHOLDS = [

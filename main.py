@@ -34,7 +34,8 @@ from data_manager import (
     load_settings, save_settings,
 )
 from utils import calculate_level, format_hours
-from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
+from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup, play_click
+import audio_manager as _audio
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("light")
@@ -312,6 +313,9 @@ class App(ctk.CTk):
         _s = load_settings()
         if _s["db"] == "newui":
             config.DB_FILE = DB_NEWUI
+        _audio.sound_click_enabled   = _s.get("sound_click",   True)
+        _audio.sound_levelup_enabled = _s.get("sound_levelup", True)
+        _audio.sound_finish_enabled  = _s.get("sound_finish",  True)
         initialize_db()
 
         self.running        = False
@@ -465,6 +469,7 @@ class App(ctk.CTk):
         self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
 
     def _nav(self, key: str):
+        play_click()
         for k, b in self._nav_btns.items():
             if k == key:
                 b.configure(fg_color=BORDER, text_color=TEXT)
@@ -512,7 +517,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("280x610")
+        dlg.geometry("280x670")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -695,6 +700,35 @@ class App(ctk.CTk):
             )
             b.pack(side="left", padx=2, pady=2)
             db_btns[key] = b
+
+        # ── Sounds ────────────────────────────────────────────────────────────
+        mk_label(dlg, "Sounds", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+        snd_row = ctk.CTkFrame(dlg, fg_color="transparent")
+        snd_row.pack(anchor="w", padx=20, pady=(6, 0))
+
+        _snd_cfg = [
+            ("element click", "sound_click",   "_audio.sound_click_enabled"),
+            ("level up",      "sound_levelup",  "_audio.sound_levelup_enabled"),
+            ("finish",        "sound_finish",   "_audio.sound_finish_enabled"),
+        ]
+        for label, setting_key, attr_path in _snd_cfg:
+            mod, attr = attr_path.split(".")
+            cur = getattr(_audio, attr)
+            var = ctk.BooleanVar(value=cur)
+
+            def _toggle(v=var, sk=setting_key, a=attr):
+                val = v.get()
+                setattr(_audio, a, val)
+                save_settings(sk, val)
+
+            cb = ctk.CTkCheckBox(
+                snd_row, text=label, variable=var, command=_toggle,
+                width=20, height=20, corner_radius=4,
+                fg_color=DARK, hover_color=DARK2,
+                border_color=BORDER, border_width=1,
+                text_color=TEXT, font=ctk.CTkFont(size=12),
+            )
+            cb.pack(side="left", padx=(0, 16))
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))

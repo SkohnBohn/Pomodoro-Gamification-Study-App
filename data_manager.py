@@ -6,11 +6,14 @@ from datetime import datetime
 from config import LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
 
 _SETTINGS_DEFAULTS = {
-    "db":           "main",
-    "timer_fills":  False,
-    "pomo_max_mins": 90.0,
+    "db":             "main",
+    "timer_fills":    False,
+    "pomo_max_mins":  90.0,
     "selected_skill": "TECH",
-    "timer_mode":   "Pomodoro",
+    "timer_mode":     "Pomodoro",
+    "sound_click":    True,
+    "sound_levelup":  True,
+    "sound_finish":   True,
 }
 
 def load_settings() -> dict:
