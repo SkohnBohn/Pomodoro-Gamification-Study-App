@@ -2804,21 +2804,65 @@ class App(ctk.CTk):
             _render()
 
         # ── Best Day / Week / Month ───────────────────────────────────────────
+        _period_list = [("Best Day", "day"), ("Best Week", "week"), ("Best Month", "month")]
+        all_period_records = {p: get_best_periods(p) for _, p in _period_list}
+
         top_row = ctk.CTkFrame(sc, fg_color="transparent")
         top_row.pack(fill="x", padx=28, pady=(22, 0))
         top_row.columnconfigure(0, weight=1)
         top_row.columnconfigure(1, weight=1)
         top_row.columnconfigure(2, weight=1)
 
-        for col_i, (lbl, period_key) in enumerate(
-                [("Best Day", "day"), ("Best Week", "week"), ("Best Month", "month")]):
+        # shared expansion area — shows extras for whichever period was last clicked
+        shared_state  = {"period": None, "n": 0}
+        shared_area   = ctk.CTkFrame(sc, fg_color="transparent")
+        shared_area.pack(fill="x")
+        shared_status = mk_label(sc, "", size=11, color=MUTED)
+        shared_status.pack(anchor="w", padx=28, pady=(0, 6))
+
+        def _render_shared():
+            for w in shared_area.winfo_children():
+                w.destroy()
+            shared_status.configure(text="")
+            period = shared_state["period"]
+            n      = shared_state["n"]
+            if not period or n == 0:
+                return
+            records = all_period_records[period]
+            max_m   = records[0]["total_min"] if records else 1
+            for i in range(1, min(n + 1, len(records))):
+                compact_row(shared_area, i + 1, records[i], max_min=max_m,
+                            status_lbl=shared_status)
+            if n + 1 < len(records):
+                def _load_more_shared(s=shared_state, recs=records):
+                    s["n"] = min(s["n"] + 3, len(recs) - 1)
+                    _render_shared()
+                load_more_btn(shared_area, _load_more_shared)
+            def _collapse_shared(s=shared_state):
+                s["period"] = None
+                s["n"] = 0
+                _render_shared()
+            collapse_btn(shared_area, _collapse_shared)
+
+        def _expand_period(period):
+            records = all_period_records[period]
+            if not records or len(records) < 2:
+                return
+            if shared_state["period"] == period:
+                shared_state["n"] = min(shared_state["n"] + 3, len(records) - 1)
+            else:
+                shared_state["period"] = period
+                shared_state["n"] = min(3, len(records) - 1)
+            _render_shared()
+
+        for col_i, (lbl, period_key) in enumerate(_period_list):
             col = ctk.CTkFrame(top_row, fg_color="transparent")
             col.grid(row=0, column=col_i, sticky="nsew",
                      padx=(0, 12) if col_i < 2 else 0)
 
-            records = get_best_periods(period_key)
+            records = all_period_records[period_key]
             card = ctk.CTkFrame(col, fg_color=PANEL, corner_radius=14)
-            card.pack(fill="both", expand=True)
+            card.pack(fill="x")
             inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="x", padx=18, pady=16)
 
@@ -2832,6 +2876,8 @@ class App(ctk.CTk):
                 draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5,
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
+                if len(records) > 1:
+                    load_more_btn(col, lambda p=period_key: _expand_period(p))
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
@@ -2987,60 +3033,6 @@ class App(ctk.CTk):
         # ── Detailed sections ─────────────────────────────────────────────────
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
         detail_container.pack(fill="x")
-        def _render_period_in(parent, title: str, period: str):
-            records = get_best_periods(period)
-            if not records:
-                return
-            section_header(parent, title)
-            shown_state = {"n": 1}
-            container = ctk.CTkFrame(parent, fg_color="transparent")
-            container.pack(fill="x")
-            status_lbl = mk_label(parent, "", size=11, color=MUTED)
-            status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
-
-            def _render():
-                for w in container.winfo_children():
-                    w.destroy()
-                n = shown_state["n"]
-                if not records:
-                    return
-                r0 = records[0]
-                try:
-                    conn2 = sqlite3.connect(config.DB_FILE)
-                    c2 = conn2.cursor()
-                    if period == "day":
-                        cnt = c2.execute(
-                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                            (r0["dates"][0],)).fetchone()[0]
-                    else:
-                        placeholders = ",".join("?" * len(r0["dates"]))
-                        cnt = c2.execute(
-                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
-                            r0["dates"]).fetchone()[0]
-                    conn2.close()
-                except Exception:
-                    cnt = None
-                hero_card(container, r0, cnt, period)
-                max_m = records[0]["total_min"] if records else 1
-                for i in range(1, min(n, len(records))):
-                    compact_row(container, i + 1, records[i], max_min=max_m,
-                                status_lbl=status_lbl)
-                if n < len(records):
-                    def _load(s=shown_state):
-                        s["n"] = min(s["n"] + 3, len(records))
-                        _render()
-                    load_more_btn(container, _load)
-                if n > 1:
-                    def _collapse(s=shown_state):
-                        s["n"] = 1
-                        _render()
-                    collapse_btn(container, _collapse)
-            _render()
-
-        _render_period_in(detail_container, "Best Days", "day")
-        _render_period_in(detail_container, "Best Weeks", "week")
-        _render_period_in(detail_container, "Best Months", "month")
-
         # ── Best Day per Skill — pill selector ───────────────────────────────
         try:
             active_skills = [sk for sk, _ in get_user_skills()]
