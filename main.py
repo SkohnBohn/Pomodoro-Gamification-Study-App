@@ -3484,7 +3484,7 @@ class App(ctk.CTk):
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
         lbl_row.pack(fill="x", padx=14, pady=(0, 8))
-        for t in ["8h", "12h", "16h", "21h", "1h"]:
+        for t in ["8am", "12pm", "4pm", "9pm", "1am"]:
             mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
 
         snapshot = d["timeline"]
@@ -3544,7 +3544,7 @@ class App(ctk.CTk):
         full_canvas.pack(fill="x", padx=16, pady=(4, 6))
         full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
         full_lbl.pack(fill="x", padx=14, pady=(0, 10))
-        for t in ["0h", "6h", "12h", "18h", "24h"]:
+        for t in ["12am", "6am", "12pm", "6pm", "12am"]:
             mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
 
         def _draw_full(event=None):
