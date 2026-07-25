@@ -3744,7 +3744,7 @@ class App(ctk.CTk):
                     overlapping = (today_x_now is not None and
                                    abs(today_x_now - avg_x_now) < OVERLAP_PX)
                     if not overlapping:
-                        tip = f"{avg_min / 60:.1f}h daily avg"
+                        tip = f"{avg_min / 60:.1f}h ⌀"
                         tip_x = min(max(avg_x_now, 30), W - 30)
                         ruler_canvas.create_text(
                             tip_x, 6, text=tip,
