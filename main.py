@@ -2816,9 +2816,7 @@ class App(ctk.CTk):
         # shared expansion area — shows extras for whichever period was last clicked
         shared_state  = {"period": None, "n": 0}
         shared_area   = ctk.CTkFrame(sc, fg_color="transparent")
-        shared_area.pack(fill="x")
         shared_status = mk_label(sc, "", size=11, color=MUTED)
-        shared_status.pack(anchor="w", padx=28, pady=(0, 6))
 
         def _render_shared():
             for w in shared_area.winfo_children():
@@ -2827,7 +2825,11 @@ class App(ctk.CTk):
             period = shared_state["period"]
             n      = shared_state["n"]
             if not period or n == 0:
+                shared_area.pack_forget()
+                shared_status.pack_forget()
                 return
+            shared_area.pack(fill="x", after=top_row)
+            shared_status.pack(anchor="w", padx=28, pady=(0, 6), after=shared_area)
             records = all_period_records[period]
             max_m   = records[0]["total_min"] if records else 1
             for i in range(1, min(n + 1, len(records))):
