@@ -3480,7 +3480,7 @@ class App(ctk.CTk):
         TL_START, TL_END = 8 * 60, 25 * 60
         TL_WIDTH = TL_END - TL_START
 
-        tl_canvas = tk.Canvas(tl_card, height=42, bg=PANEL, highlightthickness=0)
+        tl_canvas = tk.Canvas(tl_card, height=58, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
         lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
         lbl_row.pack(fill="x", padx=14, pady=(0, 8))
@@ -3496,7 +3496,7 @@ class App(ctk.CTk):
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
-            yc = 32
+            yc = 48
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
             for item in snapshot:
                 t_str = item.get("time") or ""
