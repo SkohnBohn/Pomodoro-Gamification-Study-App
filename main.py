@@ -653,7 +653,7 @@ class App(ctk.CTk):
             hover_color=DARK2,
             text_color=BG if self._theme == "yellow" else MUTED,
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
-            command=lambda: (dlg.destroy(), self._switch_theme("yellow")),
+            command=lambda: self._switch_theme("yellow"),
         )
         yellow_btn.pack(side="left", padx=(2, 0), pady=2)
 
@@ -663,7 +663,7 @@ class App(ctk.CTk):
             hover_color=DARK2,
             text_color=BG if self._theme == "light" else MUTED,
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
-            command=lambda: (dlg.destroy(), self._switch_theme("light")),
+            command=lambda: self._switch_theme("light"),
         )
         light_btn.pack(side="left", padx=(0, 2), pady=2)
 
@@ -681,7 +681,6 @@ class App(ctk.CTk):
                     fg_color=DARK if k == key else "transparent",
                     text_color=BG if k == key else MUTED,
                 )
-            dlg.destroy()
             self._switch_db(key)
 
         _cur_db = "newui" if config.DB_FILE == DB_NEWUI else "main"
