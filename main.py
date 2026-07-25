@@ -348,7 +348,7 @@ class App(ctk.CTk):
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
         self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
         self._collapse_btn.pack(side="right")
-        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right", padx=(0, 2))
+        icon_btn(hdr, "○", self._show_settings, size=13).pack(side="right", padx=(0, 0))
 
         # Nav buttons in a collapsible sub-frame
         self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -3371,6 +3371,7 @@ class App(ctk.CTk):
             entry.grid(row=0, column=1)
             entry.insert(0, target_date.strftime("%d-%m-%y"))
             entry.focus_set()
+            entry.after(1, lambda: entry._entry.selection_clear())
 
             def _confirm(_event=None):
                 val = entry.get().strip()
