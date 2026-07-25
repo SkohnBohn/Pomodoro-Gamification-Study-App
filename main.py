@@ -3600,7 +3600,7 @@ class App(ctk.CTk):
                 full_frame.pack_forget()
                 _full_shown[0] = False
             else:
-                full_frame.pack(fill="x")
+                full_frame.pack(fill="x", pady=(4, 8))
                 _full_shown[0] = True
                 full_canvas.after(50, _draw_full)
 
