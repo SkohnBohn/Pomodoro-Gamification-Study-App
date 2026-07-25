@@ -3489,7 +3489,7 @@ class App(ctk.CTk):
                 return
             yc = 54
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
-            for label, t_min in [("8am", 480), ("12pm", 720), ("4pm", 960), ("9pm", 1260), ("1am", 1500)]:
+            for label, t_min in [("8", 480), ("12", 720), ("16", 960), ("21", 1260), ("1", 1500)]:
                 lx = int((t_min - TL_START) / TL_WIDTH * W)
                 anchor = "nw" if t_min == TL_START else ("ne" if t_min == TL_END else "n")
                 tl_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
@@ -3557,7 +3557,7 @@ class App(ctk.CTk):
                 return
             DAY, yc = 24 * 60, 54
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
-            for label, t_min in [("12am", 0), ("6am", 360), ("12pm", 720), ("6pm", 1080), ("12am", 1440)]:
+            for label, t_min in [("0", 0), ("6", 360), ("12", 720), ("18", 1080), ("24", 1440)]:
                 lx = int(t_min / DAY * W)
                 anchor = "nw" if t_min == 0 else ("ne" if t_min == 1440 else "n")
                 full_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
