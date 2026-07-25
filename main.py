@@ -3475,12 +3475,8 @@ class App(ctk.CTk):
         TL_START, TL_END = 8 * 60, 25 * 60
         TL_WIDTH = TL_END - TL_START
 
-        tl_canvas = tk.Canvas(tl_card, height=64, bg=PANEL, highlightthickness=0)
+        tl_canvas = tk.Canvas(tl_card, height=80, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
-        lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
-        lbl_row.pack(fill="x", padx=14, pady=(0, 0))
-        for t in ["8am", "12pm", "4pm", "9pm", "1am"]:
-            mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
 
         snapshot = d["timeline"]
         blocks: list = []
@@ -3493,6 +3489,11 @@ class App(ctk.CTk):
                 return
             yc = 54
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for label, t_min in [("8am", 480), ("12pm", 720), ("4pm", 960), ("9pm", 1260), ("1am", 1500)]:
+                lx = int((t_min - TL_START) / TL_WIDTH * W)
+                anchor = "nw" if t_min == TL_START else ("ne" if t_min == TL_END else "n")
+                tl_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
+                                      font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
@@ -3545,12 +3546,8 @@ class App(ctk.CTk):
         # Full timeline (00:00–24:00), toggled by button
         full_frame = ctk.CTkFrame(tl_card, fg_color="transparent")
         full_blocks: list = []
-        full_canvas = tk.Canvas(full_frame, height=64, bg=PANEL, highlightthickness=0)
+        full_canvas = tk.Canvas(full_frame, height=80, bg=PANEL, highlightthickness=0)
         full_canvas.pack(fill="x", pady=(0, 6))
-        full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
-        full_lbl.pack(fill="x", pady=(0, 6))
-        for t in ["12am", "6am", "12pm", "6pm", "12am"]:
-            mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
 
         def _draw_full(event=None):
             full_canvas.delete("all")
@@ -3560,6 +3557,11 @@ class App(ctk.CTk):
                 return
             DAY, yc = 24 * 60, 54
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for label, t_min in [("12am", 0), ("6am", 360), ("12pm", 720), ("6pm", 1080), ("12am", 1440)]:
+                lx = int(t_min / DAY * W)
+                anchor = "nw" if t_min == 0 else ("ne" if t_min == 1440 else "n")
+                full_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
+                                        font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
