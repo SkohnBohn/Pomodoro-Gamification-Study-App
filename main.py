@@ -700,11 +700,11 @@ class App(ctk.CTk):
         snd_row.pack(anchor="w", padx=20, pady=(6, 0))
 
         _snd_cfg = [
-            ("element click", "sound_click",   "sound_click_enabled"),
-            ("level up",      "sound_levelup",  "sound_levelup_enabled"),
-            ("finish",        "sound_finish",   "sound_finish_enabled"),
+            ("element click", "sound_click",   "sound_click_enabled",   _audio.play_click),
+            ("level up",      "sound_levelup",  "sound_levelup_enabled", _audio.play_main_levelup),
+            ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
         ]
-        for label, setting_key, attr in _snd_cfg:
+        for label, setting_key, attr, preview_fn in _snd_cfg:
             cell = ctk.CTkFrame(snd_row, fg_color="transparent")
             cell.pack(side="left", padx=(0, 14))
 
@@ -724,10 +724,12 @@ class App(ctk.CTk):
 
             _draw()
 
-            def _toggle(_, c=sq, a=attr, sk=setting_key, d=_draw):
+            def _toggle(_, a=attr, sk=setting_key, d=_draw, fn=preview_fn):
                 setattr(_audio, a, not getattr(_audio, a))
                 save_settings(sk, getattr(_audio, a))
                 d()
+                if getattr(_audio, a):
+                    fn()
 
             sq.bind("<Button-1>", _toggle)
             lbl.bind("<Button-1>", _toggle)
