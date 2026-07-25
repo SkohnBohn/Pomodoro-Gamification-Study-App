@@ -3678,7 +3678,15 @@ class App(ctk.CTk):
                 for top_pct, need_min in thr_items:
                     tx = _x(need_min)
                     achieved = total_min >= need_min
-                    tick_color = BORDER if achieved else DIM
+                    if achieved:
+                        # blend BORDER 30% toward DIM — slightly more visible than bare BORDER
+                        def _blend(c1, c2, t):
+                            r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+                            r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+                            return f"#{int(r1*(1-t)+r2*t):02x}{int(g1*(1-t)+g2*t):02x}{int(b1*(1-t)+b2*t):02x}"
+                        tick_color = _blend(BORDER, DIM, 0.3)
+                    else:
+                        tick_color = DIM
                     ruler_canvas.create_line(
                         tx, LINE_Y - 6, tx, LINE_Y + 6,
                         fill=tick_color, width=1,
