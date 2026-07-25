@@ -425,6 +425,41 @@ def get_today_stats(target_date=None) -> dict:
             else:
                 break
 
+    # Streak: reuse the open connection instead of a second sqlite3.connect()
+    from datetime import timedelta as _td
+    c.execute(
+        "SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC"
+    )
+    _date_rows = [r[0] for r in c.fetchall()]
+    streak = 0
+    if _date_rows:
+        _anchor = None
+        for ds in _date_rows:
+            try:
+                _d = _date.fromisoformat(ds)
+            except ValueError:
+                continue
+            if _d <= target_date:
+                _anchor = _d
+                break
+        if _anchor is not None:
+            _ok = (_anchor >= target_date - _td(days=1)) if target_date == _date.today() \
+                  else (_anchor == target_date)
+            if _ok:
+                _expected = _anchor
+                for ds in _date_rows:
+                    try:
+                        _d = _date.fromisoformat(ds)
+                    except ValueError:
+                        continue
+                    if _d > target_date:
+                        continue
+                    if _d == _expected:
+                        streak += 1
+                        _expected -= _td(days=1)
+                    elif _d < _expected:
+                        break
+
     conn.close()
 
     # Thresholds: minutes needed to reach top X% of all days
@@ -450,6 +485,7 @@ def get_today_stats(target_date=None) -> dict:
         "total_days":      total_days,
         "thresholds":      thresholds,
         "days_unbeaten":   days_unbeaten,
+        "streak":          streak,
     }
 
 

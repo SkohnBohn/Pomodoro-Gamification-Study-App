@@ -207,9 +207,14 @@ def mk_card(parent, bg=None, border=None, **kw) -> ctk.CTkFrame:
                         border_width=1, border_color=border or BORDER, **kw)
 
 
+_font_cache: dict = {}
+
 def mk_label(parent, text, size=13, weight="normal", color=None, **kw) -> ctk.CTkLabel:
+    key = (size, weight)
+    if key not in _font_cache:
+        _font_cache[key] = ctk.CTkFont(size=size, weight=weight)
     return ctk.CTkLabel(parent, text=text, text_color=color or TEXT,
-                        font=ctk.CTkFont(size=size, weight=weight), **kw)
+                        font=_font_cache[key], **kw)
 
 
 def mk_btn(parent, text, command, width=120, height=40,
@@ -1749,11 +1754,11 @@ class App(ctk.CTk):
                 "SELECT duration, skill FROM pomodoro_session "
                 "ORDER BY sessions DESC LIMIT 1")
             last = cur.fetchone()
+            cur.execute("SELECT skill, confirmed_level FROM skill_confirmed_levels")
+            confirmed = {sk: lv for sk, lv in cur.fetchall()}
             conn.close()
         except Exception:
-            pass
-
-        confirmed = get_skill_confirmed_levels()
+            confirmed = {}
 
         def lvl_prog(hours):
             for i, t in enumerate(SKILL_THRESHOLDS):
@@ -1874,11 +1879,12 @@ class App(ctk.CTk):
             over30 = cur.fetchone()[0] or 0
             cur.execute("SELECT COUNT(*) FROM pomodoro_session WHERE duration > 59.9")
             over60 = cur.fetchone()[0] or 0
+            cur.execute("SELECT stat, confirmed_level FROM stat_confirmed_levels")
+            stat_confirmed = {s: l for s, l in cur.fetchall()}
             conn.close()
         except Exception:
             total_min = sessions = over30 = over60 = 0
-
-        stat_confirmed = get_stat_confirmed_levels()
+            stat_confirmed = {}
         lvl = calculate_level(total_h)
 
         # ── Badges ────────────────────────────────────────────────────────────
@@ -2192,7 +2198,12 @@ class App(ctk.CTk):
                 return
             self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, tip)
 
-        canvas.bind("<Configure>", lambda _: _redraw())
+        _bar_pending = [None]
+        def _redraw_debounced_bar(*_):
+            if _bar_pending[0]:
+                canvas.after_cancel(_bar_pending[0])
+            _bar_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _redraw_debounced_bar)
         chart_skill.trace_add("write", lambda *_: _redraw())
         chart_period.trace_add("write", lambda *_: _redraw())
 
@@ -2351,7 +2362,12 @@ class App(ctk.CTk):
                 return
             self._draw_lines(canvas, line_skill.get(), w, tip)
 
-        canvas.bind("<Configure>", lambda _: _redraw())
+        _line_pending = [None]
+        def _redraw_debounced_line(*_):
+            if _line_pending[0]:
+                canvas.after_cancel(_line_pending[0])
+            _line_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _redraw_debounced_line)
         line_skill.trace_add("write", lambda *_: _redraw())
 
     def _draw_lines(self, canvas, skill: str, canvas_w: int, tip_lbl):
@@ -2593,7 +2609,12 @@ class App(ctk.CTk):
                 canvas.bind("<Motion>", on_move)
                 canvas.bind("<Leave>", on_leave)
 
-            canvas.bind("<Configure>", _redraw)
+            _redraw_pending = [None]
+            def _redraw_debounced(event=None, _cv=canvas, _pend=_redraw_pending):
+                if _pend[0]:
+                    _cv.after_cancel(_pend[0])
+                _pend[0] = _cv.after(60, _redraw)
+            canvas.bind("<Configure>", _redraw_debounced)
             canvas.after(50, _redraw)
 
         def skill_list(parent, breakdown: dict, total_min: float):
@@ -2719,7 +2740,12 @@ class App(ctk.CTk):
                     c.bind("<Motion>", _on_move)
                     c.bind("<Leave>", _on_leave)
 
-                bc.bind("<Configure>", _redraw_inline)
+                _inline_pending = [None]
+                def _redraw_inline_debounced(event=None, c=bc, _pend=_inline_pending):
+                    if _pend[0]:
+                        c.after_cancel(_pend[0])
+                    _pend[0] = c.after(60, _redraw_inline)
+                bc.bind("<Configure>", _redraw_inline_debounced)
                 bc.after(60, _redraw_inline)
 
         def load_more_btn(parent, callback):
@@ -2761,21 +2787,7 @@ class App(ctk.CTk):
                 if not records:
                     return
                 r0 = records[0]
-                try:
-                    conn2 = sqlite3.connect(config.DB_FILE)
-                    c2 = conn2.cursor()
-                    if period == "day":
-                        cnt = c2.execute(
-                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                            (r0["dates"][0],)).fetchone()[0]
-                    else:
-                        placeholders = ",".join("?" * len(r0["dates"]))
-                        cnt = c2.execute(
-                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
-                            r0["dates"]).fetchone()[0]
-                    conn2.close()
-                except Exception:
-                    cnt = None
+                cnt = r0.get("session_count")
                 hero_card(container, r0, cnt, period)
 
                 max_m = records[0]["total_min"] if records else 1
@@ -2942,7 +2954,12 @@ class App(ctk.CTk):
                     dot_c.create_text(W - 2, cy, anchor="e",
                                       text=f"+{remaining}",
                                       fill=MUTED, font=("Helvetica", 9))
-            dot_c.bind("<Configure>", _draw_dots)
+            _dots_pending = [None]
+            def _draw_dots_debounced(event=None):
+                if _dots_pending[0]:
+                    dot_c.after_cancel(_dots_pending[0])
+                _dots_pending[0] = dot_c.after(60, _draw_dots)
+            dot_c.bind("<Configure>", _draw_dots_debounced)
             dot_c.after(60, _draw_dots)
 
         # longest streak extras — button visible by default, entries hidden until clicked
@@ -3009,7 +3026,12 @@ class App(ctk.CTk):
                             cv.create_text(W2 - 2, cy2, anchor="e",
                                            text=f"+{remaining2}",
                                            fill=MUTED, font=("Helvetica", 8))
-                    c.bind("<Configure>", _draw_mini)
+                    _mini_pending = [None]
+                    def _draw_mini_debounced(event=None, cv_ref=c, _pend=_mini_pending):
+                        if _pend[0]:
+                            cv_ref.after_cancel(_pend[0])
+                        _pend[0] = cv_ref.after(60, _draw_mini)
+                    c.bind("<Configure>", _draw_mini_debounced)
                     c.after(80, _draw_mini)
                     # col3: date range
                     mk_label(row, range_s, size=11, color=DIM,
@@ -3326,7 +3348,7 @@ class App(ctk.CTk):
             target_date = date.today()
 
         d = get_today_stats(target_date)
-        streak = get_streak(target_date)
+        streak = d["streak"]
 
         # ── Day navigation row ────────────────────────────────────────────────
         nav = ctk.CTkFrame(sc, fg_color="transparent")
@@ -3567,7 +3589,12 @@ class App(ctk.CTk):
         def _tl_leave(_e=None):
             tl_canvas.delete("tl_tip")
 
-        tl_canvas.bind("<Configure>", _draw_tl)
+        _tl_pending = [None]
+        def _draw_tl_debounced(event=None):
+            if _tl_pending[0]:
+                tl_canvas.after_cancel(_tl_pending[0])
+            _tl_pending[0] = tl_canvas.after(80, _draw_tl)
+        tl_canvas.bind("<Configure>", _draw_tl_debounced)
         tl_canvas.bind("<Motion>", _tl_motion)
         tl_canvas.bind("<Leave>", _tl_leave)
         tl_canvas.after(80, _draw_tl)
@@ -3632,7 +3659,12 @@ class App(ctk.CTk):
         def _full_leave(_e=None):
             full_canvas.delete("tl_tip")
 
-        full_canvas.bind("<Configure>", _draw_full)
+        _full_pending = [None]
+        def _draw_full_debounced(event=None):
+            if _full_pending[0]:
+                full_canvas.after_cancel(_full_pending[0])
+            _full_pending[0] = full_canvas.after(80, _draw_full)
+        full_canvas.bind("<Configure>", _draw_full_debounced)
         full_canvas.bind("<Motion>", _full_motion)
         full_canvas.bind("<Leave>", _full_leave)
 
@@ -3818,7 +3850,12 @@ class App(ctk.CTk):
             def _ruler_leave(_e=None):
                 ruler_canvas.delete("ruler_tip")
 
-            ruler_canvas.bind("<Configure>", _draw_ruler)
+            _ruler_pending = [None]
+            def _draw_ruler_debounced(event=None):
+                if _ruler_pending[0]:
+                    ruler_canvas.after_cancel(_ruler_pending[0])
+                _ruler_pending[0] = ruler_canvas.after(80, _draw_ruler)
+            ruler_canvas.bind("<Configure>", _draw_ruler_debounced)
             ruler_canvas.bind("<Motion>", _ruler_motion)
             ruler_canvas.bind("<Leave>", _ruler_leave)
             ruler_canvas.after(80, _draw_ruler)
