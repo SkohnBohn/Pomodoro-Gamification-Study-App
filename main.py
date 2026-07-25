@@ -3528,10 +3528,11 @@ class App(ctk.CTk):
                 fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
-                txt = f"{line1}\n{line2}"
-                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 2,
-                                      text=txt, fill=TEXT, font=("Helvetica", 10),
-                                      anchor="nw", tags="tl_tip")
+                tip_x = min(e.x + 8, tl_canvas.winfo_width() - 4)
+                tl_canvas.create_text(tip_x, 4, text=line1, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="nw", tags="tl_tip")
+                tl_canvas.create_text(tip_x, 17, text=line2, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="nw", tags="tl_tip")
 
         def _tl_leave(_e=None):
             tl_canvas.delete("tl_tip")
