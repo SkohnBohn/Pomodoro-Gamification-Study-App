@@ -3541,7 +3541,7 @@ class App(ctk.CTk):
         full_canvas = tk.Canvas(full_frame, height=64, bg=PANEL, highlightthickness=0)
         full_canvas.pack(fill="x", padx=16, pady=(4, 6))
         full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
-        full_lbl.pack(fill="x", padx=14, pady=(0, 10))
+        full_lbl.pack(fill="x", padx=14, pady=(0, 6))
         for t in ["12am", "6am", "12pm", "6pm", "12am"]:
             mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
 
@@ -3600,7 +3600,7 @@ class App(ctk.CTk):
                 full_frame.pack_forget()
                 _full_shown[0] = False
             else:
-                full_frame.pack(fill="x", pady=(4, 8))
+                full_frame.pack(fill="x", pady=(4, 14))
                 _full_shown[0] = True
                 full_canvas.after(50, _draw_full)
 
