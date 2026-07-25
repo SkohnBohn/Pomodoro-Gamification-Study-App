@@ -517,11 +517,9 @@ class App(ctk.CTk):
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, "Settings", size=14, weight="bold",
-                 color=DARK).pack(padx=20, pady=(18, 14), anchor="w")
 
         # ── Max pomo duration ──────────────────────────────────────────────────
-        mk_label(dlg, "Max. Pomo Duration", size=11, color=MUTED).pack(anchor="w", padx=20)
+        mk_label(dlg, "Max. Pomo Duration", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(16, 0))
 
         presets = [25, 45, 60, 90, 120]
         pill_w  = 44
