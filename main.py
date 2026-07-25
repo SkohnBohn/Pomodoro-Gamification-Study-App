@@ -3419,14 +3419,19 @@ class App(ctk.CTk):
         left.grid(row=0, column=0, sticky="ew")
         total_h = d["total_min"] / 60
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
+        rank_detail = None
         if d["best_day_min"] > 0:
             bar = progress_bar(left, color=DARK)
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
             bar.pack(fill="x", pady=(8, 4))
             pct_of_rec = d["total_min"] / d["best_day_min"] * 100
-            mk_label(left,
+            bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
+            bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
+            mk_label(bottom_row,
                      f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
-                     size=10, color=DIM).pack(anchor="w")
+                     size=10, color=DIM).pack(side="left")
+            rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
+            rank_detail.pack(side="right")
 
         if d["percentile"] is not None:
             top_pct = max(0.01, 100 - d["percentile"])
@@ -3434,10 +3439,18 @@ class App(ctk.CTk):
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
             if d.get("day_rank") is not None:
-                mk_label(right, f"#{d['day_rank']}", size=11, color=DIM).pack(anchor="e", pady=(2, 0))
-                td = d.get("total_days", "?")
-                mk_label(right, f"top {d['day_rank']} of {td} days",
-                         size=10, color=DIM).pack(anchor="e", pady=(1, 0))
+                rank_lbl = mk_label(right, f"#{d['day_rank']}", size=11, color=DIM)
+                rank_lbl.pack(anchor="e", pady=(2, 0))
+                if rank_detail is not None:
+                    _dr, _td = d["day_rank"], d.get("total_days", "?")
+                    def _show(_e, lbl=rank_detail, dr=_dr, td=_td):
+                        lbl.configure(text=f"top {dr} of {td} days")
+                    def _hide(_e, lbl=rank_detail):
+                        lbl.configure(text="")
+                    for _w in (rank_lbl, getattr(rank_lbl, "_label", None)):
+                        if _w:
+                            _w.bind("<Enter>", _show)
+                            _w.bind("<Leave>", _hide)
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
