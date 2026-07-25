@@ -3261,9 +3261,8 @@ class App(ctk.CTk):
             outer.pack(fill="x", pady=3, padx=4)
 
             # left accent stripe
-            stripe = ctk.CTkFrame(outer, fg_color=acc, corner_radius=0, width=4)
-            stripe.pack(side="left", fill="y", padx=(0, 0))
-            stripe.pack_propagate(False)
+            stripe = tk.Frame(outer, bg=acc, width=4)
+            stripe.pack(side="left", fill="y")
 
             inner = ctk.CTkFrame(outer, fg_color="transparent")
             inner.pack(side="left", fill="x", expand=True, padx=(12, 14), pady=10)
