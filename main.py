@@ -137,6 +137,21 @@ def _stat_card_color(lvl: int):
     return _STAT_CARD_PALETTE[idx]
 
 
+def _fix_scroll(sf):
+    """Rebind <MouseWheel> on all descendants so child canvases don't eat scroll events."""
+    try:
+        canvas = sf._parent_canvas
+    except AttributeError:
+        return
+    def _on_wheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 60)), "units")
+    def _bind(w):
+        w.bind("<MouseWheel>", _on_wheel, add="+")
+        for ch in w.winfo_children():
+            _bind(ch)
+    _bind(sf)
+
+
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
     if minutes < 30:   return "#fbbf24"
@@ -477,6 +492,18 @@ class App(ctk.CTk):
         elif key == "stats":        self._refresh_stats()
         elif key == "records":      self._refresh_records()
         elif key == "leaderboard":  self._refresh_leaderboard()
+
+        _scroll_frames = {
+            "skills":       "_sk_scroll",
+            "achievements": "_ach_scroll",
+            "today":        "_today_scroll",
+            "stats":        "_stats_scroll",
+            "records":      "_rec_scroll",
+            "leaderboard":  "_lb_scroll",
+        }
+        sf_attr = _scroll_frames.get(key)
+        if sf_attr and hasattr(self, sf_attr):
+            _fix_scroll(getattr(self, sf_attr))
 
     # ── Settings popup ────────────────────────────────────────────────────────
     def _show_settings(self):
