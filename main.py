@@ -1843,7 +1843,7 @@ class App(ctk.CTk):
                         if date_s and date_s != "Von Anfang an":
                             try:
                                 from datetime import datetime as _dt
-                                fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d.%m.%y")
+                                fmt = _dt.strptime(date_s, "%Y-%m-%d").strftime("%d-%m-%y")
                             except Exception:
                                 fmt = date_s
                             mk_label(d, f"unlocked on {fmt}",
@@ -2042,10 +2042,11 @@ class App(ctk.CTk):
             info = cell_map.get((c, r))
             if info:
                 ds, mins = info
+                dd = datetime.strptime(ds, "%Y-%m-%d").strftime("%d-%m-%y")
                 if mins:
-                    tip.configure(text=f"{ds}  ·  {mins / 60:.1f}h")
+                    tip.configure(text=f"{dd}  ·  {mins / 60:.1f}h")
                 else:
-                    tip.configure(text=f"{ds}  ·  —")
+                    tip.configure(text=f"{dd}  ·  —")
             else:
                 tip.configure(text="")
 
@@ -2208,8 +2209,8 @@ class App(ctk.CTk):
                 val = values[idx]
                 ds = d.strftime("%Y-%m-%d")
                 tip_lbl.configure(
-                    text=f"{ds}  ·  {val:.1f}h" if val > 0
-                    else f"{ds}  ·  —"
+                    text=f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h" if val > 0
+                    else f"{d.strftime('%d-%m-%y')}  ·  —"
                 )
             else:
                 tip_lbl.configure(text="")
@@ -2376,7 +2377,7 @@ class App(ctk.CTk):
             idx  = max(0, min(num_days - 1, round(frac * (num_days - 1))))
             d    = days[idx]
             val  = cumulative[idx]
-            tip_lbl.configure(text=f"{d.strftime('%Y-%m-%d')}  ·  {val:.1f}h")
+            tip_lbl.configure(text=f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h")
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
@@ -2437,8 +2438,8 @@ class App(ctk.CTk):
                 year_m = re.search(r"(\d{4})$", part2)
                 year = year_m.group(1) if year_m else ""
                 try:
-                    d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d.%m.%y")
-                    d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d.%m.%y")
+                    d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d-%m-%y")
+                    d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d-%m-%y")
                     return f"{d1} – {d2}"
                 except Exception:
                     pass
@@ -2453,7 +2454,7 @@ class App(ctk.CTk):
             # single date: "Sat, 14 Mar 2026" or "14 Mar 2026"
             for fmt in ("%a, %d %b %Y", "%d %b %Y"):
                 try:
-                    return _dtt.strptime(label.strip(), fmt).strftime("%d.%m.%y")
+                    return _dtt.strptime(label.strip(), fmt).strftime("%d-%m-%y")
                 except Exception:
                     pass
 
@@ -2462,7 +2463,7 @@ class App(ctk.CTk):
             if m:
                 try:
                     from datetime import date as _date
-                    return _date.fromisoformat(m.group(1)).strftime("%d.%m.%y")
+                    return _date.fromisoformat(m.group(1)).strftime("%d-%m-%y")
                 except Exception:
                     pass
             return label
@@ -2774,7 +2775,7 @@ class App(ctk.CTk):
                 from datetime import date as _date
                 d1 = _date.fromisoformat(s0["start_date"])
                 d2 = _date.fromisoformat(s0["end_date"])
-                sh_range = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+                sh_range = f"{d1.strftime('%d-%m-%y')} – {d2.strftime('%d-%m-%y')}"
             except Exception:
                 sh_range = f"{s0['start_date']} – {s0['end_date']}"
             mk_label(sh_top, sh_range, size=13, color=MUTED).pack(
@@ -2841,7 +2842,7 @@ class App(ctk.CTk):
                         from datetime import date as _date
                         d1 = _date.fromisoformat(s["start_date"])
                         d2 = _date.fromisoformat(s["end_date"])
-                        range_s = f"{d1.strftime('%d.%m.%y')} – {d2.strftime('%d.%m.%y')}"
+                        range_s = f"{d1.strftime('%d-%m-%y')} – {d2.strftime('%d-%m-%y')}"
                     except Exception:
                         range_s = f"{s['start_date']} – {s['end_date']}"
                     row = ctk.CTkFrame(streak_container, fg_color="transparent")
@@ -3231,7 +3232,7 @@ class App(ctk.CTk):
             mk_label(top, f"  {dur:.0f} min", size=15, weight="bold",
                      color=rank_c if is_top else TEXT).pack(side="left")
 
-            meta = f"{dt.strftime('%d.%m.%Y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
+            meta = f"{dt.strftime('%d-%m-%y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
             mk_label(top, meta, size=11, color=DIM).pack(side="right")
 
             # intention below
