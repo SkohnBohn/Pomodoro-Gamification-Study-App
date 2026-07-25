@@ -18,18 +18,26 @@ def load_settings() -> dict:
         with open(config.SETTINGS_FILE, "r") as f:
             data = json.load(f)
         return {**_SETTINGS_DEFAULTS, **data}
-    except Exception:
+    except FileNotFoundError:
+        return dict(_SETTINGS_DEFAULTS)
+    except Exception as e:
+        import sys
+        print(f"[settings] load failed: {e}", file=sys.stderr, flush=True)
         return dict(_SETTINGS_DEFAULTS)
 
 def save_settings(key: str, value) -> None:
     settings = load_settings()
     settings[key] = value
+    path = config.SETTINGS_FILE
+    dir_ = os.path.dirname(path)
     try:
-        os.makedirs(os.path.dirname(config.SETTINGS_FILE), exist_ok=True)
-        with open(config.SETTINGS_FILE, "w") as f:
+        if dir_:
+            os.makedirs(dir_, exist_ok=True)
+        with open(path, "w") as f:
             json.dump(settings, f, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        import sys
+        print(f"[settings] save failed ({path}): {e}", file=sys.stderr, flush=True)
 
 
 def initialize_db():
