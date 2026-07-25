@@ -3442,8 +3442,8 @@ class App(ctk.CTk):
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
         row2.pack(fill="x", padx=16, pady=(0, 8))
-        row2.columnconfigure(0, weight=1)
-        row2.columnconfigure(1, weight=1)
+        row2.columnconfigure(0, weight=1, uniform="stat")
+        row2.columnconfigure(1, weight=1, uniform="stat")
 
         # Streak card — centered
         s_card = mk_card(row2)
@@ -3453,18 +3453,13 @@ class App(ctk.CTk):
         mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
         mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
 
-        # Sessions card — centered number, meta row below
+        # Sessions card — centered
         ss_card = mk_card(row2)
         ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
         ss_in.pack(expand=True, fill="both", padx=10, pady=18)
         mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
-        meta_row = ctk.CTkFrame(ss_in, fg_color="transparent")
-        meta_row.pack(fill="x", pady=(4, 0))
-        mk_label(meta_row, "sessions", size=11, color=MUTED).pack(side="left", padx=(10, 0))
-        if d["longest_min"]:
-            mk_label(meta_row, f"longest: {int(d['longest_min'])}min",
-                     size=11, color=DIM).pack(side="right")
+        mk_label(ss_in, "sessions", size=11, color=MUTED).pack(pady=(4, 0))
 
         # ── Timeline canvas ───────────────────────────────────────────────────
         tl_card = mk_card(sc)
