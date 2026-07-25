@@ -2208,8 +2208,8 @@ class App(ctk.CTk):
                 val = values[idx]
                 ds = d.strftime("%Y-%m-%d")
                 tip_lbl.configure(
-                    text=f"{ds}  ·  {val:.2f}h" if val > 0
-                    else f"{ds}  ·  kein Eintrag"
+                    text=f"{ds}  ·  {val:.1f}h" if val > 0
+                    else f"{ds}  ·  —"
                 )
             else:
                 tip_lbl.configure(text="")
@@ -2376,7 +2376,7 @@ class App(ctk.CTk):
             idx  = max(0, min(num_days - 1, round(frac * (num_days - 1))))
             d    = days[idx]
             val  = cumulative[idx]
-            tip_lbl.configure(text=f"{d.strftime('%Y-%m-%d')}  ·  {val:.1f}h gesamt")
+            tip_lbl.configure(text=f"{d.strftime('%Y-%m-%d')}  ·  {val:.1f}h")
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
