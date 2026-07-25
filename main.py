@@ -139,8 +139,8 @@ def _stat_card_color(lvl: int):
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
     if minutes < 30:   return "#fbbf24"
-    if minutes < 60:   return "#d97706"
-    if minutes < 120:  return "#92400e"
+    if minutes < 90:   return "#d97706"
+    if minutes < 240:  return "#92400e"
     return DARK
 
 
@@ -2058,7 +2058,7 @@ class App(ctk.CTk):
         leg = ctk.CTkFrame(parent, fg_color="transparent")
         leg.pack(anchor="w", padx=14, pady=(0, 14))
         mk_label(leg, "Less", size=10, color=MUTED).pack(side="left", padx=(0, 4))
-        _legend_ranges = ["0h", "< 0.5h", "0.5–2h", "2–5h", "> 5h"]
+        _legend_ranges = ["0", "<30", "<90", "<240", ">240"]
         for col_val, rng in zip([CARD, "#fbbf24", "#d97706", "#92400e", DARK], _legend_ranges):
             c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
                           highlightthickness=0)
