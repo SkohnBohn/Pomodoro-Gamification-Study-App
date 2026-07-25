@@ -399,8 +399,6 @@ def get_today_stats(target_date=None) -> dict:
     )
     best_day_min = c.fetchone()[0] or 0
 
-    conn.close()
-
     # Percentile + rank: what % of days were worse, and ordinal position from top
     if total_min > 0 and all_days:
         rank = sum(1 for d in all_days if d <= total_min)
@@ -411,6 +409,23 @@ def get_today_stats(target_date=None) -> dict:
         percentile = None
         day_rank = None
         total_days = len(all_days) if all_days else 0
+
+    # Days unbeaten: consecutive past days (most recent first) with less total than today
+    days_unbeaten = 0
+    if total_min > 0:
+        c2 = conn.cursor()
+        c2.execute(
+            "SELECT SUM(duration) FROM pomodoro_session"
+            " WHERE date < ? AND date IS NOT NULL GROUP BY date ORDER BY date DESC",
+            (day_str,)
+        )
+        for (past_total,) in c2.fetchall():
+            if (past_total or 0) < total_min:
+                days_unbeaten += 1
+            else:
+                break
+
+    conn.close()
 
     # Thresholds: minutes needed to reach top X% of all days
     thresholds: dict = {}
@@ -434,6 +449,7 @@ def get_today_stats(target_date=None) -> dict:
         "day_rank":        day_rank,
         "total_days":      total_days,
         "thresholds":      thresholds,
+        "days_unbeaten":   days_unbeaten,
     }
 
 

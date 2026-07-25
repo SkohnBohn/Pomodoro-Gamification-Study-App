@@ -3457,8 +3457,9 @@ class App(ctk.CTk):
         row2.pack(fill="x", padx=16, pady=(0, 8))
         row2.columnconfigure(0, weight=1, uniform="stat")
         row2.columnconfigure(1, weight=1, uniform="stat")
+        row2.columnconfigure(2, weight=1, uniform="stat")
 
-        # Streak card — centered
+        # Streak card
         s_card = mk_card(row2)
         s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         s_in = ctk.CTkFrame(s_card, fg_color="transparent")
@@ -3466,9 +3467,19 @@ class App(ctk.CTk):
         mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
         mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
 
-        # Sessions card — centered
+        # Days unbeaten card
+        ub = d.get("days_unbeaten", 0)
+        ub_card = mk_card(row2)
+        ub_card.grid(row=0, column=1, sticky="nsew", padx=(5, 5))
+        ub_in = ctk.CTkFrame(ub_card, fg_color="transparent")
+        ub_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ub_in, str(ub) if ub else "—", size=28, weight="bold", color=DARK).pack()
+        if ub:
+            mk_label(ub_in, "days unbeaten", size=11, color=MUTED).pack(pady=(4, 0))
+
+        # Sessions card
         ss_card = mk_card(row2)
-        ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        ss_card.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
         ss_in.pack(expand=True, fill="both", padx=10, pady=18)
         mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
