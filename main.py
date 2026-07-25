@@ -3424,18 +3424,14 @@ class App(ctk.CTk):
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
             bar.pack(fill="x", pady=(8, 4))
             pct_of_rec = d["total_min"] / d["best_day_min"] * 100
-            mk_label(left,
+            rec_row = ctk.CTkFrame(left, fg_color="transparent")
+            rec_row.pack(fill="x")
+            mk_label(rec_row,
                      f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
-                     size=10, color=DIM).pack(anchor="w")
-
-        if d["percentile"] is not None:
-            top_pct = max(0.01, 100 - d["percentile"])
-            right = ctk.CTkFrame(inner, fg_color="transparent")
-            right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
-            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+                     size=10, color=DIM).pack(side="left")
             if d.get("day_rank") is not None:
-                rank_lbl = mk_label(right, f"#{d['day_rank']}", size=11, color=DIM)
-                rank_lbl.pack(anchor="e", pady=(2, 0))
+                rank_lbl = mk_label(rec_row, f"#{d['day_rank']}", size=10, color=DIM)
+                rank_lbl.pack(side="right")
                 _tip_ref = [None]
                 def _show_tip(_e, lbl=rank_lbl, dr=d["day_rank"], td=d.get("total_days", "?")):
                     if _tip_ref[0]:
@@ -3453,6 +3449,12 @@ class App(ctk.CTk):
                         _tip_ref[0] = None
                 rank_lbl.bind("<Enter>", _show_tip)
                 rank_lbl.bind("<Leave>", _hide_tip)
+
+        if d["percentile"] is not None:
+            top_pct = max(0.01, 100 - d["percentile"])
+            right = ctk.CTkFrame(inner, fg_color="transparent")
+            right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
+            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
