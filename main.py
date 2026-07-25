@@ -3516,16 +3516,20 @@ class App(ctk.CTk):
                 x1 = max(x0 + 4, int((end - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                            fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start))
 
         def _tl_motion(e):
             tl_canvas.delete("tl_tip")
-            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
+            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk = hit
-                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 4,
+                dur, sk, start_m = hit
+                end_m = start_m + dur
+                fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"
+                line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                line2 = f"{fmt(start_m)} - {fmt(end_m)}"
+                txt = f"{line1}\n{line2}"
+                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 2,
                                       text=txt, fill=TEXT, font=("Helvetica", 10),
                                       anchor="nw", tags="tl_tip")
 
@@ -3570,16 +3574,20 @@ class App(ctk.CTk):
                 x1 = max(x0 + 4, int((start + dur) / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                              fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start))
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
-            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in full_blocks
+            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in full_blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk = hit
-                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 4,
+                dur, sk, start_m = hit
+                end_m = start_m + dur
+                fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"
+                line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                line2 = f"{fmt(start_m)} - {fmt(end_m)}"
+                txt = f"{line1}\n{line2}"
+                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 2,
                                         text=txt, fill=TEXT, font=("Helvetica", 10),
                                         anchor="nw", tags="tl_tip")
 
