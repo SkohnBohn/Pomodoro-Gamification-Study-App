@@ -1352,29 +1352,40 @@ class App(ctk.CTk):
             side.pack(side="right", padx=(6, 0))
 
             def _rename(note_id=nid, lbl=title_lbl):
-                rd = ctk.CTkToplevel(dlg)
-                rd.title("Umbenennen")
-                rd.geometry("340x128")
-                rd.configure(fg_color=PANEL)
-                rd.grab_set()
-                rd.lift()
-                rd.resizable(False, False)
-                e = ctk.CTkEntry(rd, height=38, fg_color=CARD, border_color=BORDER,
-                                 text_color=TEXT, font=ctk.CTkFont(size=13))
-                e.insert(0, lbl.cget("text"))
-                e.pack(fill="x", padx=20, pady=(20, 12))
-                e.focus_set()
-                e.select_range(0, "end")
-                def _ok():
-                    t = e.get().strip()
-                    if t:
-                        rename_note(note_id, t)
-                        lbl.configure(text=t)
-                    rd.destroy()
-                e.bind("<Return>", lambda _: _ok())
-                e.bind("<Escape>", lambda _: rd.destroy())
-                mk_btn(rd, "OK", _ok, primary=True, height=34).pack(
-                    fill="x", padx=20)
+                current = lbl.cget("text")
+                lbl.pack_forget()
+                ent = ctk.CTkEntry(
+                    card, height=28, fg_color="transparent",
+                    border_width=0, border_color="transparent",
+                    text_color=TEXT,
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                )
+                ent.insert(0, current)
+                ent.pack(anchor="w", padx=(8, 12), pady=(7, 6), fill="x", before=body)
+                ent.focus_set()
+                ent.select_range(0, "end")
+                _done = [False]
+
+                def _commit(evt=None):
+                    if _done[0]:
+                        return
+                    _done[0] = True
+                    t = ent.get().strip() or current
+                    rename_note(note_id, t)
+                    lbl.configure(text=t)
+                    ent.destroy()
+                    lbl.pack(anchor="w", padx=12, pady=(7, 6), before=body)
+
+                def _cancel(evt=None):
+                    if _done[0]:
+                        return
+                    _done[0] = True
+                    ent.destroy()
+                    lbl.pack(anchor="w", padx=12, pady=(7, 6), before=body)
+
+                ent.bind("<Return>", _commit)
+                ent.bind("<Escape>", _cancel)
+                ent.bind("<FocusOut>", _commit)
 
             o_lbl = mk_label(side, "○", size=13, color=MUTED)
             o_lbl.pack(pady=(4, 10))
