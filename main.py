@@ -3524,8 +3524,8 @@ class App(ctk.CTk):
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
                 dur, sk, start_m = hit
-                end_m = start_m + dur
-                fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"
+                end_m = start_m + int(dur)
+                fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
                 txt = f"{line1}\n{line2}"
@@ -3582,8 +3582,8 @@ class App(ctk.CTk):
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
                 dur, sk, start_m = hit
-                end_m = start_m + dur
-                fmt = lambda m: f"{m // 60:02d}:{m % 60:02d}"
+                end_m = start_m + int(dur)
+                fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
                 txt = f"{line1}\n{line2}"
