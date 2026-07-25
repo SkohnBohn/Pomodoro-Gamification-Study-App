@@ -31,6 +31,7 @@ from data_manager import (
     get_best_periods, get_all_streaks, get_best_days_for_skill,
     get_last_session_duration,
     get_today_stats,
+    load_settings, save_settings,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup
@@ -290,6 +291,9 @@ class App(ctk.CTk):
         self.configure(fg_color=BG)
         self.bind("<Control-q>", lambda _: self.destroy())
 
+        _s = load_settings()
+        if _s["db"] == "newui":
+            config.DB_FILE = DB_NEWUI
         initialize_db()
 
         self.running        = False
@@ -298,13 +302,14 @@ class App(ctk.CTk):
         self.total_seconds  = 0
         self.elapsed_secs   = 0
         self.intention_text = ""
-        self.selected_skill = "TECH"
-        self.timer_mode     = "Pomodoro"
+        self.selected_skill = _s["selected_skill"]
+        self.timer_mode     = _s["timer_mode"]
         self._skill_edit_mode = False
 
         self._views: dict = {}
         self._active_view = ""
         self._theme = "yellow"
+        self._startup_settings = _s
 
         self._build_ui()
         self._nav("timer")
@@ -504,6 +509,7 @@ class App(ctk.CTk):
 
         def _select_preset(v, deselect_custom=True):
             self._pomo_max_mins = float(v)
+            save_settings("pomo_max_mins", float(v))
             for val, btn in preset_btns.items():
                 btn.configure(
                     fg_color=DARK if val == v else "transparent",
@@ -575,6 +581,7 @@ class App(ctk.CTk):
 
         def _set_dir(fills: bool):
             self._timer_fills = fills
+            save_settings("timer_fills", fills)
             fill_btn.configure(fg_color=DARK if fills  else "transparent",
                                text_color=BG  if fills  else MUTED)
             emp_btn.configure( fg_color=DARK if not fills else "transparent",
@@ -884,6 +891,7 @@ class App(ctk.CTk):
         if config.DB_FILE == new_path:
             return
         config.DB_FILE = new_path
+        save_settings("db", "newui" if new_path == DB_NEWUI else "main")
         from data_manager import initialize_db as _init
         _init()
         prev_view = self._active_view
@@ -960,8 +968,8 @@ class App(ctk.CTk):
         # placed at top-right of the ring canvas; shown/hidden dynamically
 
         self._pomo_mins     = 25.0
-        self._pomo_max_mins = 90.0
-        self._timer_fills   = False  # False = countdown (full→empty), True = fill (empty→full)
+        self._pomo_max_mins = self._startup_settings.get("pomo_max_mins", 90.0)
+        self._timer_fills   = self._startup_settings.get("timer_fills", False)
         self._dragging      = False
 
         def _angle_to_mins(e):
@@ -1165,6 +1173,7 @@ class App(ctk.CTk):
 
     def _pick_skill(self, skill: str):
         self.selected_skill = skill
+        save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
             if sk == skill:
                 b.configure(fg_color=DARK, text_color=BG, border_color=DARK)
@@ -1173,6 +1182,7 @@ class App(ctk.CTk):
 
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
+        save_settings("timer_mode", mode)
         self._reset_timer()
 
     # ── Notes ─────────────────────────────────────────────────────────────────

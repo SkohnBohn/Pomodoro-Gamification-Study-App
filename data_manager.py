@@ -1,7 +1,35 @@
 import sqlite3
+import json
+import os
 import config
 from datetime import datetime
 from config import LEVEL_THRESHOLDS, SKILLS, SKILL_EMOJIS
+
+_SETTINGS_DEFAULTS = {
+    "db":           "main",
+    "timer_fills":  False,
+    "pomo_max_mins": 90.0,
+    "selected_skill": "TECH",
+    "timer_mode":   "Pomodoro",
+}
+
+def load_settings() -> dict:
+    try:
+        with open(config.SETTINGS_FILE, "r") as f:
+            data = json.load(f)
+        return {**_SETTINGS_DEFAULTS, **data}
+    except Exception:
+        return dict(_SETTINGS_DEFAULTS)
+
+def save_settings(key: str, value) -> None:
+    settings = load_settings()
+    settings[key] = value
+    try:
+        os.makedirs(os.path.dirname(config.SETTINGS_FILE), exist_ok=True)
+        with open(config.SETTINGS_FILE, "w") as f:
+            json.dump(settings, f, indent=2)
+    except Exception:
+        pass
 
 
 def initialize_db():
