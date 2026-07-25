@@ -3447,8 +3447,10 @@ class App(ctk.CTk):
                     if _tip_ref[0]:
                         _tip_ref[0].destroy()
                         _tip_ref[0] = None
-                rank_lbl.bind("<Enter>", _show_tip)
-                rank_lbl.bind("<Leave>", _hide_tip)
+                for _w in (rank_lbl, getattr(rank_lbl, "_label", None)):
+                    if _w:
+                        _w.bind("<Enter>", _show_tip)
+                        _w.bind("<Leave>", _hide_tip)
 
         if d["percentile"] is not None:
             top_pct = max(0.01, 100 - d["percentile"])
