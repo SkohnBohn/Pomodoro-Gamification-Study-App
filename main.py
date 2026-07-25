@@ -3433,6 +3433,8 @@ class App(ctk.CTk):
             right = ctk.CTkFrame(inner, fg_color="transparent")
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+            if d.get("day_rank") is not None:
+                mk_label(right, f"#{d['day_rank']}", size=11, color=DIM).pack(anchor="e", pady=(2, 0))
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")

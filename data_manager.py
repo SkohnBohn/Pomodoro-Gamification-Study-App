@@ -401,12 +401,14 @@ def get_today_stats(target_date=None) -> dict:
 
     conn.close()
 
-    # Percentile: what % of days were worse than the target day
+    # Percentile + rank: what % of days were worse, and ordinal position from top
     if total_min > 0 and all_days:
         rank = sum(1 for d in all_days if d <= total_min)
         percentile = round(rank / len(all_days) * 100, 2)
+        day_rank = sum(1 for d in all_days if d > total_min) + 1
     else:
         percentile = None
+        day_rank = None
 
     # Thresholds: minutes needed to reach top X% of all days
     thresholds: dict = {}
@@ -427,6 +429,7 @@ def get_today_stats(target_date=None) -> dict:
         "best_day_min":    best_day_min,
         "avg_min":         avg_min,
         "percentile":      percentile,
+        "day_rank":        day_rank,
         "thresholds":      thresholds,
     }
 
