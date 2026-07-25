@@ -2043,11 +2043,9 @@ class App(ctk.CTk):
             if info:
                 ds, mins = info
                 if mins:
-                    h, m = divmod(int(mins), 60)
-                    ts = f"{h}h {m}min" if h else f"{m}min"
-                    tip.configure(text=f"{ds}  ·  {ts}")
+                    tip.configure(text=f"{ds}  ·  {mins / 60:.1f}h")
                 else:
-                    tip.configure(text=f"{ds}  ·  kein Eintrag")
+                    tip.configure(text=f"{ds}  ·  —")
             else:
                 tip.configure(text="")
 
