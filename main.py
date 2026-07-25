@@ -3521,11 +3521,11 @@ class App(ctk.CTk):
                 fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
-                tip_x = min(e.x + 8, tl_canvas.winfo_width() - 4)
-                tl_canvas.create_text(tip_x, 0, text=line1, fill=TEXT,
-                                      font=("Helvetica", 10), anchor="nw", tags="tl_tip")
-                tl_canvas.create_text(tip_x, 13, text=line2, fill=TEXT,
-                                      font=("Helvetica", 10), anchor="nw", tags="tl_tip")
+                tip_x = min(max(e.x, 35), tl_canvas.winfo_width() - 35)
+                tl_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="n", tags="tl_tip")
+                tl_canvas.create_text(tip_x, 15, text=line2, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="n", tags="tl_tip")
 
         def _tl_leave(_e=None):
             tl_canvas.delete("tl_tip")
@@ -3580,10 +3580,11 @@ class App(ctk.CTk):
                 fmt = lambda m: f"{int(m) // 60:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
-                txt = f"{line1}\n{line2}"
-                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 2,
-                                        text=txt, fill=TEXT, font=("Helvetica", 10),
-                                        anchor="nw", tags="tl_tip")
+                tip_x = min(max(e.x, 35), full_canvas.winfo_width() - 35)
+                full_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="tl_tip")
+                full_canvas.create_text(tip_x, 15, text=line2, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="tl_tip")
 
         def _full_leave(_e=None):
             full_canvas.delete("tl_tip")
