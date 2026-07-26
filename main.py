@@ -204,29 +204,30 @@ def _fix_scroll(sf):
     sf.bind_all("<MouseWheel>", _on_wheel)
 
 
-_RANK_HISTORY_FILE = os.path.expanduser("~/Desktop/Pomodoro/stat_rank_history.json")
+_STAT_RANK_HISTORY_FILE  = os.path.expanduser("~/Desktop/Pomodoro/stat_rank_history.json")
+_SKILL_RANK_HISTORY_FILE = os.path.expanduser("~/Desktop/Pomodoro/skill_rank_history.json")
 
-def _load_rank_history() -> dict:
+def _load_rank_history(path: str) -> dict:
     try:
-        with open(_RANK_HISTORY_FILE) as f:
+        with open(path) as f:
             return json.load(f)
     except Exception:
         return {}
 
-def _save_rank_history(today_str: str, positions: dict):
-    h = _load_rank_history()
+def _save_rank_history(path: str, today_str: str, positions: dict):
+    h = _load_rank_history(path)
     h[today_str] = positions
     cutoff = (date.today() - timedelta(days=7)).isoformat()
     h = {k: v for k, v in h.items() if k >= cutoff}
     try:
-        with open(_RANK_HISTORY_FILE, "w") as f:
+        with open(path, "w") as f:
             json.dump(h, f)
     except Exception:
         pass
 
-def _get_rank_changes(current: dict) -> dict:
+def _get_rank_changes(path: str, current: dict) -> dict:
     """Returns {key: (arrow, date_str)} for positions that changed in last 3 days."""
-    h = _load_rank_history()
+    h = _load_rank_history(path)
     today = date.today()
     changes = {}
     for days_ago in range(1, 4):
@@ -1881,8 +1882,13 @@ class App(ctk.CTk):
                     return i, (hours - lo) / (t - lo), t
             return len(SKILL_THRESHOLDS), 1.0, SKILL_THRESHOLDS[-1]
 
-        for skill, hours in sorted(skill_hours.items(),
-                                    key=lambda x: lvl_prog(x[1])[:2], reverse=True):
+        _sk_sorted = sorted(skill_hours.items(),
+                            key=lambda x: lvl_prog(x[1])[:2], reverse=True)
+        _sk_positions = {sk: i for i, (sk, _) in enumerate(_sk_sorted)}
+        _sk_changes = _get_rank_changes(_SKILL_RANK_HISTORY_FILE, _sk_positions)
+        _save_rank_history(_SKILL_RANK_HISTORY_FILE, date.today().isoformat(), _sk_positions)
+
+        for skill, hours in _sk_sorted:
             lvl, frac, next_t = lvl_prog(hours)
             emoji    = active.get(skill, "")
             at_cap   = lvl >= len(SKILL_THRESHOLDS)
@@ -1898,8 +1904,26 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, f"{emoji}  {skill}", size=15, weight="bold",
+            name_row = ctk.CTkFrame(top, fg_color="transparent")
+            name_row.pack(side="left")
+            mk_label(name_row, f"{emoji}  {skill}", size=15, weight="bold",
                      color=card_text).pack(side="left")
+            sk_change = _sk_changes.get(skill)
+            if sk_change:
+                _arr, _day = sk_change
+                _arr_color = SUCCESS if _arr == "↑" else DANGER
+                try:
+                    _day_fmt = datetime.strptime(_day, "%Y-%m-%d").strftime("%d-%m-%y")
+                except Exception:
+                    _day_fmt = _day
+                arr_lbl = ctk.CTkLabel(name_row, text=_arr, text_color=_arr_color,
+                                       font=ctk.CTkFont(size=10), fg_color="transparent")
+                arr_lbl.pack(side="left", padx=(5, 0))
+                date_lbl = ctk.CTkLabel(name_row, text="", text_color=DIM,
+                                        font=ctk.CTkFont(size=11), fg_color="transparent")
+                date_lbl.pack(side="left", padx=(4, 0))
+                arr_lbl.bind("<Enter>", lambda e, d=date_lbl, t=_day_fmt: d.configure(text=t))
+                arr_lbl.bind("<Leave>", lambda e, d=date_lbl: d.configure(text=""))
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl}"
             mk_label(top, cap_label, size=14, weight="bold",
                      color=card_text).pack(side="right")
@@ -2085,8 +2109,8 @@ class App(ctk.CTk):
 
         current_positions = {s[1]: i for i, s in enumerate(stats)}
 
-        rank_changes = _get_rank_changes(current_positions)
-        _save_rank_history(date.today().isoformat(), current_positions)
+        rank_changes = _get_rank_changes(_STAT_RANK_HISTORY_FILE, current_positions)
+        _save_rank_history(_STAT_RANK_HISTORY_FILE, date.today().isoformat(), current_positions)
 
         for name, key, val, thresholds, unit in stats:
             lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
