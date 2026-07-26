@@ -1711,11 +1711,24 @@ class App(ctk.CTk):
         ext.pack(side="left")
         mk_label(ext_row, "min", size=13, color=DIM).pack(side="left", padx=(6, 0))
 
+        _discard_armed = [False]
+        _discard_reset_id = [None]
+
         def _discard():
-            self._ext_accum = 0.0
-            self._ext_result = ""
-            dlg.destroy()
-            self._reset_timer()
+            if not _discard_armed[0]:
+                _discard_armed[0] = True
+                discard_btn.configure(text="✕ sure?", text_color=DANGER)
+                if _discard_reset_id[0]:
+                    dlg.after_cancel(_discard_reset_id[0])
+                def _reset_arm():
+                    _discard_armed[0] = False
+                    discard_btn.configure(text="✕", text_color=DIM)
+                _discard_reset_id[0] = dlg.after(2500, _reset_arm)
+            else:
+                self._ext_accum = 0.0
+                self._ext_result = ""
+                dlg.destroy()
+                self._reset_timer()
 
         def _extend():
             try:
@@ -1759,13 +1772,14 @@ class App(ctk.CTk):
         btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
         btn_row.pack(fill="x", padx=32, pady=(0, 12))
 
-        ctk.CTkButton(
+        discard_btn = ctk.CTkButton(
             btn_row, text="✕", command=_discard,
-            width=32, height=32, corner_radius=0,
+            width=64, height=32, corner_radius=0,
             fg_color=PANEL, hover_color=PANEL,
             text_color=DIM, border_width=0,
             font=ctk.CTkFont(size=18),
-        ).pack(side="left")
+        )
+        discard_btn.pack(side="left")
 
         ctk.CTkButton(
             btn_row, text="✓", command=_save,
