@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import math
 import os
+import json
 import platform
 import time as _time
 import subprocess
@@ -201,6 +202,45 @@ def _fix_scroll(sf):
             return
         canvas.yview_scroll(int(-event.delta) or (-1 if event.delta < 0 else 1), "units")
     sf.bind_all("<MouseWheel>", _on_wheel)
+
+
+_RANK_HISTORY_FILE = os.path.expanduser("~/Desktop/Pomodoro/stat_rank_history.json")
+
+def _load_rank_history() -> dict:
+    try:
+        with open(_RANK_HISTORY_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_rank_history(today_str: str, positions: dict):
+    h = _load_rank_history()
+    h[today_str] = positions
+    cutoff = (date.today() - timedelta(days=7)).isoformat()
+    h = {k: v for k, v in h.items() if k >= cutoff}
+    try:
+        with open(_RANK_HISTORY_FILE, "w") as f:
+            json.dump(h, f)
+    except Exception:
+        pass
+
+def _get_rank_changes(current: dict) -> dict:
+    """Returns {key: (arrow, date_str)} for positions that changed in last 3 days."""
+    h = _load_rank_history()
+    today = date.today()
+    changes = {}
+    for days_ago in range(1, 4):
+        day_str = (today - timedelta(days=days_ago)).isoformat()
+        if day_str not in h:
+            continue
+        old = h[day_str]
+        for key, cur_pos in current.items():
+            if key in changes:
+                continue
+            old_pos = old.get(key)
+            if old_pos is not None and old_pos != cur_pos:
+                changes[key] = ("↑" if cur_pos < old_pos else "↓", day_str)
+    return changes
 
 
 def _heatmap_color(minutes: float) -> str:
@@ -2043,6 +2083,24 @@ class App(ctk.CTk):
         ]
         stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[0], reverse=True)
 
+        current_positions = {s[1]: i for i, s in enumerate(stats)}
+
+        # Simulation: seed yesterday entry so "sessions" appears to have moved up
+        _h = _load_rank_history()
+        _yesterday = (date.today() - timedelta(days=1)).isoformat()
+        if not any(k <= _yesterday for k in _h):
+            _mock = dict(current_positions)
+            _sess_pos = _mock.get("sessions")
+            if _sess_pos is not None and _sess_pos > 0:
+                _above = next((k for k, v in _mock.items() if v == _sess_pos - 1), None)
+                if _above:
+                    _mock["sessions"] = _sess_pos - 1
+                    _mock[_above] = _sess_pos
+            _save_rank_history(_yesterday, _mock)
+
+        rank_changes = _get_rank_changes(current_positions)
+        _save_rank_history(date.today().isoformat(), current_positions)
+
         for name, key, val, thresholds, unit in stats:
             lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
             at_cap          = lvl_s >= len(thresholds)
@@ -2058,7 +2116,25 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, name, size=14, weight="bold", color=card_text).pack(side="left")
+            name_row = ctk.CTkFrame(top, fg_color="transparent")
+            name_row.pack(side="left")
+            mk_label(name_row, name, size=14, weight="bold", color=card_text).pack(side="left")
+            change = rank_changes.get(key)
+            if change:
+                _arr, _day = change
+                _arr_color = SUCCESS if _arr == "↑" else DANGER
+                try:
+                    _day_fmt = datetime.strptime(_day, "%Y-%m-%d").strftime("%d-%m-%y")
+                except Exception:
+                    _day_fmt = _day
+                arr_lbl = ctk.CTkLabel(name_row, text=_arr, text_color=_arr_color,
+                                       font=ctk.CTkFont(size=10), fg_color="transparent")
+                arr_lbl.pack(side="left", padx=(5, 0))
+                date_lbl = ctk.CTkLabel(name_row, text="", text_color=DIM,
+                                        font=ctk.CTkFont(size=11), fg_color="transparent")
+                date_lbl.pack(side="left", padx=(4, 0))
+                arr_lbl.bind("<Enter>", lambda e, d=date_lbl, t=_day_fmt: d.configure(text=t))
+                arr_lbl.bind("<Leave>", lambda e, d=date_lbl: d.configure(text=""))
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl_s}"
             mk_label(top, cap_label, size=14, weight="bold",
                      color=card_text).pack(side="right")
