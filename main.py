@@ -2937,15 +2937,14 @@ class App(ctk.CTk):
 
         for col_i, (lbl, period_key) in enumerate(_period_list):
             col = ctk.CTkFrame(top_row, fg_color="transparent")
-            col.grid(row=0, column=col_i, sticky="nsew",
+            col.grid(row=0, column=col_i, sticky="new",
                      padx=(0, 12) if col_i < 2 else 0)
 
             records = all_period_records[period_key]
             card = ctk.CTkFrame(col, fg_color=PANEL, corner_radius=14)
             card.pack(fill="x")
-            has_more = len(records) > 1
             inner = ctk.CTkFrame(card, fg_color="transparent")
-            inner.pack(fill="x", padx=18, pady=(16, 8 if has_more else 16))
+            inner.pack(fill="x", padx=18, pady=16)
 
             mk_label(inner, lbl.upper(), size=9, weight="bold", color=DIM).pack(anchor="w")
             if records:
@@ -2957,9 +2956,8 @@ class App(ctk.CTk):
                 draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5,
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
-                if has_more:
-                    load_more_btn(card, lambda p=period_key: _expand_period(p), anchor="center")
-                    ctk.CTkFrame(card, height=10, fg_color="transparent").pack()
+                if len(records) > 1:
+                    load_more_btn(col, lambda p=period_key: _expand_period(p), anchor="center")
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
