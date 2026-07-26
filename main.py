@@ -52,6 +52,11 @@ _PALETTES = {
         DARK="#111111", DARK2="#333333", MUTED="#666666", DIM="#999999",
         TEXT="#111111", SUCCESS="#14532d", DANGER="#991b1b",
     ),
+    "dark": dict(
+        BG="#141414", PANEL="#1e1e1e", CARD="#272727", BORDER="#333333",
+        DARK="#e8e6e1", DARK2="#c0bdb8", MUTED="#888888", DIM="#555555",
+        TEXT="#e8e6e1", SUCCESS="#4ade80", DANGER="#f87171",
+    ),
 }
 _active_palette = "yellow"
 
@@ -66,50 +71,91 @@ def _apply_palette(name: str):
     if name == "yellow":
         _ARROW_FG       = "#8a7340"
         _ARROW_FG_HOVER = "#3d3000"
+    elif name == "dark":
+        _ARROW_FG       = "#666666"
+        _ARROW_FG_HOVER = "#cccccc"
     else:
         _ARROW_FG       = "#888888"
         _ARROW_FG_HOVER = "#333333"
+    _build_stat_palette()
 
 _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
 
-# Skill colors — desaturated jewel tones, chosen to sit beautifully on golden yellow
+# Skill colors — desaturated jewel tones for light/yellow backgrounds
 _SKILL_COLORS = {
-    "SOZ":     "#c1666b",   # dusty rose-red
-    "SUR":     "#9b7eb8",   # soft plum
-    "MATH":    "#6b7fa3",   # slate blue
-    "JOURNAL": "#c4724a",   # warm terracotta
-    "TECH":    "#4a8b8b",   # deep teal
-    "UNI":     "#7a9e7e",   # muted sage
-    "DESIGN":  "#b07b8e",   # dusty mauve
-    "ORGA":    "#8a9a5b",   # warm olive
+    "SOZ":     "#c1666b",
+    "SUR":     "#9b7eb8",
+    "MATH":    "#6b7fa3",
+    "JOURNAL": "#c4724a",
+    "TECH":    "#4a8b8b",
+    "UNI":     "#7a9e7e",
+    "DESIGN":  "#b07b8e",
+    "ORGA":    "#8a9a5b",
 }
 
-# (bg, border, text)  — one entry per level 0-15, smooth gradient
+# Brighter variants for dark background
+_SKILL_COLORS_DARK = {
+    "SOZ":     "#e07a80",
+    "SUR":     "#b99fd4",
+    "MATH":    "#8fa8cc",
+    "JOURNAL": "#e0916a",
+    "TECH":    "#5eb0b0",
+    "UNI":     "#96c49a",
+    "DESIGN":  "#d49ab0",
+    "ORGA":    "#aac070",
+}
+
+def _skill_color(sk: str) -> str:
+    if _active_palette == "dark":
+        return _SKILL_COLORS_DARK.get(sk, "#aaaaaa")
+    return _SKILL_COLORS.get(sk, DARK)
+
+# (bg, border, text) — one entry per level 0-15, smooth gradient
 _SKILL_CARD_PALETTE = [
-    ("#fffcf5", "#c6c4bf", DARK),        # 0  — warm white
-    ("#feefcb", "#c6ba9e", DARK),        # 1
-    ("#fde3a1", "#c5b17d", DARK),        # 2
-    ("#fcd777", "#c4a75c", DARK),        # 3
-    ("#fbcb4d", "#c39e3c", DARK),        # 4
-    ("#fbbf24", "#c3941c", DARK),        # 5  — golden yellow
-    ("#fbaf37", "#c3882a", DARK),        # 6
-    ("#fb9f4a", "#c37c39", DARK),        # 7
-    ("#fb905e", "#c37049", DARK),        # 8
-    ("#fb8071", "#c36358", DARK),        # 9
-    ("#fb7185", "#c35867", "#fff8e7"),   # 10 — soft rose
-    ("#e25e71", "#b04958", "#fff8e7"),   # 11
-    ("#c94b5e", "#9c3a49", "#fff8e7"),   # 12
-    ("#b0384b", "#892b3a", "#fff8e7"),   # 13
-    ("#972538", "#751c2b", "#fff8e7"),   # 14
-    ("#7f1225", "#630e1c", "#fff8e7"),   # 15 — dark ruby
+    ("#fffcf5", "#c6c4bf", "#1a1200"),        # 0  — warm white
+    ("#feefcb", "#c6ba9e", "#1a1200"),        # 1
+    ("#fde3a1", "#c5b17d", "#1a1200"),        # 2
+    ("#fcd777", "#c4a75c", "#1a1200"),        # 3
+    ("#fbcb4d", "#c39e3c", "#1a1200"),        # 4
+    ("#fbbf24", "#c3941c", "#1a1200"),        # 5  — golden yellow
+    ("#fbaf37", "#c3882a", "#1a1200"),        # 6
+    ("#fb9f4a", "#c37c39", "#1a1200"),        # 7
+    ("#fb905e", "#c37049", "#1a1200"),        # 8
+    ("#fb8071", "#c36358", "#1a1200"),        # 9
+    ("#fb7185", "#c35867", "#fff8e7"),        # 10 — soft rose
+    ("#e25e71", "#b04958", "#fff8e7"),        # 11
+    ("#c94b5e", "#9c3a49", "#fff8e7"),        # 12
+    ("#b0384b", "#892b3a", "#fff8e7"),        # 13
+    ("#972538", "#751c2b", "#fff8e7"),        # 14
+    ("#7f1225", "#630e1c", "#fff8e7"),        # 15 — dark ruby
+]
+
+_SKILL_CARD_PALETTE_DARK = [
+    ("#242424", "#383838", "#c8c6c0"),        # 0
+    ("#2a2418", "#3d3520", "#c8c6c0"),        # 1
+    ("#302c1a", "#443e25", "#d0cdc5"),        # 2
+    ("#38331e", "#4d4628", "#d0cdc5"),        # 3
+    ("#423c22", "#59502c", "#d8d5cc"),        # 4
+    ("#4d4426", "#665830", "#e0ddd4"),        # 5  — warm amber
+    ("#553a22", "#6e4a2e", "#e0ddd4"),        # 6
+    ("#5c301e", "#75401e", "#e8e5dc"),        # 7
+    ("#60261a", "#7a3520", "#e8e5dc"),        # 8
+    ("#621c1e", "#7c2a28", "#ffe8e8"),        # 9
+    ("#641428", "#7e2035", "#ffe8e8"),        # 10
+    ("#5e1230", "#782040", "#ffe8e8"),        # 11
+    ("#581038", "#722048", "#ffe8e8"),        # 12
+    ("#520e3e", "#6c1e50", "#ffe8ee"),        # 13
+    ("#4a0c42", "#641858", "#ffe8ee"),        # 14
+    ("#3e0a44", "#581660", "#ffe8ee"),        # 15 — deep plum
 ]
 
 
 def _skill_card_color(lvl: int):
-    idx = max(0, min(lvl, len(_SKILL_CARD_PALETTE) - 1))
-    return _SKILL_CARD_PALETTE[idx]
+    palette = _SKILL_CARD_PALETTE_DARK if _active_palette == "dark" else _SKILL_CARD_PALETTE
+    idx = max(0, min(lvl, len(palette) - 1))
+    return palette[idx]
 
 
 def _grad(c1, c2, t):
@@ -117,13 +163,26 @@ def _grad(c1, c2, t):
     r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
     return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
 
-# (bg, border, text) — gradient: light sage green → soft plum (mirrors timeline palette)
-_STAT_CARD_PALETTE = [
-    (_grad("#e8f4e8", "#9b7eb8", i / 15),
-     _grad("#c0d4c0", "#7a5e98", i / 15),
-     DARK if i < 9 else "#f0e8ff")
-    for i in range(16)
-]
+_STAT_CARD_PALETTE: list = []
+
+def _build_stat_palette():
+    global _STAT_CARD_PALETTE
+    if _active_palette == "dark":
+        _STAT_CARD_PALETTE = [
+            (_grad("#1e2e1e", "#2a1e38", i / 15),
+             _grad("#2e422e", "#3a2a50", i / 15),
+             "#c8e8c8" if i < 9 else "#e8d8ff")
+            for i in range(16)
+        ]
+    else:
+        _STAT_CARD_PALETTE = [
+            (_grad("#e8f4e8", "#9b7eb8", i / 15),
+             _grad("#c0d4c0", "#7a5e98", i / 15),
+             DARK if i < 9 else "#f0e8ff")
+            for i in range(16)
+        ]
+
+_build_stat_palette()
 
 
 def _stat_card_color(lvl: int):
@@ -147,6 +206,11 @@ def _fix_scroll(sf):
 
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
+    if _active_palette == "dark":
+        if minutes < 30:   return "#1e3a2e"
+        if minutes < 90:   return "#1e5c3a"
+        if minutes < 240:  return "#1a7a48"
+        return "#4ade80"
     if minutes < 30:   return "#fbbf24"
     if minutes < 90:   return "#d97706"
     if minutes < 240:  return "#92400e"
@@ -639,7 +703,7 @@ class App(ctk.CTk):
         # ── Theme ─────────────────────────────────────────────────────────────
         mk_label(dlg, "Theme", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
 
-        theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
+        theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=264)
         theme_pill.pack(pady=(6, 0))
         theme_pill.pack_propagate(False)
 
@@ -661,7 +725,17 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
             command=lambda: self._switch_theme("light"),
         )
-        light_btn.pack(side="left", padx=(0, 2), pady=2)
+        light_btn.pack(side="left", padx=0, pady=2)
+
+        dark_btn = ctk.CTkButton(
+            theme_pill, text="Dark", width=86, height=32, corner_radius=12,
+            fg_color=DARK if self._theme == "dark" else "transparent",
+            hover_color=DARK2,
+            text_color=BG if self._theme == "dark" else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: self._switch_theme("dark"),
+        )
+        dark_btn.pack(side="left", padx=(0, 2), pady=2)
 
         # ── DB selector ───────────────────────────────────────────────────────
         mk_label(dlg, "Database", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(16, 0))
@@ -936,6 +1010,7 @@ class App(ctk.CTk):
             return
         self._theme = name
         _apply_palette(name)
+        ctk.set_appearance_mode("dark" if name == "dark" else "light")
         # Stop any running timer to avoid dangling callbacks
         was_running = self.running
         self.running = False
@@ -2556,7 +2631,7 @@ class App(ctk.CTk):
             return label
 
         def skill_color(sk):
-            return _SKILL_COLORS.get(sk, DARK)
+            return _skill_color(sk)
 
         def draw_bar(parent, breakdown: dict, total_min: float, height=6,
                      status_lbl=None):
@@ -3567,7 +3642,7 @@ class App(ctk.CTk):
                 x0 = int((vis_s - TL_START) / TL_WIDTH * W)
                 x1 = max(x0 + 4, int((vis_e - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                                           fill=_skill_color(sk), outline="")
                 blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _tl_motion(e):
@@ -3637,7 +3712,7 @@ class App(ctk.CTk):
                 x0 = int(vis_s / DAY * W)
                 x1 = max(x0 + 4, int(vis_e / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                             fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                                             fill=_skill_color(sk), outline="")
                 full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _full_motion(e):
@@ -3694,7 +3769,7 @@ class App(ctk.CTk):
                 ctk.CTkLabel(
                     pill,
                     text=f"{sk}  {mins/60:.1f}h",
-                    text_color=_SKILL_COLORS.get(sk, DARK),
+                    text_color=_skill_color(sk),
                     font=ctk.CTkFont(size=12, weight="bold"),
                 ).pack(padx=10, pady=5)
 
