@@ -2708,9 +2708,9 @@ class App(ctk.CTk):
                 mk_label(row, f"{sk} {pct}%", size=11, color=MUTED).pack(
                     side="left", padx=(0, 10))
 
-        def section_header(parent, title: str):
+        def section_header(parent, title: str, top_pad=14):
             h = ctk.CTkFrame(parent, fg_color="transparent")
-            h.pack(fill="x", padx=28, pady=(28, 6))
+            h.pack(fill="x", padx=28, pady=(top_pad, 6))
             mk_label(h, title.upper(), size=10, weight="bold", color=DIM).pack(side="left")
             ctk.CTkFrame(h, height=1, fg_color=BORDER).pack(
                 side="left", fill="x", expand=True, padx=(10, 0), pady=(1, 0))
@@ -2840,7 +2840,7 @@ class App(ctk.CTk):
             lbl = ctk.CTkLabel(parent, text="⌃", font=("Helvetica", 20),
                                text_color="#888880", fg_color="transparent",
                                cursor="")
-            lbl.pack(anchor="w", padx=32, pady=(2, 0))
+            lbl.pack(anchor="w", padx=32, pady=(0, 0))
             lbl.bind("<Button-1>", lambda e: callback())
             lbl.bind("<Enter>", lambda e: lbl.configure(text_color="#555550"))
             lbl.bind("<Leave>", lambda e: lbl.configure(text_color="#888880"))
@@ -2911,8 +2911,8 @@ class App(ctk.CTk):
                 shared_area.pack_forget()
                 shared_status.pack_forget()
                 return
-            shared_area.pack(fill="x", after=top_row)
-            shared_status.pack(anchor="w", padx=28, pady=(0, 6), after=shared_area)
+            shared_area.pack(fill="x", after=top_row, pady=(6, 0))
+            shared_status.pack(anchor="w", padx=28, pady=(0, 2), after=shared_area)
             records = all_period_records[period]
             max_m   = records[0]["total_min"] if records else 1
             for i in range(1, min(n + 1, len(records))):
@@ -2943,8 +2943,9 @@ class App(ctk.CTk):
             records = all_period_records[period_key]
             card = ctk.CTkFrame(col, fg_color=PANEL, corner_radius=14)
             card.pack(fill="x")
+            has_more = len(records) > 1
             inner = ctk.CTkFrame(card, fg_color="transparent")
-            inner.pack(fill="x", padx=18, pady=16)
+            inner.pack(fill="x", padx=18, pady=(16, 8 if has_more else 16))
 
             mk_label(inner, lbl.upper(), size=9, weight="bold", color=DIM).pack(anchor="w")
             if records:
@@ -2956,8 +2957,9 @@ class App(ctk.CTk):
                 draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5,
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
-                if len(records) > 1:
-                    load_more_btn(col, lambda p=period_key: _expand_period(p), anchor="center")
+                if has_more:
+                    load_more_btn(card, lambda p=period_key: _expand_period(p), anchor="center")
+                    ctk.CTkFrame(card, height=10, fg_color="transparent").pack()
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
