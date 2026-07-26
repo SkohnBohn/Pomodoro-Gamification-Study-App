@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import math
 import os
+import json
 import platform
 import time as _time
 import subprocess
@@ -52,8 +53,37 @@ _PALETTES = {
         DARK="#111111", DARK2="#333333", MUTED="#666666", DIM="#999999",
         TEXT="#111111", SUCCESS="#14532d", DANGER="#991b1b",
     ),
+    "dark": dict(
+        BG="#141414", PANEL="#1e1e1e", CARD="#272727", BORDER="#333333",
+        DARK="#e8e6e1", DARK2="#c0bdb8", MUTED="#888888", DIM="#555555",
+        TEXT="#e8e6e1", SUCCESS="#4ade80", DANGER="#f87171",
+    ),
 }
 _active_palette = "yellow"
+
+def _grad(c1, c2, t):
+    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
+
+_STAT_CARD_PALETTE: list = []
+
+def _build_stat_palette():
+    global _STAT_CARD_PALETTE
+    if _active_palette == "dark":
+        _STAT_CARD_PALETTE = [
+            (_grad("#1e2e1e", "#2a1e38", i / 15),
+             _grad("#2e422e", "#3a2a50", i / 15),
+             "#c8e8c8" if i < 9 else "#e8d8ff")
+            for i in range(16)
+        ]
+    else:
+        _STAT_CARD_PALETTE = [
+            (_grad("#e8f4e8", "#9b7eb8", i / 15),
+             _grad("#c0d4c0", "#7a5e98", i / 15),
+             DARK if i < 9 else "#f0e8ff")
+            for i in range(16)
+        ]
 
 def _apply_palette(name: str):
     global BG, PANEL, CARD, BORDER, DARK, DARK2, MUTED, DIM, TEXT, SUCCESS, DANGER, _active_palette
@@ -66,64 +96,93 @@ def _apply_palette(name: str):
     if name == "yellow":
         _ARROW_FG       = "#8a7340"
         _ARROW_FG_HOVER = "#3d3000"
+    elif name == "dark":
+        _ARROW_FG       = "#666666"
+        _ARROW_FG_HOVER = "#cccccc"
     else:
         _ARROW_FG       = "#888888"
         _ARROW_FG_HOVER = "#333333"
+    _build_stat_palette()
 
 _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 _apply_palette("yellow")
 
-# Skill colors — desaturated jewel tones, chosen to sit beautifully on golden yellow
+# Skill colors — desaturated jewel tones for light/yellow backgrounds
 _SKILL_COLORS = {
-    "SOZ":     "#c1666b",   # dusty rose-red
-    "SUR":     "#9b7eb8",   # soft plum
-    "MATH":    "#6b7fa3",   # slate blue
-    "JOURNAL": "#c4724a",   # warm terracotta
-    "TECH":    "#4a8b8b",   # deep teal
-    "UNI":     "#7a9e7e",   # muted sage
-    "DESIGN":  "#b07b8e",   # dusty mauve
-    "ORGA":    "#8a9a5b",   # warm olive
+    "SOZ":     "#c1666b",
+    "SUR":     "#9b7eb8",
+    "MATH":    "#6b7fa3",
+    "JOURNAL": "#c4724a",
+    "TECH":    "#4a8b8b",
+    "UNI":     "#7a9e7e",
+    "DESIGN":  "#b07b8e",
+    "ORGA":    "#8a9a5b",
 }
 
-# (bg, border, text)  — one entry per level 0-15, smooth gradient
+# Brighter variants for dark background
+_SKILL_COLORS_DARK = {
+    "SOZ":     "#e07a80",
+    "SUR":     "#b99fd4",
+    "MATH":    "#8fa8cc",
+    "JOURNAL": "#e0916a",
+    "TECH":    "#5eb0b0",
+    "UNI":     "#96c49a",
+    "DESIGN":  "#d49ab0",
+    "ORGA":    "#aac070",
+}
+
+def _skill_color(sk: str) -> str:
+    if _active_palette == "dark":
+        return _SKILL_COLORS_DARK.get(sk, "#aaaaaa")
+    return _SKILL_COLORS.get(sk, DARK)
+
+# (bg, border, text) — one entry per level 0-15, smooth gradient
 _SKILL_CARD_PALETTE = [
-    ("#fffcf5", "#c6c4bf", DARK),        # 0  — warm white
-    ("#feefcb", "#c6ba9e", DARK),        # 1
-    ("#fde3a1", "#c5b17d", DARK),        # 2
-    ("#fcd777", "#c4a75c", DARK),        # 3
-    ("#fbcb4d", "#c39e3c", DARK),        # 4
-    ("#fbbf24", "#c3941c", DARK),        # 5  — golden yellow
-    ("#fbaf37", "#c3882a", DARK),        # 6
-    ("#fb9f4a", "#c37c39", DARK),        # 7
-    ("#fb905e", "#c37049", DARK),        # 8
-    ("#fb8071", "#c36358", DARK),        # 9
-    ("#fb7185", "#c35867", "#fff8e7"),   # 10 — soft rose
-    ("#e25e71", "#b04958", "#fff8e7"),   # 11
-    ("#c94b5e", "#9c3a49", "#fff8e7"),   # 12
-    ("#b0384b", "#892b3a", "#fff8e7"),   # 13
-    ("#972538", "#751c2b", "#fff8e7"),   # 14
-    ("#7f1225", "#630e1c", "#fff8e7"),   # 15 — dark ruby
+    ("#fffcf5", "#c6c4bf", "#1a1200"),        # 0  — warm white
+    ("#feefcb", "#c6ba9e", "#1a1200"),        # 1
+    ("#fde3a1", "#c5b17d", "#1a1200"),        # 2
+    ("#fcd777", "#c4a75c", "#1a1200"),        # 3
+    ("#fbcb4d", "#c39e3c", "#1a1200"),        # 4
+    ("#fbbf24", "#c3941c", "#1a1200"),        # 5  — golden yellow
+    ("#fbaf37", "#c3882a", "#1a1200"),        # 6
+    ("#fb9f4a", "#c37c39", "#1a1200"),        # 7
+    ("#fb905e", "#c37049", "#1a1200"),        # 8
+    ("#fb8071", "#c36358", "#1a1200"),        # 9
+    ("#fb7185", "#c35867", "#fff8e7"),        # 10 — soft rose
+    ("#e25e71", "#b04958", "#fff8e7"),        # 11
+    ("#c94b5e", "#9c3a49", "#fff8e7"),        # 12
+    ("#b0384b", "#892b3a", "#fff8e7"),        # 13
+    ("#972538", "#751c2b", "#fff8e7"),        # 14
+    ("#7f1225", "#630e1c", "#fff8e7"),        # 15 — dark ruby
+]
+
+_SKILL_CARD_PALETTE_DARK = [
+    ("#242424", "#383838", "#c8c6c0"),        # 0
+    ("#2a2418", "#3d3520", "#c8c6c0"),        # 1
+    ("#302c1a", "#443e25", "#d0cdc5"),        # 2
+    ("#38331e", "#4d4628", "#d0cdc5"),        # 3
+    ("#423c22", "#59502c", "#d8d5cc"),        # 4
+    ("#4d4426", "#665830", "#e0ddd4"),        # 5  — warm amber
+    ("#553a22", "#6e4a2e", "#e0ddd4"),        # 6
+    ("#5c301e", "#75401e", "#e8e5dc"),        # 7
+    ("#60261a", "#7a3520", "#e8e5dc"),        # 8
+    ("#621c1e", "#7c2a28", "#ffe8e8"),        # 9
+    ("#641428", "#7e2035", "#ffe8e8"),        # 10
+    ("#5e1230", "#782040", "#ffe8e8"),        # 11
+    ("#581038", "#722048", "#ffe8e8"),        # 12
+    ("#520e3e", "#6c1e50", "#ffe8ee"),        # 13
+    ("#4a0c42", "#641858", "#ffe8ee"),        # 14
+    ("#3e0a44", "#581660", "#ffe8ee"),        # 15 — deep plum
 ]
 
 
 def _skill_card_color(lvl: int):
-    idx = max(0, min(lvl, len(_SKILL_CARD_PALETTE) - 1))
-    return _SKILL_CARD_PALETTE[idx]
+    palette = _SKILL_CARD_PALETTE_DARK if _active_palette == "dark" else _SKILL_CARD_PALETTE
+    idx = max(0, min(lvl, len(palette) - 1))
+    return palette[idx]
 
 
-def _grad(c1, c2, t):
-    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
-    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
-    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
-
-# (bg, border, text) — gradient: light sage green → soft plum (mirrors timeline palette)
-_STAT_CARD_PALETTE = [
-    (_grad("#e8f4e8", "#9b7eb8", i / 15),
-     _grad("#c0d4c0", "#7a5e98", i / 15),
-     DARK if i < 9 else "#f0e8ff")
-    for i in range(16)
-]
 
 
 def _stat_card_color(lvl: int):
@@ -145,8 +204,53 @@ def _fix_scroll(sf):
     sf.bind_all("<MouseWheel>", _on_wheel)
 
 
+_STAT_RANK_HISTORY_FILE  = os.path.expanduser("~/Desktop/Pomodoro/stat_rank_history.json")
+_SKILL_RANK_HISTORY_FILE = os.path.expanduser("~/Desktop/Pomodoro/skill_rank_history.json")
+
+def _load_rank_history(path: str) -> dict:
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_rank_history(path: str, today_str: str, positions: dict):
+    h = _load_rank_history(path)
+    h[today_str] = positions
+    cutoff = (date.today() - timedelta(days=7)).isoformat()
+    h = {k: v for k, v in h.items() if k >= cutoff}
+    try:
+        with open(path, "w") as f:
+            json.dump(h, f)
+    except Exception:
+        pass
+
+def _get_rank_changes(path: str, current: dict) -> dict:
+    """Returns {key: (arrow, date_str)} for positions that changed in last 3 days."""
+    h = _load_rank_history(path)
+    today = date.today()
+    changes = {}
+    for days_ago in range(1, 4):
+        day_str = (today - timedelta(days=days_ago)).isoformat()
+        if day_str not in h:
+            continue
+        old = h[day_str]
+        for key, cur_pos in current.items():
+            if key in changes:
+                continue
+            old_pos = old.get(key)
+            if old_pos is not None and old_pos != cur_pos:
+                changes[key] = ("↑" if cur_pos < old_pos else "↓", day_str)
+    return changes
+
+
 def _heatmap_color(minutes: float) -> str:
     if minutes == 0:   return CARD
+    if _active_palette == "dark":
+        if minutes < 30:   return "#1e3a2e"
+        if minutes < 90:   return "#1e5c3a"
+        if minutes < 240:  return "#1a7a48"
+        return "#4ade80"
     if minutes < 30:   return "#fbbf24"
     if minutes < 90:   return "#d97706"
     if minutes < 240:  return "#92400e"
@@ -545,6 +649,11 @@ class App(ctk.CTk):
             if deselect_custom:
                 custom_entry.configure(border_color=BORDER)
             _flash()
+            if not self.running:
+                self._pomo_mins = min(self._pomo_mins, self._pomo_max_mins)
+                total_s = int(self._pomo_mins * 60)
+                m, s = divmod(total_s, 60)
+                self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
 
         current = int(self._pomo_max_mins)
         for i, p in enumerate(presets):
@@ -639,7 +748,7 @@ class App(ctk.CTk):
         # ── Theme ─────────────────────────────────────────────────────────────
         mk_label(dlg, "Theme", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
 
-        theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=176)
+        theme_pill = ctk.CTkFrame(dlg, fg_color=CARD, corner_radius=14, height=32, width=264)
         theme_pill.pack(pady=(6, 0))
         theme_pill.pack_propagate(False)
 
@@ -661,7 +770,17 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
             command=lambda: self._switch_theme("light"),
         )
-        light_btn.pack(side="left", padx=(0, 2), pady=2)
+        light_btn.pack(side="left", padx=0, pady=2)
+
+        dark_btn = ctk.CTkButton(
+            theme_pill, text="Dark", width=86, height=32, corner_radius=12,
+            fg_color=DARK if self._theme == "dark" else "transparent",
+            hover_color=DARK2,
+            text_color=BG if self._theme == "dark" else MUTED,
+            font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+            command=lambda: self._switch_theme("dark"),
+        )
+        dark_btn.pack(side="left", padx=(0, 2), pady=2)
 
         # ── DB selector ───────────────────────────────────────────────────────
         mk_label(dlg, "Database", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(16, 0))
@@ -936,6 +1055,7 @@ class App(ctk.CTk):
             return
         self._theme = name
         _apply_palette(name)
+        ctk.set_appearance_mode("dark" if name == "dark" else "light")
         # Stop any running timer to avoid dangling callbacks
         was_running = self.running
         self.running = False
@@ -1591,11 +1711,24 @@ class App(ctk.CTk):
         ext.pack(side="left")
         mk_label(ext_row, "min", size=13, color=DIM).pack(side="left", padx=(6, 0))
 
+        _discard_armed = [False]
+        _discard_reset_id = [None]
+
         def _discard():
-            self._ext_accum = 0.0
-            self._ext_result = ""
-            dlg.destroy()
-            self._reset_timer()
+            if not _discard_armed[0]:
+                _discard_armed[0] = True
+                discard_btn.configure(text="✕ sure?", text_color=DANGER)
+                if _discard_reset_id[0]:
+                    dlg.after_cancel(_discard_reset_id[0])
+                def _reset_arm():
+                    _discard_armed[0] = False
+                    discard_btn.configure(text="✕", text_color=DIM)
+                _discard_reset_id[0] = dlg.after(2500, _reset_arm)
+            else:
+                self._ext_accum = 0.0
+                self._ext_result = ""
+                dlg.destroy()
+                self._reset_timer()
 
         def _extend():
             try:
@@ -1639,13 +1772,14 @@ class App(ctk.CTk):
         btn_row = ctk.CTkFrame(dlg, fg_color="transparent")
         btn_row.pack(fill="x", padx=32, pady=(0, 12))
 
-        ctk.CTkButton(
+        discard_btn = ctk.CTkButton(
             btn_row, text="✕", command=_discard,
-            width=32, height=32, corner_radius=0,
+            width=64, height=32, corner_radius=0,
             fg_color=PANEL, hover_color=PANEL,
             text_color=DIM, border_width=0,
             font=ctk.CTkFont(size=18),
-        ).pack(side="left")
+        )
+        discard_btn.pack(side="left")
 
         ctk.CTkButton(
             btn_row, text="✓", command=_save,
@@ -1767,8 +1901,13 @@ class App(ctk.CTk):
                     return i, (hours - lo) / (t - lo), t
             return len(SKILL_THRESHOLDS), 1.0, SKILL_THRESHOLDS[-1]
 
-        for skill, hours in sorted(skill_hours.items(),
-                                    key=lambda x: x[1], reverse=True):
+        _sk_sorted = sorted(skill_hours.items(),
+                            key=lambda x: lvl_prog(x[1])[:2], reverse=True)
+        _sk_positions = {sk: i for i, (sk, _) in enumerate(_sk_sorted)}
+        _sk_changes = _get_rank_changes(_SKILL_RANK_HISTORY_FILE, _sk_positions)
+        _save_rank_history(_SKILL_RANK_HISTORY_FILE, date.today().isoformat(), _sk_positions)
+
+        for skill, hours in _sk_sorted:
             lvl, frac, next_t = lvl_prog(hours)
             emoji    = active.get(skill, "")
             at_cap   = lvl >= len(SKILL_THRESHOLDS)
@@ -1784,8 +1923,26 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, f"{emoji}  {skill}", size=15, weight="bold",
+            name_row = ctk.CTkFrame(top, fg_color="transparent")
+            name_row.pack(side="left")
+            mk_label(name_row, f"{emoji}  {skill}", size=15, weight="bold",
                      color=card_text).pack(side="left")
+            sk_change = _sk_changes.get(skill)
+            if sk_change:
+                _arr, _day = sk_change
+                _arr_color = SUCCESS if _arr == "↑" else DANGER
+                try:
+                    _day_fmt = datetime.strptime(_day, "%Y-%m-%d").strftime("%d-%m-%y")
+                except Exception:
+                    _day_fmt = _day
+                arr_lbl = ctk.CTkLabel(name_row, text=_arr, text_color=_arr_color,
+                                       font=ctk.CTkFont(size=10), fg_color="transparent")
+                arr_lbl.pack(side="left", padx=(5, 0))
+                date_lbl = ctk.CTkLabel(name_row, text="", text_color=DIM,
+                                        font=ctk.CTkFont(size=11), fg_color="transparent")
+                date_lbl.pack(side="left", padx=(4, 0))
+                arr_lbl.bind("<Enter>", lambda e, d=date_lbl, t=_day_fmt: d.configure(text=t))
+                arr_lbl.bind("<Leave>", lambda e, d=date_lbl: d.configure(text=""))
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl}"
             mk_label(top, cap_label, size=14, weight="bold",
                      color=card_text).pack(side="right")
@@ -1825,8 +1982,6 @@ class App(ctk.CTk):
 
         ctk.CTkFrame(self._sk_scroll, height=1, fg_color=BORDER).pack(
             fill="x", padx=6, pady=14)
-        mk_label(self._sk_scroll, f"Gesamt: {total_all:.1f} Stunden",
-                 color=MUTED, size=13).pack(pady=2)
 
         # ── Level colour legend ───────────────────────────────────────────────
         SQ, GAP = 16, 3
@@ -1967,7 +2122,12 @@ class App(ctk.CTk):
             ("Sessions > 30 min", "over30",   over30,    STAT_THRESHOLDS["over30"],   ""),
             ("Sessions > 60 min", "over60",   over60,    STAT_THRESHOLDS["over60"],   ""),
         ]
-        stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[0], reverse=True)
+        stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[:2], reverse=True)
+
+        current_positions = {s[1]: i for i, s in enumerate(stats)}
+
+        rank_changes = _get_rank_changes(_STAT_RANK_HISTORY_FILE, current_positions)
+        _save_rank_history(_STAT_RANK_HISTORY_FILE, date.today().isoformat(), current_positions)
 
         for name, key, val, thresholds, unit in stats:
             lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
@@ -1984,7 +2144,25 @@ class App(ctk.CTk):
 
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
-            mk_label(top, name, size=14, weight="bold", color=card_text).pack(side="left")
+            name_row = ctk.CTkFrame(top, fg_color="transparent")
+            name_row.pack(side="left")
+            mk_label(name_row, name, size=14, weight="bold", color=card_text).pack(side="left")
+            change = rank_changes.get(key)
+            if change:
+                _arr, _day = change
+                _arr_color = SUCCESS if _arr == "↑" else DANGER
+                try:
+                    _day_fmt = datetime.strptime(_day, "%Y-%m-%d").strftime("%d-%m-%y")
+                except Exception:
+                    _day_fmt = _day
+                arr_lbl = ctk.CTkLabel(name_row, text=_arr, text_color=_arr_color,
+                                       font=ctk.CTkFont(size=10), fg_color="transparent")
+                arr_lbl.pack(side="left", padx=(5, 0))
+                date_lbl = ctk.CTkLabel(name_row, text="", text_color=DIM,
+                                        font=ctk.CTkFont(size=11), fg_color="transparent")
+                date_lbl.pack(side="left", padx=(4, 0))
+                arr_lbl.bind("<Enter>", lambda e, d=date_lbl, t=_day_fmt: d.configure(text=t))
+                arr_lbl.bind("<Leave>", lambda e, d=date_lbl: d.configure(text=""))
             cap_label = "MAX ⭐" if at_cap else f"LVL {lvl_s}"
             mk_label(top, cap_label, size=14, weight="bold",
                      color=card_text).pack(side="right")
@@ -2556,7 +2734,7 @@ class App(ctk.CTk):
             return label
 
         def skill_color(sk):
-            return _SKILL_COLORS.get(sk, DARK)
+            return _skill_color(sk)
 
         def draw_bar(parent, breakdown: dict, total_min: float, height=6,
                      status_lbl=None):
@@ -2634,9 +2812,9 @@ class App(ctk.CTk):
                 mk_label(row, f"{sk} {pct}%", size=11, color=MUTED).pack(
                     side="left", padx=(0, 10))
 
-        def section_header(parent, title: str):
+        def section_header(parent, title: str, top_pad=14):
             h = ctk.CTkFrame(parent, fg_color="transparent")
-            h.pack(fill="x", padx=28, pady=(28, 6))
+            h.pack(fill="x", padx=28, pady=(top_pad, 6))
             mk_label(h, title.upper(), size=10, weight="bold", color=DIM).pack(side="left")
             ctk.CTkFrame(h, height=1, fg_color=BORDER).pack(
                 side="left", fill="x", expand=True, padx=(10, 0), pady=(1, 0))
@@ -2748,7 +2926,7 @@ class App(ctk.CTk):
                 bc.bind("<Configure>", _redraw_inline_debounced)
                 bc.after(60, _redraw_inline)
 
-        def load_more_btn(parent, callback):
+        def load_more_btn(parent, callback, anchor="w"):
             b = ctk.CTkButton(
                 parent, text="+ 3 more", width=90, height=26,
                 fg_color="transparent", hover_color=BORDER,
@@ -2756,14 +2934,17 @@ class App(ctk.CTk):
                 font=ctk.CTkFont(size=11), corner_radius=8,
                 command=callback,
             )
-            b.pack(anchor="w", padx=28, pady=(4, 0))
+            if anchor == "center":
+                b.pack(pady=(4, 0))
+            else:
+                b.pack(anchor="w", padx=28, pady=(4, 0))
             return b
 
         def collapse_btn(parent, callback):
             lbl = ctk.CTkLabel(parent, text="⌃", font=("Helvetica", 20),
                                text_color="#888880", fg_color="transparent",
                                cursor="")
-            lbl.pack(anchor="w", padx=32, pady=(2, 0))
+            lbl.pack(anchor="w", padx=32, pady=(0, 0))
             lbl.bind("<Button-1>", lambda e: callback())
             lbl.bind("<Enter>", lambda e: lbl.configure(text_color="#555550"))
             lbl.bind("<Leave>", lambda e: lbl.configure(text_color="#888880"))
@@ -2834,18 +3015,13 @@ class App(ctk.CTk):
                 shared_area.pack_forget()
                 shared_status.pack_forget()
                 return
-            shared_area.pack(fill="x", after=top_row)
-            shared_status.pack(anchor="w", padx=28, pady=(0, 6), after=shared_area)
+            shared_area.pack(fill="x", after=top_row, pady=(6, 0))
+            shared_status.pack(anchor="w", padx=28, pady=(0, 2), after=shared_area)
             records = all_period_records[period]
             max_m   = records[0]["total_min"] if records else 1
             for i in range(1, min(n + 1, len(records))):
                 compact_row(shared_area, i + 1, records[i], max_min=max_m,
                             status_lbl=shared_status)
-            if n + 1 < len(records):
-                def _load_more_shared(s=shared_state, recs=records):
-                    s["n"] = min(s["n"] + 3, len(recs) - 1)
-                    _render_shared()
-                load_more_btn(shared_area, _load_more_shared)
             def _collapse_shared(s=shared_state):
                 s["period"] = None
                 s["n"] = 0
@@ -2865,7 +3041,7 @@ class App(ctk.CTk):
 
         for col_i, (lbl, period_key) in enumerate(_period_list):
             col = ctk.CTkFrame(top_row, fg_color="transparent")
-            col.grid(row=0, column=col_i, sticky="nsew",
+            col.grid(row=0, column=col_i, sticky="new",
                      padx=(0, 12) if col_i < 2 else 0)
 
             records = all_period_records[period_key]
@@ -2885,7 +3061,7 @@ class App(ctk.CTk):
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
                 if len(records) > 1:
-                    load_more_btn(col, lambda p=period_key: _expand_period(p))
+                    load_more_btn(col, lambda p=period_key: _expand_period(p), anchor="center")
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
@@ -3527,7 +3703,7 @@ class App(ctk.CTk):
         TL_WIDTH = TL_END - TL_START
 
         tl_canvas = tk.Canvas(tl_card, height=80, bg=PANEL, highlightthickness=0)
-        tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
+        tl_canvas.pack(fill="x", padx=16, pady=(0, 12))
 
         snapshot = d["timeline"]
         blocks: list = []
@@ -3567,7 +3743,7 @@ class App(ctk.CTk):
                 x0 = int((vis_s - TL_START) / TL_WIDTH * W)
                 x1 = max(x0 + 4, int((vis_e - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                           fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                                           fill=_skill_color(sk), outline="")
                 blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _tl_motion(e):
@@ -3637,7 +3813,7 @@ class App(ctk.CTk):
                 x0 = int(vis_s / DAY * W)
                 x1 = max(x0 + 4, int(vis_e / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                             fill=_SKILL_COLORS.get(sk, DARK), outline="")
+                                             fill=_skill_color(sk), outline="")
                 full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _full_motion(e):
@@ -3694,7 +3870,7 @@ class App(ctk.CTk):
                 ctk.CTkLabel(
                     pill,
                     text=f"{sk}  {mins/60:.1f}h",
-                    text_color=_SKILL_COLORS.get(sk, DARK),
+                    text_color=_skill_color(sk),
                     font=ctk.CTkFont(size=12, weight="bold"),
                 ).pack(padx=10, pady=5)
 
