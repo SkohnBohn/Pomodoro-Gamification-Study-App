@@ -3668,18 +3668,23 @@ class App(ctk.CTk):
         full_canvas.bind("<Motion>", _full_motion)
         full_canvas.bind("<Leave>", _full_leave)
 
-        _full_shown = [False]
+        if not hasattr(self, "_tl_full_shown"):
+            self._tl_full_shown = False
 
         def _toggle_full():
-            if _full_shown[0]:
+            if self._tl_full_shown:
                 full_frame.pack_forget()
-                _full_shown[0] = False
+                self._tl_full_shown = False
             else:
                 full_frame.pack(fill="x", padx=16, pady=(0, 14))
-                _full_shown[0] = True
+                self._tl_full_shown = True
                 full_canvas.after(50, _draw_full)
 
         toggle_btn.configure(command=_toggle_full)
+
+        if self._tl_full_shown:
+            full_frame.pack(fill="x", padx=16, pady=(0, 14))
+            full_canvas.after(80, _draw_full)
 
         # ── Skill pills ───────────────────────────────────────────────────────
         if d["skill_breakdown"]:
