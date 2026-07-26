@@ -2085,19 +2085,6 @@ class App(ctk.CTk):
 
         current_positions = {s[1]: i for i, s in enumerate(stats)}
 
-        # Simulation: seed yesterday entry so "sessions" appears to have moved up
-        _h = _load_rank_history()
-        _yesterday = (date.today() - timedelta(days=1)).isoformat()
-        if not any(k <= _yesterday for k in _h):
-            _mock = dict(current_positions)
-            _sess_pos = _mock.get("sessions")
-            if _sess_pos is not None and _sess_pos > 0:
-                _above = next((k for k, v in _mock.items() if v == _sess_pos - 1), None)
-                if _above:
-                    _mock["sessions"] = _sess_pos - 1
-                    _mock[_above] = _sess_pos
-            _save_rank_history(_yesterday, _mock)
-
         rank_changes = _get_rank_changes(current_positions)
         _save_rank_history(date.today().isoformat(), current_positions)
 
