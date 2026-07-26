@@ -2822,7 +2822,7 @@ class App(ctk.CTk):
                 bc.bind("<Configure>", _redraw_inline_debounced)
                 bc.after(60, _redraw_inline)
 
-        def load_more_btn(parent, callback):
+        def load_more_btn(parent, callback, anchor="w"):
             b = ctk.CTkButton(
                 parent, text="+ 3 more", width=90, height=26,
                 fg_color="transparent", hover_color=BORDER,
@@ -2830,7 +2830,10 @@ class App(ctk.CTk):
                 font=ctk.CTkFont(size=11), corner_radius=8,
                 command=callback,
             )
-            b.pack(anchor="w", padx=28, pady=(4, 0))
+            if anchor == "center":
+                b.pack(pady=(4, 0))
+            else:
+                b.pack(anchor="w", padx=28, pady=(4, 0))
             return b
 
         def collapse_btn(parent, callback):
@@ -2915,11 +2918,6 @@ class App(ctk.CTk):
             for i in range(1, min(n + 1, len(records))):
                 compact_row(shared_area, i + 1, records[i], max_min=max_m,
                             status_lbl=shared_status)
-            if n + 1 < len(records):
-                def _load_more_shared(s=shared_state, recs=records):
-                    s["n"] = min(s["n"] + 3, len(recs) - 1)
-                    _render_shared()
-                load_more_btn(shared_area, _load_more_shared)
             def _collapse_shared(s=shared_state):
                 s["period"] = None
                 s["n"] = 0
@@ -2959,7 +2957,7 @@ class App(ctk.CTk):
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
                 if len(records) > 1:
-                    load_more_btn(col, lambda p=period_key: _expand_period(p))
+                    load_more_btn(col, lambda p=period_key: _expand_period(p), anchor="center")
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
