@@ -112,24 +112,17 @@ def _skill_card_color(lvl: int):
     return _SKILL_CARD_PALETTE[idx]
 
 
-# (bg, border, text) — smooth gradient white → mint → fresh green → dark forest
+def _grad(c1, c2, t):
+    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
+
+# (bg, border, text) — gradient: light sage green → soft plum (mirrors timeline palette)
 _STAT_CARD_PALETTE = [
-    ("#fffcf5", "#c6c4bf", DARK),        # 0  — warm white
-    ("#f1fbed", "#bbc3b8", DARK),        # 1
-    ("#e3fae6", "#b1c3b3", DARK),        # 2
-    ("#d6f9de", "#a6c2ad", DARK),        # 3
-    ("#c8f8d7", "#9cc1a7", DARK),        # 4
-    ("#bbf7d0", "#91c0a2", DARK),        # 5  — mint
-    ("#a4f2c0", "#7fbc95", DARK),        # 6
-    ("#8dedb0", "#6db889", DARK),        # 7
-    ("#77e8a0", "#5cb47c", DARK),        # 8
-    ("#60e390", "#4ab170", DARK),        # 9
-    ("#4ade80", "#39ad63", "#f0fdf4"),   # 10 — fresh green
-    ("#3fc26f", "#319756", "#f0fdf4"),   # 11
-    ("#34a65e", "#288149", "#f0fdf4"),   # 12
-    ("#298a4e", "#1f6b3c", "#f0fdf4"),   # 13
-    ("#1e6e3d", "#17552f", "#f0fdf4"),   # 14
-    ("#14532d", "#0f4023", "#f0fdf4"),   # 15 — dark forest
+    (_grad("#e8f4e8", "#9b7eb8", i / 15),
+     _grad("#c0d4c0", "#7a5e98", i / 15),
+     DARK if i < 9 else "#f0e8ff")
+    for i in range(16)
 ]
 
 
@@ -214,9 +207,14 @@ def mk_card(parent, bg=None, border=None, **kw) -> ctk.CTkFrame:
                         border_width=1, border_color=border or BORDER, **kw)
 
 
+_font_cache: dict = {}
+
 def mk_label(parent, text, size=13, weight="normal", color=None, **kw) -> ctk.CTkLabel:
+    key = (size, weight)
+    if key not in _font_cache:
+        _font_cache[key] = ctk.CTkFont(size=size, weight=weight)
     return ctk.CTkLabel(parent, text=text, text_color=color or TEXT,
-                        font=ctk.CTkFont(size=size, weight=weight), **kw)
+                        font=_font_cache[key], **kw)
 
 
 def mk_btn(parent, text, command, width=120, height=40,
@@ -348,7 +346,7 @@ class App(ctk.CTk):
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
         self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
         self._collapse_btn.pack(side="right")
-        icon_btn(hdr, "○", self._show_settings, size=15).pack(side="right", padx=(0, 2))
+        icon_btn(hdr, "○", self._show_settings, size=13).pack(side="right", padx=(0, 0))
 
         # Nav buttons in a collapsible sub-frame
         self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -517,11 +515,9 @@ class App(ctk.CTk):
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
-        mk_label(dlg, "Settings", size=14, weight="bold",
-                 color=DARK).pack(padx=20, pady=(18, 14), anchor="w")
 
         # ── Max pomo duration ──────────────────────────────────────────────────
-        mk_label(dlg, "Max. Pomo Duration", size=11, color=MUTED).pack(anchor="w", padx=20)
+        mk_label(dlg, "Max Pomo Duration", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(16, 0))
 
         presets = [25, 45, 60, 90, 120]
         pill_w  = 44
@@ -653,7 +649,7 @@ class App(ctk.CTk):
             hover_color=DARK2,
             text_color=BG if self._theme == "yellow" else MUTED,
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
-            command=lambda: (dlg.destroy(), self._switch_theme("yellow")),
+            command=lambda: self._switch_theme("yellow"),
         )
         yellow_btn.pack(side="left", padx=(2, 0), pady=2)
 
@@ -663,7 +659,7 @@ class App(ctk.CTk):
             hover_color=DARK2,
             text_color=BG if self._theme == "light" else MUTED,
             font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
-            command=lambda: (dlg.destroy(), self._switch_theme("light")),
+            command=lambda: self._switch_theme("light"),
         )
         light_btn.pack(side="left", padx=(0, 2), pady=2)
 
@@ -681,7 +677,6 @@ class App(ctk.CTk):
                     fg_color=DARK if k == key else "transparent",
                     text_color=BG if k == key else MUTED,
                 )
-            dlg.destroy()
             self._switch_db(key)
 
         _cur_db = "newui" if config.DB_FILE == DB_NEWUI else "main"
@@ -703,19 +698,20 @@ class App(ctk.CTk):
         snd_row.pack(anchor="w", padx=20, pady=(6, 0))
 
         _snd_cfg = [
-            ("element click", "sound_click",   "sound_click_enabled"),
-            ("level up",      "sound_levelup",  "sound_levelup_enabled"),
-            ("finish",        "sound_finish",   "sound_finish_enabled"),
+            ("element click", "sound_click",   "sound_click_enabled",   _audio.play_click),
+            ("level up",      "sound_levelup",  "sound_levelup_enabled", _audio.play_main_levelup),
+            ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
         ]
-        for label, setting_key, attr in _snd_cfg:
+        for label, setting_key, attr, preview_fn in _snd_cfg:
             cell = ctk.CTkFrame(snd_row, fg_color="transparent")
             cell.pack(side="left", padx=(0, 14))
 
             sq = tk.Canvas(cell, width=11, height=11, highlightthickness=0,
-                           bg=PANEL, cursor="hand2")
+                           bg=PANEL)
             sq.pack(side="left", padx=(0, 5))
 
-            mk_label(cell, label, size=12, color=MUTED).pack(side="left")
+            lbl = mk_label(cell, label, size=12, color=MUTED)
+            lbl.pack(side="left")
 
             def _draw(c=sq, a=attr):
                 c.delete("all")
@@ -726,12 +722,15 @@ class App(ctk.CTk):
 
             _draw()
 
-            def _toggle(_, c=sq, a=attr, sk=setting_key, d=_draw):
+            def _toggle(_, a=attr, sk=setting_key, d=_draw, fn=preview_fn):
                 setattr(_audio, a, not getattr(_audio, a))
                 save_settings(sk, getattr(_audio, a))
                 d()
+                if getattr(_audio, a):
+                    fn()
 
             sq.bind("<Button-1>", _toggle)
+            lbl.bind("<Button-1>", _toggle)
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
@@ -767,7 +766,7 @@ class App(ctk.CTk):
             frac  = max(0.0, min((total - lower) / (upper - lower), 1.0))
             self._lvl_bar.set(frac)
             self._next_lbl.configure(
-                text=f"{format_hours(upper - total)} bis LVL {level + 1}")
+                text=f"{format_hours(upper - total)} to LVL {level + 1}")
 
         badge_path = os.path.join(BADGE_DIR, f"p{level}.png")
         if os.path.exists(badge_path):
@@ -876,7 +875,7 @@ class App(ctk.CTk):
         big.place(relx=0.5, rely=0.38, anchor="center")
 
         sub = tk.Label(
-            inner, text="gespeichert ✓",
+            inner, text="saved ✓",
             font=("", 11),
             fg="#86efac", bg=ov_inner,
             anchor="center",
@@ -1139,7 +1138,7 @@ class App(ctk.CTk):
         # Notes
         notes_card = mk_card(right)
         notes_card.pack(fill="both", expand=True)
-        sec_title(notes_card, "Notizen")
+        sec_title(notes_card, "Notes")
         self.notes_box = ctk.CTkTextbox(
             notes_card, corner_radius=10, fg_color=CARD,
             text_color=TEXT, font=ctk.CTkFont(size=13),
@@ -1263,14 +1262,14 @@ class App(ctk.CTk):
         auto_title = f"Note {len(get_notes(limit=10000)) + 1}"
 
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Speichern")
+        dlg.title("Save")
         dlg.geometry("360x156")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
         dlg.resizable(False, False)
 
-        mk_label(dlg, "Titel", size=12, color=MUTED).pack(
+        mk_label(dlg, "Title", size=12, color=MUTED).pack(
             padx=22, pady=(20, 4), anchor="w")
         entry = ctk.CTkEntry(
             dlg, height=38, fg_color=CARD, border_color=BORDER,
@@ -1290,12 +1289,12 @@ class App(ctk.CTk):
 
         dlg.bind("<Return>", lambda _: _do_save())
         dlg.bind("<Escape>", lambda _: dlg.destroy())
-        mk_btn(dlg, "Speichern", _do_save, height=36, primary=True).pack(
+        mk_btn(dlg, "Save", _do_save, height=36, primary=True).pack(
             fill="x", padx=22)
 
     def _load_notes_dialog(self):
         dlg = ctk.CTkToplevel(self)
-        dlg.title("Notizen")
+        dlg.title("Notes")
         dlg.geometry("460x520")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
@@ -1306,7 +1305,7 @@ class App(ctk.CTk):
         notes = get_notes(limit=200)
 
         if not notes:
-            mk_label(dlg, "Noch nichts gespeichert.", size=13,
+            mk_label(dlg, "Nothing saved yet.", size=13,
                      color=MUTED).pack(pady=60)
             return
 
@@ -1676,7 +1675,7 @@ class App(ctk.CTk):
         mk_label(dlg, "✨ ⭐ ✨", size=32, color=DARK).pack(pady=(30, 4))
         mk_label(dlg, f"Level {level} erreicht!", size=18, weight="bold",
                  color=DARK).pack()
-        mk_btn(dlg, "✨  Weiter", dlg.destroy,
+        mk_btn(dlg, "✨  Continue", dlg.destroy,
                width=180, height=44, primary=True).pack(pady=24)
 
     def _skill_levelup_dialog(self, skill: str, level: int):
@@ -1755,11 +1754,11 @@ class App(ctk.CTk):
                 "SELECT duration, skill FROM pomodoro_session "
                 "ORDER BY sessions DESC LIMIT 1")
             last = cur.fetchone()
+            cur.execute("SELECT skill, confirmed_level FROM skill_confirmed_levels")
+            confirmed = {sk: lv for sk, lv in cur.fetchall()}
             conn.close()
         except Exception:
-            pass
-
-        confirmed = get_skill_confirmed_levels()
+            confirmed = {}
 
         def lvl_prog(hours):
             for i, t in enumerate(SKILL_THRESHOLDS):
@@ -1799,15 +1798,15 @@ class App(ctk.CTk):
             stat.pack(fill="x")
             mk_label(stat, f"{hours:.1f}h", color=card_text, size=12).pack(side="left")
             if not at_cap:
-                mk_label(stat, f"→ {next_t}h für LVL {lvl + 1}",
+                mk_label(stat, f"→ {next_t}h LVL {lvl + 1}",
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 pending = lvl - conf_lvl
                 if pending > 1:
-                    btn_text = f"⭐  LVL {next_collect}–{lvl} einsammeln! ({pending}×)"
+                    btn_text = f"⭐  collect LVL {next_collect}–{lvl} ({pending}x)"
                 else:
-                    btn_text = f"⭐  LVL {next_collect} einsammeln!"
+                    btn_text = f"⭐  collect LVL {next_collect}"
 
                 def _collect(sk=skill, lv=lvl, card=c):
                     play_skill_levelup()
@@ -1880,11 +1879,12 @@ class App(ctk.CTk):
             over30 = cur.fetchone()[0] or 0
             cur.execute("SELECT COUNT(*) FROM pomodoro_session WHERE duration > 59.9")
             over60 = cur.fetchone()[0] or 0
+            cur.execute("SELECT stat, confirmed_level FROM stat_confirmed_levels")
+            stat_confirmed = {s: l for s, l in cur.fetchall()}
             conn.close()
         except Exception:
             total_min = sessions = over30 = over60 = 0
-
-        stat_confirmed = get_stat_confirmed_levels()
+            stat_confirmed = {}
         lvl = calculate_level(total_h)
 
         # ── Badges ────────────────────────────────────────────────────────────
@@ -2000,15 +2000,15 @@ class App(ctk.CTk):
             mk_label(val_row, f"{val_s}{unit}", color=card_text, size=12).pack(side="left")
             if not at_cap:
                 next_s = str(int(next_t)) if next_t == int(next_t) else f"{next_t:.0f}"
-                mk_label(val_row, f"→ {next_s}{unit} für LVL {lvl_s + 1}",
+                mk_label(val_row, f"→ {next_s}{unit} LVL {lvl_s + 1}",
                          color=card_text, size=12).pack(side="right")
 
             if has_uncollected:
                 pending_s = lvl_s - conf_lvl
                 if pending_s > 1:
-                    btn_text_s = f"⭐  LVL {next_collect}–{lvl_s} einsammeln! ({pending_s}×)"
+                    btn_text_s = f"⭐  collect LVL {next_collect}–{lvl_s} ({pending_s}x)"
                 else:
-                    btn_text_s = f"⭐  LVL {next_collect} einsammeln!"
+                    btn_text_s = f"⭐  collect LVL {next_collect}"
 
                 def _collect_stat(k=key, lv=lvl_s, n=name, card=c):
                     play_stat_levelup()
@@ -2182,7 +2182,7 @@ class App(ctk.CTk):
         ).pack(side="right", padx=(6, 0))
 
         ctk.CTkOptionMenu(
-            ctrl, values=["30d", "90d", "1y", "All"],
+            ctrl, values=["30d", "90d", "1y"],
             variable=chart_period, width=90, **_opt_kw,
         ).pack(side="right")
 
@@ -2198,7 +2198,12 @@ class App(ctk.CTk):
                 return
             self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, tip)
 
-        canvas.bind("<Configure>", lambda _: _redraw())
+        _bar_pending = [None]
+        def _redraw_debounced_bar(*_):
+            if _bar_pending[0]:
+                canvas.after_cancel(_bar_pending[0])
+            _bar_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _redraw_debounced_bar)
         chart_skill.trace_add("write", lambda *_: _redraw())
         chart_period.trace_add("write", lambda *_: _redraw())
 
@@ -2228,7 +2233,7 @@ class App(ctk.CTk):
         max_h = max(values) if any(v > 0 for v in values) else 0.0
         if max_h == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
@@ -2357,7 +2362,12 @@ class App(ctk.CTk):
                 return
             self._draw_lines(canvas, line_skill.get(), w, tip)
 
-        canvas.bind("<Configure>", lambda _: _redraw())
+        _line_pending = [None]
+        def _redraw_debounced_line(*_):
+            if _line_pending[0]:
+                canvas.after_cancel(_line_pending[0])
+            _line_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _redraw_debounced_line)
         line_skill.trace_add("write", lambda *_: _redraw())
 
     def _draw_lines(self, canvas, skill: str, canvas_w: int, tip_lbl):
@@ -2370,7 +2380,7 @@ class App(ctk.CTk):
         first = get_first_session_date()
         if not first:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
@@ -2394,7 +2404,7 @@ class App(ctk.CTk):
         total_h = cumulative[-1]
         if total_h == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
-                               text="Keine Daten", fill=MUTED,
+                               text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
@@ -2517,7 +2527,7 @@ class App(ctk.CTk):
                 try:
                     d1 = _dtt.strptime(f"{part1} {year}", "%d %b %Y").strftime("%d-%m-%y")
                     d2 = _dtt.strptime(part2, "%d %b %Y").strftime("%d-%m-%y")
-                    return f"{d1} – {d2}"
+                    return f"{d1} to {d2}"
                 except Exception:
                     pass
 
@@ -2546,7 +2556,7 @@ class App(ctk.CTk):
             return label
 
         def skill_color(sk):
-            return _SKILL_COLORS.get(sk, "#bbbbbb")
+            return _SKILL_COLORS.get(sk, DARK)
 
         def draw_bar(parent, breakdown: dict, total_min: float, height=6,
                      status_lbl=None):
@@ -2599,7 +2609,12 @@ class App(ctk.CTk):
                 canvas.bind("<Motion>", on_move)
                 canvas.bind("<Leave>", on_leave)
 
-            canvas.bind("<Configure>", _redraw)
+            _redraw_pending = [None]
+            def _redraw_debounced(event=None, _cv=canvas, _pend=_redraw_pending):
+                if _pend[0]:
+                    _cv.after_cancel(_pend[0])
+                _pend[0] = _cv.after(60, _redraw)
+            canvas.bind("<Configure>", _redraw_debounced)
             canvas.after(50, _redraw)
 
         def skill_list(parent, breakdown: dict, total_min: float):
@@ -2725,7 +2740,12 @@ class App(ctk.CTk):
                     c.bind("<Motion>", _on_move)
                     c.bind("<Leave>", _on_leave)
 
-                bc.bind("<Configure>", _redraw_inline)
+                _inline_pending = [None]
+                def _redraw_inline_debounced(event=None, c=bc, _pend=_inline_pending):
+                    if _pend[0]:
+                        c.after_cancel(_pend[0])
+                    _pend[0] = c.after(60, _redraw_inline)
+                bc.bind("<Configure>", _redraw_inline_debounced)
                 bc.after(60, _redraw_inline)
 
         def load_more_btn(parent, callback):
@@ -2767,21 +2787,7 @@ class App(ctk.CTk):
                 if not records:
                     return
                 r0 = records[0]
-                try:
-                    conn2 = sqlite3.connect(config.DB_FILE)
-                    c2 = conn2.cursor()
-                    if period == "day":
-                        cnt = c2.execute(
-                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                            (r0["dates"][0],)).fetchone()[0]
-                    else:
-                        placeholders = ",".join("?" * len(r0["dates"]))
-                        cnt = c2.execute(
-                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
-                            r0["dates"]).fetchone()[0]
-                    conn2.close()
-                except Exception:
-                    cnt = None
+                cnt = r0.get("session_count")
                 hero_card(container, r0, cnt, period)
 
                 max_m = records[0]["total_min"] if records else 1
@@ -2804,21 +2810,67 @@ class App(ctk.CTk):
             _render()
 
         # ── Best Day / Week / Month ───────────────────────────────────────────
+        _period_list = [("Best Day", "day"), ("Best Week", "week"), ("Best Month", "month")]
+        all_period_records = {p: get_best_periods(p) for _, p in _period_list}
+
         top_row = ctk.CTkFrame(sc, fg_color="transparent")
         top_row.pack(fill="x", padx=28, pady=(22, 0))
         top_row.columnconfigure(0, weight=1)
         top_row.columnconfigure(1, weight=1)
         top_row.columnconfigure(2, weight=1)
 
-        for col_i, (lbl, period_key) in enumerate(
-                [("Best Day", "day"), ("Best Week", "week"), ("Best Month", "month")]):
+        # shared expansion area — shows extras for whichever period was last clicked
+        shared_state  = {"period": None, "n": 0}
+        shared_area   = ctk.CTkFrame(sc, fg_color="transparent")
+        shared_status = mk_label(sc, "", size=11, color=MUTED)
+
+        def _render_shared():
+            for w in shared_area.winfo_children():
+                w.destroy()
+            shared_status.configure(text="")
+            period = shared_state["period"]
+            n      = shared_state["n"]
+            if not period or n == 0:
+                shared_area.pack_forget()
+                shared_status.pack_forget()
+                return
+            shared_area.pack(fill="x", after=top_row)
+            shared_status.pack(anchor="w", padx=28, pady=(0, 6), after=shared_area)
+            records = all_period_records[period]
+            max_m   = records[0]["total_min"] if records else 1
+            for i in range(1, min(n + 1, len(records))):
+                compact_row(shared_area, i + 1, records[i], max_min=max_m,
+                            status_lbl=shared_status)
+            if n + 1 < len(records):
+                def _load_more_shared(s=shared_state, recs=records):
+                    s["n"] = min(s["n"] + 3, len(recs) - 1)
+                    _render_shared()
+                load_more_btn(shared_area, _load_more_shared)
+            def _collapse_shared(s=shared_state):
+                s["period"] = None
+                s["n"] = 0
+                _render_shared()
+            collapse_btn(shared_area, _collapse_shared)
+
+        def _expand_period(period):
+            records = all_period_records[period]
+            if not records or len(records) < 2:
+                return
+            if shared_state["period"] == period:
+                shared_state["n"] = min(shared_state["n"] + 3, len(records) - 1)
+            else:
+                shared_state["period"] = period
+                shared_state["n"] = min(3, len(records) - 1)
+            _render_shared()
+
+        for col_i, (lbl, period_key) in enumerate(_period_list):
             col = ctk.CTkFrame(top_row, fg_color="transparent")
             col.grid(row=0, column=col_i, sticky="nsew",
                      padx=(0, 12) if col_i < 2 else 0)
 
-            records = get_best_periods(period_key)
+            records = all_period_records[period_key]
             card = ctk.CTkFrame(col, fg_color=PANEL, corner_radius=14)
-            card.pack(fill="both", expand=True)
+            card.pack(fill="x")
             inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="x", padx=18, pady=16)
 
@@ -2832,6 +2884,8 @@ class App(ctk.CTk):
                 draw_bar(inner, r.get("breakdown", {}), r["total_min"], height=5,
                          status_lbl=top_status)
                 top_status.pack(anchor="w", pady=(3, 0))
+                if len(records) > 1:
+                    load_more_btn(col, lambda p=period_key: _expand_period(p))
             else:
                 mk_label(inner, "—", size=22, color=DIM).pack(anchor="w", pady=(4, 0))
 
@@ -2900,7 +2954,12 @@ class App(ctk.CTk):
                     dot_c.create_text(W - 2, cy, anchor="e",
                                       text=f"+{remaining}",
                                       fill=MUTED, font=("Helvetica", 9))
-            dot_c.bind("<Configure>", _draw_dots)
+            _dots_pending = [None]
+            def _draw_dots_debounced(event=None):
+                if _dots_pending[0]:
+                    dot_c.after_cancel(_dots_pending[0])
+                _dots_pending[0] = dot_c.after(60, _draw_dots)
+            dot_c.bind("<Configure>", _draw_dots_debounced)
             dot_c.after(60, _draw_dots)
 
         # longest streak extras — button visible by default, entries hidden until clicked
@@ -2967,7 +3026,12 @@ class App(ctk.CTk):
                             cv.create_text(W2 - 2, cy2, anchor="e",
                                            text=f"+{remaining2}",
                                            fill=MUTED, font=("Helvetica", 8))
-                    c.bind("<Configure>", _draw_mini)
+                    _mini_pending = [None]
+                    def _draw_mini_debounced(event=None, cv_ref=c, _pend=_mini_pending):
+                        if _pend[0]:
+                            cv_ref.after_cancel(_pend[0])
+                        _pend[0] = cv_ref.after(60, _draw_mini)
+                    c.bind("<Configure>", _draw_mini_debounced)
                     c.after(80, _draw_mini)
                     # col3: date range
                     mk_label(row, range_s, size=11, color=DIM,
@@ -2987,60 +3051,6 @@ class App(ctk.CTk):
         # ── Detailed sections ─────────────────────────────────────────────────
         detail_container = ctk.CTkFrame(sc, fg_color="transparent")
         detail_container.pack(fill="x")
-        def _render_period_in(parent, title: str, period: str):
-            records = get_best_periods(period)
-            if not records:
-                return
-            section_header(parent, title)
-            shown_state = {"n": 1}
-            container = ctk.CTkFrame(parent, fg_color="transparent")
-            container.pack(fill="x")
-            status_lbl = mk_label(parent, "", size=11, color=MUTED)
-            status_lbl.pack(anchor="w", padx=28, pady=(0, 6))
-
-            def _render():
-                for w in container.winfo_children():
-                    w.destroy()
-                n = shown_state["n"]
-                if not records:
-                    return
-                r0 = records[0]
-                try:
-                    conn2 = sqlite3.connect(config.DB_FILE)
-                    c2 = conn2.cursor()
-                    if period == "day":
-                        cnt = c2.execute(
-                            "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                            (r0["dates"][0],)).fetchone()[0]
-                    else:
-                        placeholders = ",".join("?" * len(r0["dates"]))
-                        cnt = c2.execute(
-                            f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({placeholders})",
-                            r0["dates"]).fetchone()[0]
-                    conn2.close()
-                except Exception:
-                    cnt = None
-                hero_card(container, r0, cnt, period)
-                max_m = records[0]["total_min"] if records else 1
-                for i in range(1, min(n, len(records))):
-                    compact_row(container, i + 1, records[i], max_min=max_m,
-                                status_lbl=status_lbl)
-                if n < len(records):
-                    def _load(s=shown_state):
-                        s["n"] = min(s["n"] + 3, len(records))
-                        _render()
-                    load_more_btn(container, _load)
-                if n > 1:
-                    def _collapse(s=shown_state):
-                        s["n"] = 1
-                        _render()
-                    collapse_btn(container, _collapse)
-            _render()
-
-        _render_period_in(detail_container, "Best Days", "day")
-        _render_period_in(detail_container, "Best Weeks", "week")
-        _render_period_in(detail_container, "Best Months", "month")
-
         # ── Best Day per Skill — pill selector ───────────────────────────────
         try:
             active_skills = [sk for sk, _ in get_user_skills()]
@@ -3273,9 +3283,8 @@ class App(ctk.CTk):
             outer.pack(fill="x", pady=3, padx=4)
 
             # left accent stripe
-            stripe = ctk.CTkFrame(outer, fg_color=acc, corner_radius=0, width=4)
-            stripe.pack(side="left", fill="y", padx=(0, 0))
-            stripe.pack_propagate(False)
+            stripe = tk.Frame(outer, bg=acc, width=4)
+            stripe.pack(side="left", fill="y")
 
             inner = ctk.CTkFrame(outer, fg_color="transparent")
             inner.pack(side="left", fill="x", expand=True, padx=(12, 14), pady=10)
@@ -3292,9 +3301,12 @@ class App(ctk.CTk):
             meta = f"{dt.strftime('%d-%m-%y')}  |  {dt.strftime('%H:%M')}  |  {skill}"
             mk_label(top, meta, size=11, color=DIM).pack(side="right")
 
-            # intention below
+            # intention below — max 2 lines (~110 chars)
             if intention:
-                mk_label(inner, intention, size=12, color=MUTED).pack(anchor="w", pady=(2, 0))
+                _MAX = 110
+                txt = (intention[:_MAX].rstrip() + "…") if len(intention) > _MAX else intention
+                mk_label(inner, txt, size=12, color=MUTED,
+                         wraplength=800, justify="left").pack(anchor="w", pady=(2, 0))
 
         if not filtered:
             mk_label(self._lb_scroll, "No entries for this period.",
@@ -3303,7 +3315,7 @@ class App(ctk.CTk):
             remaining = len(filtered) - shown
             mk_btn(
                 self._lb_scroll,
-                f"Load 10  ({remaining} more)",
+                f"+ 10 more",
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
@@ -3311,6 +3323,7 @@ class App(ctk.CTk):
 
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
+        self._today_offset = 0
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._today_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -3323,15 +3336,102 @@ class App(ctk.CTk):
     def _refresh_today(self):
         if not hasattr(self, "_today_scroll"):
             return
+        if not hasattr(self, "_today_offset"):
+            self._today_offset = 0
         for w in self._today_scroll.winfo_children():
             w.destroy()
         sc = self._today_scroll
-        d = get_today_stats()
-        streak = get_streak()
+
+        target_date = date.today() + timedelta(days=self._today_offset)
+        if target_date > date.today():
+            self._today_offset = 0
+            target_date = date.today()
+
+        d = get_today_stats(target_date)
+        streak = d["streak"]
+
+        # ── Day navigation row ────────────────────────────────────────────────
+        nav = ctk.CTkFrame(sc, fg_color="transparent")
+        nav.pack(fill="x", padx=16, pady=(12, 0))
+        nav.columnconfigure(0, weight=0)
+        nav.columnconfigure(1, weight=1)
+        nav.columnconfigure(2, weight=0)
+
+        def _go_prev():
+            self._today_offset -= 1
+            self._refresh_today()
+
+        def _go_next():
+            if self._today_offset < 0:
+                self._today_offset += 1
+                self._refresh_today()
+
+        ctk.CTkButton(
+            nav, text="‹", width=28, height=28, corner_radius=8,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=18),
+            command=_go_prev,
+        ).grid(row=0, column=0, sticky="w")
+
+        is_today = (self._today_offset == 0)
+        nav_label = "today" if is_today else target_date.strftime("%d-%m-%y")
+        date_lbl = mk_label(nav, nav_label, size=12, color=MUTED)
+        date_lbl.grid(row=0, column=1)
+
+        def _start_date_edit(_event=None):
+            date_lbl.grid_remove()
+            entry = ctk.CTkEntry(
+                nav, width=90, height=26, corner_radius=8,
+                fg_color=CARD, border_color=BORDER, text_color=TEXT,
+                font=ctk.CTkFont(size=12), justify="center",
+            )
+            entry.grid(row=0, column=1)
+            entry.insert(0, target_date.strftime("%d-%m-%y"))
+            entry.focus_set()
+            def _deselect():
+                try:
+                    entry._entry.selection_clear()
+                    entry._entry.icursor("end")
+                except Exception:
+                    pass
+            entry.after(50, _deselect)
+
+            def _confirm(_event=None):
+                val = entry.get().strip()
+                try:
+                    from datetime import datetime as _dt
+                    picked = _dt.strptime(val, "%d-%m-%y").date()
+                    if picked > date.today():
+                        raise ValueError("future")
+                    self._today_offset = (picked - date.today()).days
+                    self._refresh_today()
+                except ValueError:
+                    entry.configure(border_color=DANGER)
+                    entry.after(600, lambda: entry.configure(border_color=BORDER))
+
+            def _cancel(_event=None):
+                self._refresh_today()
+
+            entry.bind("<Return>", _confirm)
+            entry.bind("<Escape>", _cancel)
+
+        date_lbl.bind("<Button-1>", _start_date_edit)
+        date_lbl.bind("<Enter>", lambda _: date_lbl.configure(text_color=DARK))
+        date_lbl.bind("<Leave>", lambda _: date_lbl.configure(text_color=MUTED))
+
+        next_btn = ctk.CTkButton(
+            nav, text="›", width=28, height=28, corner_radius=8,
+            fg_color="transparent", hover_color=CARD, border_width=0,
+            text_color=MUTED, font=ctk.CTkFont(size=18),
+            command=_go_next,
+        )
+        next_btn.grid(row=0, column=2, sticky="e")
+        if is_today:
+            next_btn.configure(state="disabled", text_color=BORDER)
 
         # ── Hero card ─────────────────────────────────────────────────────────
         hero = mk_card(sc)
-        hero.pack(fill="x", padx=16, pady=(16, 8))
+        hero.pack(fill="x", padx=16, pady=(8, 8))
         inner = ctk.CTkFrame(hero, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=18)
         inner.columnconfigure(0, weight=1)
@@ -3341,29 +3441,47 @@ class App(ctk.CTk):
         left.grid(row=0, column=0, sticky="ew")
         total_h = d["total_min"] / 60
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
-        mk_label(left, "today", size=11, color=MUTED).pack(anchor="w", pady=(0, 10))
+        rank_detail = None
         if d["best_day_min"] > 0:
             bar = progress_bar(left, color=DARK)
             bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
-            bar.pack(fill="x", pady=(0, 4))
+            bar.pack(fill="x", pady=(8, 4))
             pct_of_rec = d["total_min"] / d["best_day_min"] * 100
-            mk_label(left,
+            bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
+            bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
+            mk_label(bottom_row,
                      f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
-                     size=10, color=DIM).pack(anchor="w")
+                     size=10, color=DIM).pack(side="left")
+            rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
+            rank_detail.pack(side="right")
 
         if d["percentile"] is not None:
             top_pct = max(0.01, 100 - d["percentile"])
             right = ctk.CTkFrame(inner, fg_color="transparent")
             right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
             mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+            if d.get("day_rank") is not None:
+                rank_lbl = mk_label(right, f"#{d['day_rank']}", size=11, color=DIM)
+                rank_lbl.pack(anchor="e", pady=(2, 0))
+                if rank_detail is not None:
+                    _dr, _td = d["day_rank"], d.get("total_days", "?")
+                    def _show(_e, lbl=rank_detail, dr=_dr, td=_td):
+                        lbl.configure(text=f"top {dr} of {td} days")
+                    def _hide(_e, lbl=rank_detail):
+                        lbl.configure(text="")
+                    for _w in (rank_lbl, getattr(rank_lbl, "_label", None)):
+                        if _w:
+                            _w.bind("<Enter>", _show)
+                            _w.bind("<Leave>", _hide)
 
         # ── Streak + Sessions row ─────────────────────────────────────────────
         row2 = ctk.CTkFrame(sc, fg_color="transparent")
         row2.pack(fill="x", padx=16, pady=(0, 8))
-        row2.columnconfigure(0, weight=1)
-        row2.columnconfigure(1, weight=1)
+        row2.columnconfigure(0, weight=1, uniform="stat")
+        row2.columnconfigure(1, weight=1, uniform="stat")
+        row2.columnconfigure(2, weight=1, uniform="stat")
 
-        # Streak card — centered
+        # Streak card
         s_card = mk_card(row2)
         s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         s_in = ctk.CTkFrame(s_card, fg_color="transparent")
@@ -3371,18 +3489,23 @@ class App(ctk.CTk):
         mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
         mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
 
-        # Sessions card — centered number, meta row below
+        # Days unbeaten card
+        ub = d.get("days_unbeaten", 0)
+        ub_card = mk_card(row2)
+        ub_card.grid(row=0, column=1, sticky="nsew", padx=(5, 5))
+        ub_in = ctk.CTkFrame(ub_card, fg_color="transparent")
+        ub_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ub_in, str(ub) if ub else "—", size=28, weight="bold", color=DARK).pack()
+        if ub:
+            mk_label(ub_in, "days unbeaten", size=11, color=MUTED).pack(pady=(4, 0))
+
+        # Sessions card
         ss_card = mk_card(row2)
-        ss_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        ss_card.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
         ss_in.pack(expand=True, fill="both", padx=10, pady=18)
         mk_label(ss_in, str(d["sessions"]), size=28, weight="bold", color=DARK).pack()
-        meta_row = ctk.CTkFrame(ss_in, fg_color="transparent")
-        meta_row.pack(fill="x", pady=(4, 0))
-        mk_label(meta_row, "sessions", size=11, color=MUTED).pack(side="left", padx=(10, 0))
-        if d["longest_min"]:
-            mk_label(meta_row, f"longest: {int(d['longest_min'])}min",
-                     size=11, color=DIM).pack(side="right")
+        mk_label(ss_in, "sessions", size=11, color=MUTED).pack(pady=(4, 0))
 
         # ── Timeline canvas ───────────────────────────────────────────────────
         tl_card = mk_card(sc)
@@ -3403,12 +3526,8 @@ class App(ctk.CTk):
         TL_START, TL_END = 8 * 60, 25 * 60
         TL_WIDTH = TL_END - TL_START
 
-        tl_canvas = tk.Canvas(tl_card, height=42, bg=PANEL, highlightthickness=0)
+        tl_canvas = tk.Canvas(tl_card, height=80, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
-        lbl_row = ctk.CTkFrame(tl_card, fg_color="transparent")
-        lbl_row.pack(fill="x", padx=14, pady=(0, 8))
-        for t in ["8h", "12h", "16h", "21h", "1h"]:
-            mk_label(lbl_row, t, size=9, color=DIM).pack(side="left", expand=True)
 
         snapshot = d["timeline"]
         blocks: list = []
@@ -3419,8 +3538,13 @@ class App(ctk.CTk):
             W = tl_canvas.winfo_width()
             if W < 4:
                 return
-            yc = 32
+            yc = 54
             tl_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for label, t_min in [("8", 480), ("12", 720), ("16", 960), ("21", 1260), ("1", 1500)]:
+                lx = int((t_min - TL_START) / TL_WIDTH * W)
+                anchor = "nw" if t_min == TL_START else ("ne" if t_min == TL_END else "n")
+                tl_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
+                                      font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
@@ -3429,33 +3553,48 @@ class App(ctk.CTk):
                     continue
                 try:
                     p = t_str.split(":")
-                    start = int(p[0]) * 60 + int(p[1])
+                    end_m = int(p[0]) * 60 + int(p[1])
+                    # stored time is END; post-midnight hours (0-5) are next-day on timeline
+                    if int(p[0]) < 6:
+                        end_m += 24 * 60
+                    start_m = end_m - dur
                 except Exception:
                     continue
-                if start < TL_START or start >= TL_END:
+                if start_m >= TL_END or end_m <= TL_START:
                     continue
-                end = min(start + dur, TL_END)
-                x0 = int((start - TL_START) / TL_WIDTH * W)
-                x1 = max(x0 + 4, int((end - TL_START) / TL_WIDTH * W))
+                vis_s = max(start_m, TL_START)
+                vis_e = min(end_m, TL_END)
+                x0 = int((vis_s - TL_START) / TL_WIDTH * W)
+                x1 = max(x0 + 4, int((vis_e - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                            fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _tl_motion(e):
             tl_canvas.delete("tl_tip")
-            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in blocks
+            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk = hit
-                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                tl_canvas.create_text(min(e.x + 8, tl_canvas.winfo_width() - 4), 4,
-                                      text=txt, fill=TEXT, font=("Helvetica", 10),
-                                      anchor="nw", tags="tl_tip")
+                dur, sk, start_m = hit
+                end_m = start_m + int(dur)
+                fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
+                line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                line2 = f"{fmt(start_m)} - {fmt(end_m)}"
+                tip_x = min(max(e.x, 35), tl_canvas.winfo_width() - 35)
+                tl_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="n", tags="tl_tip")
+                tl_canvas.create_text(tip_x, 15, text=line2, fill=TEXT,
+                                      font=("Helvetica", 10), anchor="n", tags="tl_tip")
 
         def _tl_leave(_e=None):
             tl_canvas.delete("tl_tip")
 
-        tl_canvas.bind("<Configure>", _draw_tl)
+        _tl_pending = [None]
+        def _draw_tl_debounced(event=None):
+            if _tl_pending[0]:
+                tl_canvas.after_cancel(_tl_pending[0])
+            _tl_pending[0] = tl_canvas.after(80, _draw_tl)
+        tl_canvas.bind("<Configure>", _draw_tl_debounced)
         tl_canvas.bind("<Motion>", _tl_motion)
         tl_canvas.bind("<Leave>", _tl_leave)
         tl_canvas.after(80, _draw_tl)
@@ -3463,12 +3602,8 @@ class App(ctk.CTk):
         # Full timeline (00:00–24:00), toggled by button
         full_frame = ctk.CTkFrame(tl_card, fg_color="transparent")
         full_blocks: list = []
-        full_canvas = tk.Canvas(full_frame, height=42, bg=PANEL, highlightthickness=0)
-        full_canvas.pack(fill="x", padx=16, pady=(4, 6))
-        full_lbl = ctk.CTkFrame(full_frame, fg_color="transparent")
-        full_lbl.pack(fill="x", padx=14, pady=(0, 10))
-        for t in ["0h", "6h", "12h", "18h", "24h"]:
-            mk_label(full_lbl, t, size=9, color=DIM).pack(side="left", expand=True)
+        full_canvas = tk.Canvas(full_frame, height=80, bg=PANEL, highlightthickness=0)
+        full_canvas.pack(fill="x", pady=(0, 6))
 
         def _draw_full(event=None):
             full_canvas.delete("all")
@@ -3476,8 +3611,13 @@ class App(ctk.CTk):
             W = full_canvas.winfo_width()
             if W < 4:
                 return
-            DAY, yc = 24 * 60, 32
+            DAY, yc = 24 * 60, 54
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
+            for label, t_min in [("0", 0), ("6", 360), ("12", 720), ("18", 1080), ("24", 1440)]:
+                lx = int(t_min / DAY * W)
+                anchor = "nw" if t_min == 0 else ("ne" if t_min == 1440 else "n")
+                full_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
+                                        font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
@@ -3486,30 +3626,45 @@ class App(ctk.CTk):
                     continue
                 try:
                     p = t_str.split(":")
-                    start = int(p[0]) * 60 + int(p[1])
+                    end_m = int(p[0]) * 60 + int(p[1])
+                    start_m = end_m - dur
                 except Exception:
                     continue
-                x0 = int(start / DAY * W)
-                x1 = max(x0 + 4, int((start + dur) / DAY * W))
+                vis_s = max(start_m, 0)
+                vis_e = min(end_m, DAY)
+                if vis_s >= DAY or vis_e <= 0:
+                    continue
+                x0 = int(vis_s / DAY * W)
+                x1 = max(x0 + 4, int(vis_e / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                              fill=_SKILL_COLORS.get(sk, DARK), outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk))
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
-            hit = next(((dur, sk) for x0, y0, x1, y1, dur, sk in full_blocks
+            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in full_blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk = hit
-                txt = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
-                full_canvas.create_text(min(e.x + 8, full_canvas.winfo_width() - 4), 4,
-                                        text=txt, fill=TEXT, font=("Helvetica", 10),
-                                        anchor="nw", tags="tl_tip")
+                dur, sk, start_m = hit
+                end_m = start_m + int(dur)
+                fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
+                line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
+                line2 = f"{fmt(start_m)} - {fmt(end_m)}"
+                tip_x = min(max(e.x, 35), full_canvas.winfo_width() - 35)
+                full_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="tl_tip")
+                full_canvas.create_text(tip_x, 15, text=line2, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="tl_tip")
 
         def _full_leave(_e=None):
             full_canvas.delete("tl_tip")
 
-        full_canvas.bind("<Configure>", _draw_full)
+        _full_pending = [None]
+        def _draw_full_debounced(event=None):
+            if _full_pending[0]:
+                full_canvas.after_cancel(_full_pending[0])
+            _full_pending[0] = full_canvas.after(80, _draw_full)
+        full_canvas.bind("<Configure>", _draw_full_debounced)
         full_canvas.bind("<Motion>", _full_motion)
         full_canvas.bind("<Leave>", _full_leave)
 
@@ -3520,7 +3675,7 @@ class App(ctk.CTk):
                 full_frame.pack_forget()
                 _full_shown[0] = False
             else:
-                full_frame.pack(fill="x")
+                full_frame.pack(fill="x", padx=16, pady=(0, 14))
                 _full_shown[0] = True
                 full_canvas.after(50, _draw_full)
 
@@ -3543,37 +3698,173 @@ class App(ctk.CTk):
                     font=ctk.CTkFont(size=12, weight="bold"),
                 ).pack(padx=10, pady=5)
 
-        # ── Average comparison + percentile milestones ────────────────────────
+        # ── Daily average + percentile ruler ─────────────────────────────────
         avg_card = mk_card(sc)
         avg_card.pack(fill="x", padx=16, pady=(0, 16))
-        body = ctk.CTkFrame(avg_card, fg_color="transparent")
-        body.pack(fill="x", padx=18, pady=(14, 14))
 
-        if d["avg_min"] > 0:
-            delta = d["total_min"] - d["avg_min"]
-            dh = abs(delta) / 60
-            avg_h = d["avg_min"] / 60
-            above = delta >= 0
-            sign = "+" if above else "−"
-            direction = "above" if above else "below"
-            txt = f"{sign}{dh:.1f}h {direction} daily avg  ({avg_h:.1f}h)"
-            mk_label(body, txt, size=13, weight="bold",
-                     color=SUCCESS if above else DANGER).pack(anchor="w")
+        avg_hdr = ctk.CTkFrame(avg_card, fg_color="transparent")
+        avg_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(avg_hdr, "DAILY AVERAGE", size=10, color=MUTED).pack(side="left")
+
+        body = ctk.CTkFrame(avg_card, fg_color="transparent")
+        body.pack(fill="x", padx=18, pady=(0, 8))
 
         thresholds = d.get("thresholds", {})
+        avg_min = d["avg_min"]
         if thresholds:
-            sep = ctk.CTkFrame(body, fg_color=BORDER, height=1)
-            sep.pack(fill="x", pady=(10, 8))
-            for top_pct, need_min in thresholds.items():
-                row = ctk.CTkFrame(body, fg_color="transparent")
-                row.pack(fill="x", pady=2)
-                mk_label(row, f"top {top_pct:>2}%", size=11, color=DIM).pack(side="left")
-                if d["total_min"] >= need_min:
-                    mk_label(row, "✓", size=11, color=SUCCESS).pack(side="right")
-                else:
-                    delta_h = (need_min - d["total_min"]) / 60
-                    mk_label(row, f"+{delta_h:.1f}h", size=11,
-                             weight="bold", color=DARK).pack(side="right")
+            thr_items = list(thresholds.items())   # 50,20,10,5,2,1
+            total_min = d["total_min"]
+            scale_max = max(thr_items[-1][1], total_min, avg_min) * 1.08
+
+            RULER_H = 62
+            ruler_canvas = tk.Canvas(
+                body, height=RULER_H, bg=PANEL, highlightthickness=0
+            )
+            ruler_canvas.pack(fill="x", pady=(4, 2))
+
+            _tick_zones: list = []   # [(x, need_min, top_pct), ...]
+            _avg_zone:   list = []   # [(x, avg_min)]
+
+            def _draw_ruler(event=None):
+                ruler_canvas.delete("all")
+                _tick_zones.clear()
+                _avg_zone.clear()
+                W = ruler_canvas.winfo_width()
+                if W < 4:
+                    return
+                LINE_Y = 38
+                PAD_L, PAD_R = 12, 12
+                rule_w = W - PAD_L - PAD_R
+
+                def _x(minutes):
+                    return PAD_L + rule_w * min(minutes / scale_max, 1.0)
+
+                # baseline
+                ruler_canvas.create_line(
+                    PAD_L, LINE_Y, W - PAD_R, LINE_Y,
+                    fill=BORDER, width=1,
+                )
+
+                # filled portion to today
+                today_x = _x(total_min)
+                ruler_canvas.create_line(
+                    PAD_L, LINE_Y, today_x, LINE_Y,
+                    fill=DARK, width=3,
+                )
+
+                # threshold ticks
+                for top_pct, need_min in thr_items:
+                    tx = _x(need_min)
+                    achieved = total_min >= need_min
+                    if achieved:
+                        # blend BORDER 30% toward DIM — slightly more visible than bare BORDER
+                        def _blend(c1, c2, t):
+                            r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+                            r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+                            return f"#{int(r1*(1-t)+r2*t):02x}{int(g1*(1-t)+g2*t):02x}{int(b1*(1-t)+b2*t):02x}"
+                        tick_color = _blend(BORDER, DIM, 0.3)
+                    else:
+                        tick_color = DIM
+                    ruler_canvas.create_line(
+                        tx, LINE_Y - 6, tx, LINE_Y + 6,
+                        fill=tick_color, width=1,
+                    )
+                    ruler_canvas.create_text(
+                        tx, LINE_Y + 14, text=f"{top_pct}%",
+                        fill=tick_color, font=("Helvetica", 9),
+                        anchor="center",
+                    )
+                    _tick_zones.append((tx, need_min, top_pct))
+
+                # daily avg dot (drawn first so today dot renders on top)
+                if avg_min > 0:
+                    ax = _x(avg_min)
+                    ruler_canvas.create_oval(
+                        ax - 5, LINE_Y - 5, ax + 5, LINE_Y + 5,
+                        fill=DARK, outline=PANEL, width=2,
+                    )
+                    _avg_zone.append((ax, avg_min))
+
+                # today dot (no static label)
+                ruler_canvas.create_oval(
+                    today_x - 5, LINE_Y - 5, today_x + 5, LINE_Y + 5,
+                    fill=DARK, outline=PANEL, width=2,
+                )
+
+            OVERLAP_PX = 12  # px threshold to consider dots overlapping
+
+            def _ruler_motion(e):
+                ruler_canvas.delete("ruler_tip")
+                RADIUS = 18
+                W = ruler_canvas.winfo_width()
+
+                today_x_now = None
+                avg_x_now   = _avg_zone[0][0] if _avg_zone else None
+
+                # recompute today_x from current canvas width
+                rule_w_now = W - 24
+                if scale_max > 0:
+                    today_x_now = 12 + rule_w_now * min(total_min / scale_max, 1.0)
+
+                # today dot hover
+                if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
+                    tip_x = min(max(today_x_now, 24), W - 24)
+                    ruler_canvas.create_text(
+                        tip_x, 8, text=f"{total_min / 60:.1f}h",
+                        fill=DARK, font=("Helvetica", 10),
+                        anchor="center", tags="ruler_tip",
+                    )
+                    if d.get("percentile") is not None:
+                        top_pct = max(0.01, 100 - d["percentile"])
+                        ruler_canvas.create_text(
+                            tip_x, 21, text=f"{top_pct:.2f}%",
+                            fill=DIM, font=("Helvetica", 8),
+                            anchor="center", tags="ruler_tip",
+                        )
+                    return
+
+                # avg dot hover — only if not overlapping with today
+                if avg_x_now is not None and abs(e.x - avg_x_now) <= RADIUS:
+                    overlapping = (today_x_now is not None and
+                                   abs(today_x_now - avg_x_now) < OVERLAP_PX)
+                    if not overlapping:
+                        tip = f"{avg_min / 60:.1f}h ⌀"
+                        tip_x = min(max(avg_x_now, 30), W - 30)
+                        ruler_canvas.create_text(
+                            tip_x, 6, text=tip,
+                            fill=DARK, font=("Helvetica", 10),
+                            anchor="center", tags="ruler_tip",
+                        )
+                        return
+
+                # threshold ticks
+                for tx, need_min, top_pct in _tick_zones:
+                    if abs(e.x - tx) <= RADIUS:
+                        if total_min >= need_min:
+                            tip = f"{need_min / 60:.1f}h"
+                        else:
+                            gap_h = (need_min - total_min) / 60
+                            tip = f"+{gap_h:.1f}h"
+                        tip_x = min(max(tx, 24), W - 24)
+                        ruler_canvas.create_text(
+                            tip_x, 6, text=tip,
+                            fill=DARK, font=("Helvetica", 10),
+                            anchor="center", tags="ruler_tip",
+                        )
+                        break
+
+            def _ruler_leave(_e=None):
+                ruler_canvas.delete("ruler_tip")
+
+            _ruler_pending = [None]
+            def _draw_ruler_debounced(event=None):
+                if _ruler_pending[0]:
+                    ruler_canvas.after_cancel(_ruler_pending[0])
+                _ruler_pending[0] = ruler_canvas.after(80, _draw_ruler)
+            ruler_canvas.bind("<Configure>", _draw_ruler_debounced)
+            ruler_canvas.bind("<Motion>", _ruler_motion)
+            ruler_canvas.bind("<Leave>", _ruler_leave)
+            ruler_canvas.after(80, _draw_ruler)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ def play_sound():
         pygame.mixer.music.load(ALARM_SOUND)
         pygame.mixer.music.play()
     except Exception as e:
-        print("Fehler beim Abspielen des Sounds:", e)
+        print("Sound playback error:", e)
 
 
 def play_click():
