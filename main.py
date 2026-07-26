@@ -3707,14 +3707,8 @@ class App(ctk.CTk):
         avg_card = mk_card(sc)
         avg_card.pack(fill="x", padx=16, pady=(0, 16))
 
-        avg_hdr = ctk.CTkFrame(avg_card, fg_color="transparent")
-        avg_hdr.pack(fill="x", padx=16, pady=(14, 6))
-        mk_label(avg_hdr, "DAILY AVERAGE", size=10, color=MUTED).pack(side="left")
-        avg_hover_lbl = mk_label(avg_hdr, "", size=10, color=DIM)
-        avg_hover_lbl.pack(side="right")
-
         body = ctk.CTkFrame(avg_card, fg_color="transparent")
-        body.pack(fill="x", padx=18, pady=(0, 16))
+        body.pack(fill="x", padx=18, pady=(20, 0))
 
         thresholds = d.get("thresholds", {})
         avg_min = d["avg_min"]
@@ -3802,7 +3796,6 @@ class App(ctk.CTk):
 
             def _ruler_motion(e):
                 ruler_canvas.delete("ruler_tip")
-                avg_hover_lbl.configure(text="")
                 RADIUS = 18
                 W = ruler_canvas.winfo_width()
 
@@ -3816,11 +3809,19 @@ class App(ctk.CTk):
 
                 # today dot hover
                 if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
-                    tip = f"{total_min / 60:.1f}h"
+                    tip_x = min(max(today_x_now, 24), W - 24)
+                    ruler_canvas.create_text(
+                        tip_x, 8, text=f"{total_min / 60:.1f}h",
+                        fill=DARK, font=("Helvetica", 10),
+                        anchor="center", tags="ruler_tip",
+                    )
                     if d.get("percentile") is not None:
                         top_pct = max(0.01, 100 - d["percentile"])
-                        tip += f"  ·  {top_pct:.2f}%"
-                    avg_hover_lbl.configure(text=tip)
+                        ruler_canvas.create_text(
+                            tip_x, 20, text=f"{top_pct:.2f}%",
+                            fill=DIM, font=("Helvetica", 8),
+                            anchor="center", tags="ruler_tip",
+                        )
                     return
 
                 # avg dot hover — only if not overlapping with today
@@ -3855,7 +3856,6 @@ class App(ctk.CTk):
 
             def _ruler_leave(_e=None):
                 ruler_canvas.delete("ruler_tip")
-                avg_hover_lbl.configure(text="")
 
             _ruler_pending = [None]
             def _draw_ruler_debounced(event=None):
@@ -3866,6 +3866,10 @@ class App(ctk.CTk):
             ruler_canvas.bind("<Motion>", _ruler_motion)
             ruler_canvas.bind("<Leave>", _ruler_leave)
             ruler_canvas.after(80, _draw_ruler)
+
+        avg_hdr = ctk.CTkFrame(avg_card, fg_color="transparent")
+        avg_hdr.pack(fill="x", padx=16, pady=(4, 12))
+        mk_label(avg_hdr, "DAILY AVERAGE", size=10, color=MUTED).pack(side="left")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
