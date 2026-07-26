@@ -1982,8 +1982,6 @@ class App(ctk.CTk):
 
         ctk.CTkFrame(self._sk_scroll, height=1, fg_color=BORDER).pack(
             fill="x", padx=6, pady=14)
-        mk_label(self._sk_scroll, f"Gesamt: {total_all:.1f} Stunden",
-                 color=MUTED, size=13).pack(pady=2)
 
         # ── Level colour legend ───────────────────────────────────────────────
         SQ, GAP = 16, 3
