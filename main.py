@@ -3707,7 +3707,7 @@ class App(ctk.CTk):
         mk_label(avg_hdr, "DAILY AVERAGE", size=10, color=MUTED).pack(side="left")
 
         body = ctk.CTkFrame(avg_card, fg_color="transparent")
-        body.pack(fill="x", padx=18, pady=(0, 16))
+        body.pack(fill="x", padx=18, pady=(0, 8))
 
         thresholds = d.get("thresholds", {})
         avg_min = d["avg_min"]
@@ -3716,7 +3716,7 @@ class App(ctk.CTk):
             total_min = d["total_min"]
             scale_max = max(thr_items[-1][1], total_min, avg_min) * 1.08
 
-            RULER_H = 52
+            RULER_H = 62
             ruler_canvas = tk.Canvas(
                 body, height=RULER_H, bg=PANEL, highlightthickness=0
             )
@@ -3732,7 +3732,7 @@ class App(ctk.CTk):
                 W = ruler_canvas.winfo_width()
                 if W < 4:
                     return
-                LINE_Y = 28
+                LINE_Y = 38
                 PAD_L, PAD_R = 12, 12
                 rule_w = W - PAD_L - PAD_R
 
@@ -3810,14 +3810,14 @@ class App(ctk.CTk):
                 if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
                     tip_x = min(max(today_x_now, 24), W - 24)
                     ruler_canvas.create_text(
-                        tip_x, 2, text=f"{total_min / 60:.1f}h",
+                        tip_x, 8, text=f"{total_min / 60:.1f}h",
                         fill=DARK, font=("Helvetica", 10),
                         anchor="center", tags="ruler_tip",
                     )
                     if d.get("percentile") is not None:
                         top_pct = max(0.01, 100 - d["percentile"])
                         ruler_canvas.create_text(
-                            tip_x, 13, text=f"{top_pct:.2f}%",
+                            tip_x, 21, text=f"{top_pct:.2f}%",
                             fill=DIM, font=("Helvetica", 8),
                             anchor="center", tags="ruler_tip",
                         )
