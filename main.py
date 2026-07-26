@@ -649,6 +649,11 @@ class App(ctk.CTk):
             if deselect_custom:
                 custom_entry.configure(border_color=BORDER)
             _flash()
+            if not self.running:
+                self._pomo_mins = min(self._pomo_mins, self._pomo_max_mins)
+                total_s = int(self._pomo_mins * 60)
+                m, s = divmod(total_s, 60)
+                self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
 
         current = int(self._pomo_max_mins)
         for i, p in enumerate(presets):
