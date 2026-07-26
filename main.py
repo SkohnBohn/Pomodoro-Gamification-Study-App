@@ -3599,7 +3599,7 @@ class App(ctk.CTk):
         TL_WIDTH = TL_END - TL_START
 
         tl_canvas = tk.Canvas(tl_card, height=80, bg=PANEL, highlightthickness=0)
-        tl_canvas.pack(fill="x", padx=16, pady=(0, 6))
+        tl_canvas.pack(fill="x", padx=16, pady=(0, 12))
 
         snapshot = d["timeline"]
         blocks: list = []
