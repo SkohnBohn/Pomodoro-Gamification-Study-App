@@ -3808,13 +3808,19 @@ class App(ctk.CTk):
 
                 # today dot hover
                 if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
-                    tip = f"{total_min / 60:.1f}h"
                     tip_x = min(max(today_x_now, 24), W - 24)
                     ruler_canvas.create_text(
-                        tip_x, 6, text=tip,
+                        tip_x, 4, text=f"{total_min / 60:.1f}h",
                         fill=DARK, font=("Helvetica", 10),
                         anchor="center", tags="ruler_tip",
                     )
+                    if d.get("percentile") is not None:
+                        top_pct = max(0.01, 100 - d["percentile"])
+                        ruler_canvas.create_text(
+                            tip_x, 16, text=f"top {top_pct:.2f}%",
+                            fill=DIM, font=("Helvetica", 8),
+                            anchor="center", tags="ruler_tip",
+                        )
                     return
 
                 # avg dot hover — only if not overlapping with today
