@@ -2000,22 +2000,8 @@ class App(ctk.CTk):
                                    fill=MUTED, font=("Helvetica", 8))
         if last:
             dur_min, sk = last
-            emoji = active.get(sk, "")
-            sk_col = _skill_color(sk)
-            # blend skill color toward BG at ~85% to get a low-opacity pill bg
-            pill_bg = _grad(BG, sk_col, 0.18)
-            pill = ctk.CTkFrame(
-                self._sk_scroll, fg_color=pill_bg, corner_radius=20,
-                height=30,
-            )
-            pill.pack(anchor="w", padx=6, pady=(0, 8))
-            pill.pack_propagate(False)
-            lbl_text = f"{emoji}  {sk}  +{dur_min:.0f}m" if emoji else f"{sk}  +{dur_min:.0f}m"
-            ctk.CTkLabel(
-                pill, text=lbl_text, text_color=sk_col,
-                font=ctk.CTkFont(size=12, weight="bold"),
-                fg_color="transparent",
-            ).pack(side="left", padx=12, pady=0)
+            mk_label(self._sk_scroll, f"{sk}  ·  +{dur_min:.0f}m",
+                     color=DIM, size=11).pack(pady=(0, 6))
 
     # ── Stats View (was Achievements) ─────────────────────────────────────────
     def _build_achievements_view(self) -> ctk.CTkFrame:
