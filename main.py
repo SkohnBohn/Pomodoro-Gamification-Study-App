@@ -1882,7 +1882,7 @@ class App(ctk.CTk):
             return len(SKILL_THRESHOLDS), 1.0, SKILL_THRESHOLDS[-1]
 
         for skill, hours in sorted(skill_hours.items(),
-                                    key=lambda x: x[1], reverse=True):
+                                    key=lambda x: lvl_prog(x[1])[:2], reverse=True):
             lvl, frac, next_t = lvl_prog(hours)
             emoji    = active.get(skill, "")
             at_cap   = lvl >= len(SKILL_THRESHOLDS)
@@ -2081,7 +2081,7 @@ class App(ctk.CTk):
             ("Sessions > 30 min", "over30",   over30,    STAT_THRESHOLDS["over30"],   ""),
             ("Sessions > 60 min", "over60",   over60,    STAT_THRESHOLDS["over60"],   ""),
         ]
-        stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[0], reverse=True)
+        stats.sort(key=lambda s: _lvl_prog_stat(s[2], s[3])[:2], reverse=True)
 
         current_positions = {s[1]: i for i, s in enumerate(stats)}
 
