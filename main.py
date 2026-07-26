@@ -60,6 +60,30 @@ _PALETTES = {
 }
 _active_palette = "yellow"
 
+def _grad(c1, c2, t):
+    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
+
+_STAT_CARD_PALETTE: list = []
+
+def _build_stat_palette():
+    global _STAT_CARD_PALETTE
+    if _active_palette == "dark":
+        _STAT_CARD_PALETTE = [
+            (_grad("#1e2e1e", "#2a1e38", i / 15),
+             _grad("#2e422e", "#3a2a50", i / 15),
+             "#c8e8c8" if i < 9 else "#e8d8ff")
+            for i in range(16)
+        ]
+    else:
+        _STAT_CARD_PALETTE = [
+            (_grad("#e8f4e8", "#9b7eb8", i / 15),
+             _grad("#c0d4c0", "#7a5e98", i / 15),
+             DARK if i < 9 else "#f0e8ff")
+            for i in range(16)
+        ]
+
 def _apply_palette(name: str):
     global BG, PANEL, CARD, BORDER, DARK, DARK2, MUTED, DIM, TEXT, SUCCESS, DANGER, _active_palette
     global _ARROW_FG, _ARROW_FG_HOVER
@@ -158,31 +182,6 @@ def _skill_card_color(lvl: int):
     return palette[idx]
 
 
-def _grad(c1, c2, t):
-    r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
-    r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
-    return f"#{round(r1+(r2-r1)*t):02x}{round(g1+(g2-g1)*t):02x}{round(b1+(b2-b1)*t):02x}"
-
-_STAT_CARD_PALETTE: list = []
-
-def _build_stat_palette():
-    global _STAT_CARD_PALETTE
-    if _active_palette == "dark":
-        _STAT_CARD_PALETTE = [
-            (_grad("#1e2e1e", "#2a1e38", i / 15),
-             _grad("#2e422e", "#3a2a50", i / 15),
-             "#c8e8c8" if i < 9 else "#e8d8ff")
-            for i in range(16)
-        ]
-    else:
-        _STAT_CARD_PALETTE = [
-            (_grad("#e8f4e8", "#9b7eb8", i / 15),
-             _grad("#c0d4c0", "#7a5e98", i / 15),
-             DARK if i < 9 else "#f0e8ff")
-            for i in range(16)
-        ]
-
-_build_stat_palette()
 
 
 def _stat_card_color(lvl: int):
