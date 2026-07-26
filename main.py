@@ -2000,7 +2000,7 @@ class App(ctk.CTk):
                                    fill=MUTED, font=("Helvetica", 8))
         if last:
             dur_min, sk = last
-            mk_label(self._sk_scroll, f"{sk}  ·  +{dur_min:.0f}m",
+            mk_label(self._sk_scroll, f"most recent  ·  {sk}  ·  +{dur_min:.0f}m",
                      color=DIM, size=11).pack(pady=(0, 6))
 
     # ── Stats View (was Achievements) ─────────────────────────────────────────
