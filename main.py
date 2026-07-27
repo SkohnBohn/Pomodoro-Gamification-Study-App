@@ -3633,6 +3633,7 @@ class App(ctk.CTk):
 
             skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
             hover_lbl = mk_label(left, "", size=10, color=DIM)
+            hover_lbl.pack(anchor="w", pady=(0, 2))
 
             def _cap(cv, cx, yc, r, fill):
                 cv.create_oval(cx - r, yc - r, cx + r, yc + r, fill=fill, outline="")
