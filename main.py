@@ -3675,12 +3675,22 @@ class App(ctk.CTk):
                 if segments:
                     _cap(cv, 0, yc, cr, _skill_color(segments[0][0]))
 
-                # dot caps the right end
+                # fill dot
                 if filled_w > 0:
                     dx = max(dr, min(filled_w, W - dr))
                     _cap(cv, dx, yc, dr, DARK)
 
-                def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl):
+                # record dot at right end of track
+                _cap(cv, W - dr, yc, dr, MUTED)
+
+                _rec_txt = f"record {best_min/60:.1f}h  ({total_today/best_min*100:.2f}%)"
+
+                def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl,
+                             rec=_rec_txt, wr=W, ddr=dr):
+                    # near right record dot?
+                    if abs(e.x - (wr - ddr)) <= ddr + 4:
+                        hl.configure(text=rec)
+                        return
                     hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
                     if hit:
                         pct  = hit[1] / ftot * 100
@@ -3700,12 +3710,8 @@ class App(ctk.CTk):
             bar_cv.bind("<Configure>", _hero_bar_debounced)
             bar_cv.after(60, _draw_hero_bar)
 
-            pct_of_rec = total_today / best_min * 100
             bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
             bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
-            mk_label(bottom_row,
-                     f"record {best_min/60:.1f}h  ({pct_of_rec:.2f}%)",
-                     size=10, color=DIM).pack(side="left")
             rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
             rank_detail.pack(side="right")
 
