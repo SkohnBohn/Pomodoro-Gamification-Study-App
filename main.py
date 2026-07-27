@@ -3617,14 +3617,15 @@ class App(ctk.CTk):
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
         rank_detail = None
         if d["best_day_min"] > 0:
-            BAR_H   = 8
+            BAR_H   = 4
             DOT_R   = 5
             breakdown = d.get("skill_breakdown") or {}
             total_today = d["total_min"]
             best_min    = d["best_day_min"]
             fill_ratio  = min(total_today / best_min, 1.0)
+            CR = BAR_H // 2  # cap radius = half bar height
 
-            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=BAR_H + DOT_R * 2 + 4)
+            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=DOT_R * 2 + 4)
             bar_host.pack(fill="x", pady=(8, 4))
             bar_host.pack_propagate(False)
             bar_cv = tk.Canvas(bar_host, bg=PANEL, highlightthickness=0, bd=0)
@@ -3633,49 +3634,56 @@ class App(ctk.CTk):
             skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
             hover_lbl = mk_label(left, "", size=10, color=DIM)
 
+            def _cap(cv, cx, yc, r, fill):
+                cv.create_oval(cx - r, yc - r, cx + r, yc + r, fill=fill, outline="")
+
             def _draw_hero_bar(event=None, cv=bar_cv, sr=skills_sorted,
-                               tot=total_today, fr=fill_ratio, h=BAR_H, dr=DOT_R):
+                               tot=total_today, fr=fill_ratio, h=BAR_H, dr=DOT_R, cr=CR):
                 cv.delete("all")
                 W = cv.winfo_width()
                 H = cv.winfo_height()
                 if W < 2:
                     return
-                yc      = H // 2
-                y0, y1  = yc - h // 2, yc + h // 2
+                yc       = H // 2
+                y0, y1   = yc - h // 2, yc + h // 2
                 filled_w = int(W * fr)
 
-                # track (unfilled)
-                cv.create_rectangle(0, y0, W, y1, fill=CARD, outline="")
+                # rounded track
+                cv.create_rectangle(cr, y0, W - cr, y1, fill=CARD, outline="")
+                _cap(cv, cr,     yc, cr, CARD)
+                _cap(cv, W - cr, yc, cr, CARD)
 
-                # skill color segments within filled region
+                # skill segments (rectangular — caps added separately)
                 segments = []
                 x = 0
                 for sk, mins in sr:
                     if mins <= 0 or tot <= 0:
                         continue
-                    seg_w = max(1, int(filled_w * mins / tot))
+                    seg_w  = max(1, int(filled_w * mins / tot))
                     x1_seg = min(x + seg_w, filled_w)
-                    col = _skill_color(sk)
+                    col    = _skill_color(sk)
                     cv.create_rectangle(x, y0, x1_seg, y1, fill=col, outline="")
                     segments.append((sk, mins, x, x1_seg))
                     x = x1_seg
                     if x >= filled_w:
                         break
-                # fill any rounding gap at filled edge
                 if segments and x < filled_w:
                     cv.create_rectangle(x, y0, filled_w, y1,
                                         fill=_skill_color(segments[-1][0]), outline="")
 
-                # dot at end of filled region
+                # left rounded cap on fill
+                if segments:
+                    _cap(cv, 0, yc, cr, _skill_color(segments[0][0]))
+
+                # dot caps the right end
                 if filled_w > 0:
-                    dx = min(filled_w, W - dr)
-                    cv.create_oval(dx - dr, yc - dr, dx + dr, yc + dr,
-                                   fill=DARK, outline="")
+                    dx = max(dr, min(filled_w, W - dr))
+                    _cap(cv, dx, yc, dr, DARK)
 
                 def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl):
                     hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
                     if hit:
-                        pct = hit[1] / ftot * 100
+                        pct  = hit[1] / ftot * 100
                         hval = hit[1] / 60
                         hl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
                     else:
