@@ -3683,25 +3683,21 @@ class App(ctk.CTk):
                 _cap(cv, W - dr, yc, dr, MUTED)
 
                 _rec_txt = f"record {best_min/60:.1f}h  ({total_today/best_min*100:.2f}%)"
-                _dim     = DIM
 
-                def _on_move(e, segs=segments, ftot=tot,
-                             rec=_rec_txt, wr=W, ddr=dr, dim=_dim):
-                    cv.delete("hover_tip")
+                def _on_move(e, segs=segments, ftot=tot, rec=_rec_txt, wr=W, ddr=dr):
                     if abs(e.x - (wr - ddr)) <= ddr + 4:
-                        cv.create_text(4, 1, text=rec, fill=dim,
-                                       font=("Helvetica", 9), anchor="nw", tags="hover_tip")
+                        skill_lbl.configure(text=rec)
                         return
                     hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
                     if hit:
                         pct  = hit[1] / ftot * 100
                         hval = hit[1] / 60
-                        cv.create_text(4, 1, text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h",
-                                       fill=dim, font=("Helvetica", 9),
-                                       anchor="nw", tags="hover_tip")
+                        skill_lbl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
+                    else:
+                        skill_lbl.configure(text="")
 
                 cv.bind("<Motion>", _on_move)
-                cv.bind("<Leave>", lambda e: cv.delete("hover_tip"))
+                cv.bind("<Leave>", lambda e: skill_lbl.configure(text=""))
 
             _hero_bar_pending = [None]
             def _hero_bar_debounced(event=None, cv=bar_cv, _pend=_hero_bar_pending):
@@ -3713,6 +3709,8 @@ class App(ctk.CTk):
 
             bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
             bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
+            skill_lbl = mk_label(bottom_row, "", size=10, color=DIM)
+            skill_lbl.pack(side="left")
             rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
             rank_detail.pack(side="right")
 
