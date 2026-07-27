@@ -3633,7 +3633,7 @@ class App(ctk.CTk):
 
             skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
             hover_lbl = mk_label(left, "", size=10, color=DIM)
-            _hl_shown = [False]
+            hover_lbl.pack(anchor="w", pady=(0, 2))
 
             def _cap(cv, cx, yc, r, fill):
                 cv.create_oval(cx - r, yc - r, cx + r, yc + r, fill=fill, outline="")
@@ -3686,35 +3686,21 @@ class App(ctk.CTk):
 
                 _rec_txt = f"record {best_min/60:.1f}h  ({total_today/best_min*100:.2f}%)"
 
-                def _set_hl(hl, text, shown):
-                    if text:
-                        hl.configure(text=text)
-                        if not shown[0]:
-                            hl.pack(anchor="w", pady=(0, 2))
-                            shown[0] = True
-                    else:
-                        if shown[0]:
-                            hl.pack_forget()
-                            shown[0] = False
-
                 def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl,
-                             rec=_rec_txt, wr=W, ddr=dr, shown=_hl_shown):
+                             rec=_rec_txt, wr=W, ddr=dr):
                     if abs(e.x - (wr - ddr)) <= ddr + 4:
-                        _set_hl(hl, rec, shown)
+                        hl.configure(text=rec)
                         return
                     hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
                     if hit:
                         pct  = hit[1] / ftot * 100
                         hval = hit[1] / 60
-                        _set_hl(hl, f"{hit[0]}  {pct:.0f}%  {hval:.1f}h", shown)
+                        hl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
                     else:
-                        _set_hl(hl, "", shown)
-
-                def _on_leave(e, hl=hover_lbl, shown=_hl_shown):
-                    _set_hl(hl, "", shown)
+                        hl.configure(text="")
 
                 cv.bind("<Motion>", _on_move)
-                cv.bind("<Leave>", _on_leave)
+                cv.bind("<Leave>", lambda e, hl=hover_lbl: hl.configure(text=""))
 
             _hero_bar_pending = [None]
             def _hero_bar_debounced(event=None, cv=bar_cv, _pend=_hero_bar_pending):
