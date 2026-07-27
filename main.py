@@ -3446,9 +3446,13 @@ class App(ctk.CTk):
         period = self._lb_period.get() if hasattr(self, "_lb_period") else "All Time"
         now = datetime.now()
         _sd = study_date()
+        _end_h = load_settings().get("day_end_hour", 3)
+        _end_time_str = f"{_end_h:02d}:00:00" if _end_h else None
 
+        # For Today: fetch today + next calendar day (catches sessions saved with wall-clock date)
         if period == "Today":
-            date_filter = f"WHERE date = '{_sd.isoformat()}'"
+            _next = (_sd + timedelta(days=1)).isoformat()
+            date_filter = f"WHERE date = '{_sd.isoformat()}' OR date = '{_next}'"
         elif period == "This Month":
             date_filter = f"WHERE date LIKE '{_sd.strftime('%Y-%m')}%'"
         elif period == "This Year":
@@ -3474,7 +3478,16 @@ class App(ctk.CTk):
                 dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
             except Exception:
                 continue
-            if period == "This Week":
+            if period == "Today":
+                # Accept: date == _sd (new-code session), or date == _sd+1 AND time < end_hour (old-code)
+                stored_date = dt.date()
+                if stored_date == _sd:
+                    pass  # new-code session correctly on study day
+                elif stored_date == _sd + timedelta(days=1) and _end_time_str and time_s < _end_time_str:
+                    pass  # old-code session on wall-clock next day but within study window
+                else:
+                    continue
+            elif period == "This Week":
                 iso = dt.isocalendar()
                 _sd_iso = _sd.isocalendar()
                 if not (iso[1] == _sd_iso[1] and iso[0] == _sd_iso[0]):

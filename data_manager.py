@@ -341,26 +341,61 @@ def confirm_stat_level(stat: str, level: int):
 # ── Chart data ─────────────────────────────────────────────────────────────────
 
 def get_chart_data(skill: str = None) -> dict:
-    """Return {date_str: hours} for bar chart, optionally filtered by skill."""
+    """Return {date_str: hours} keyed by study date, optionally filtered by skill."""
+    from datetime import date as _date, timedelta as _td
+    end_h = load_settings().get("day_end_hour", 3)
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     if skill and skill != "Alle":
         c.execute(
-            "SELECT date, SUM(duration)/60.0 FROM pomodoro_session "
-            "WHERE skill=? GROUP BY date ORDER BY date",
+            "SELECT date, time, duration FROM pomodoro_session "
+            "WHERE skill=? AND date IS NOT NULL ORDER BY date",
             (skill,),
         )
     else:
         c.execute(
-            "SELECT date, SUM(duration)/60.0 FROM pomodoro_session "
-            "GROUP BY date ORDER BY date"
+            "SELECT date, time, duration FROM pomodoro_session "
+            "WHERE date IS NOT NULL ORDER BY date"
         )
     rows = c.fetchall()
     conn.close()
-    return {d: h for d, h in rows if d}
+    result: dict = {}
+    for ds, ts, dur in rows:
+        if not ds or dur is None:
+            continue
+        try:
+            d = _date.fromisoformat(ds)
+            if end_h and ts and ts < f"{end_h:02d}:00:00":
+                d -= _td(days=1)
+            key = d.isoformat()
+        except (ValueError, TypeError):
+            key = ds
+        result[key] = result.get(key, 0.0) + dur / 60.0
+    return result
 
 
 # ── First session date ─────────────────────────────────────────────────────────
+
+def _study_day_where(target_date, end_h):
+    """
+    Returns (clause, params) that captures sessions belonging to a study day,
+    handling both old (wall-clock date) and new (study_date) saved sessions.
+    Old: session at 0:15 AM Tuesday saved as date='Tuesday', time='00:15:xx'
+    New: session at 0:15 AM Tuesday saved as date='Monday',  time='00:15:xx'
+    Both belong to Monday when day_end_hour=3.
+    """
+    from datetime import timedelta as _td
+    day_str      = target_date.isoformat()
+    next_day_str = (target_date + _td(days=1)).isoformat()
+    if end_h:
+        end_time = f"{end_h:02d}:00:00"
+        clause = "(date=? OR (date=? AND time < ?))"
+        params = (day_str, next_day_str, end_time)
+    else:
+        clause = "date=?"
+        params = (day_str,)
+    return clause, params
+
 
 def get_today_stats(target_date=None) -> dict:
     """All data needed for the Today tab in one DB connection."""
@@ -369,14 +404,17 @@ def get_today_stats(target_date=None) -> dict:
         target_date = study_date()
     day_str = target_date.isoformat()
 
+    end_h = load_settings().get("day_end_hour", 3)
+    day_clause, day_params = _study_day_where(target_date, end_h)
+
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
 
     # Target day's total and session list
     c.execute(
-        "SELECT time, duration, skill FROM pomodoro_session"
-        " WHERE date=? ORDER BY time",
-        (day_str,),
+        f"SELECT time, duration, skill FROM pomodoro_session"
+        f" WHERE {day_clause} ORDER BY time",
+        day_params,
     )
     today_rows = c.fetchall()
     total_min = sum(r[1] for r in today_rows if r[1])
@@ -437,20 +475,26 @@ def get_today_stats(target_date=None) -> dict:
             else:
                 break
 
-    # Streak: reuse the open connection instead of a second sqlite3.connect()
+    # Streak: normalize stored dates to study dates before counting
     from datetime import timedelta as _td
     c.execute(
-        "SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC"
+        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC, time DESC"
     )
-    _date_rows = [r[0] for r in c.fetchall()]
+    _study_dates_seen: set = set()
+    for _ds, _ts in c.fetchall():
+        try:
+            _d = _date.fromisoformat(_ds)
+            if end_h and _ts and _ts < f"{end_h:02d}:00:00":
+                _d -= _td(days=1)
+            _study_dates_seen.add(_d)
+        except (ValueError, TypeError):
+            continue
+    _sd_rows = sorted(_study_dates_seen, reverse=True)
+
     streak = 0
-    if _date_rows:
+    if _sd_rows:
         _anchor = None
-        for ds in _date_rows:
-            try:
-                _d = _date.fromisoformat(ds)
-            except ValueError:
-                continue
+        for _d in _sd_rows:
             if _d <= target_date:
                 _anchor = _d
                 break
@@ -459,11 +503,7 @@ def get_today_stats(target_date=None) -> dict:
                   else (_anchor == target_date)
             if _ok:
                 _expected = _anchor
-                for ds in _date_rows:
-                    try:
-                        _d = _date.fromisoformat(ds)
-                    except ValueError:
-                        continue
+                for _d in _sd_rows:
                     if _d > target_date:
                         continue
                     if _d == _expected:
@@ -522,13 +562,27 @@ def get_first_session_date() -> str | None:
 # ── Heatmap data ───────────────────────────────────────────────────────────────
 
 def get_heatmap_data() -> dict:
-    """Return {date_str: total_minutes} for all dates with sessions."""
+    """Return {date_str: total_minutes} keyed by study date (not wall-clock date)."""
+    from datetime import date as _date, timedelta as _td
+    end_h = load_settings().get("day_end_hour", 3)
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT date, SUM(duration) FROM pomodoro_session GROUP BY date")
+    c.execute("SELECT date, time, duration FROM pomodoro_session WHERE date IS NOT NULL")
     rows = c.fetchall()
     conn.close()
-    return {d: m for d, m in rows if d}
+    result: dict = {}
+    for ds, ts, dur in rows:
+        if not ds or not dur:
+            continue
+        try:
+            d = _date.fromisoformat(ds)
+            if end_h and ts and ts < f"{end_h:02d}:00:00":
+                d -= _td(days=1)
+            key = d.isoformat()
+        except (ValueError, TypeError):
+            key = ds
+        result[key] = result.get(key, 0.0) + dur
+    return result
 
 
 def get_streak(target_date=None) -> int:
@@ -536,20 +590,27 @@ def get_streak(target_date=None) -> int:
     from datetime import date, timedelta
     if target_date is None:
         target_date = study_date()
+    end_h = load_settings().get("day_end_hour", 3)
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC")
-    rows = [r[0] for r in c.fetchall()]
-    conn.close()
-    if not rows:
-        return 0
-    # Find the most recent session date that is <= target_date
-    anchor = None
-    for ds in rows:
+    c.execute("SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC, time DESC")
+    # Normalize stored dates to study dates
+    study_dates_seen: set = set()
+    for ds, ts in c.fetchall():
         try:
             d = date.fromisoformat(ds)
-        except ValueError:
+            if end_h and ts and ts < f"{end_h:02d}:00:00":
+                d -= timedelta(days=1)
+            study_dates_seen.add(d)
+        except (ValueError, TypeError):
             continue
+    conn.close()
+    rows = sorted(study_dates_seen, reverse=True)
+    if not rows:
+        return 0
+    # Find the most recent study date <= target_date
+    anchor = None
+    for d in rows:
         if d <= target_date:
             anchor = d
             break
@@ -565,11 +626,7 @@ def get_streak(target_date=None) -> int:
             return 0
     streak = 0
     expected = anchor
-    for ds in rows:
-        try:
-            d = date.fromisoformat(ds)
-        except ValueError:
-            continue
+    for d in rows:
         if d > target_date:
             continue
         if d == expected:
