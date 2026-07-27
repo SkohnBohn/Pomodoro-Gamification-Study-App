@@ -14,6 +14,7 @@ _SETTINGS_DEFAULTS = {
     "sound_click":    True,
     "sound_levelup":  True,
     "sound_finish":   True,
+    "day_end_hour":   3,
 }
 
 def load_settings() -> dict:
@@ -27,6 +28,17 @@ def load_settings() -> dict:
         import sys
         print(f"[settings] load failed: {e}", file=sys.stderr, flush=True)
         return dict(_SETTINGS_DEFAULTS)
+
+def study_date(dt=None):
+    """Return the 'study day' date for a datetime, shifted back if before day_end_hour."""
+    from datetime import datetime as _dt, timedelta, date as _date
+    if dt is None:
+        dt = _dt.now()
+    end_h = load_settings().get("day_end_hour", 3)
+    if end_h and dt.hour < end_h:
+        return (dt - timedelta(days=1)).date()
+    return dt.date()
+
 
 def save_settings(key: str, value) -> None:
     settings = load_settings()
@@ -146,7 +158,7 @@ def save_session(duration, intention, result, skill="POMO"):
         INSERT INTO pomodoro_session
             (sessions, date, time, skill, duration, total_time, intention, result)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (last_id + 1, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
+    ''', (last_id + 1, study_date(now).isoformat(), now.strftime("%H:%M:%S"),
           skill, round(duration, 2), round(total_time, 2), intention, result))
     conn.commit()
     conn.close()
@@ -354,7 +366,7 @@ def get_today_stats(target_date=None) -> dict:
     """All data needed for the Today tab in one DB connection."""
     from datetime import date as _date
     if target_date is None:
-        target_date = _date.today()
+        target_date = study_date()
     day_str = target_date.isoformat()
 
     conn = sqlite3.connect(config.DB_FILE)
@@ -443,7 +455,7 @@ def get_today_stats(target_date=None) -> dict:
                 _anchor = _d
                 break
         if _anchor is not None:
-            _ok = (_anchor >= target_date - _td(days=1)) if target_date == _date.today() \
+            _ok = (_anchor >= target_date - _td(days=1)) if target_date == study_date() \
                   else (_anchor == target_date)
             if _ok:
                 _expected = _anchor
@@ -523,7 +535,7 @@ def get_streak(target_date=None) -> int:
     """Return consecutive-day streak ending on or before target_date (default: today)."""
     from datetime import date, timedelta
     if target_date is None:
-        target_date = date.today()
+        target_date = study_date()
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC")
@@ -545,7 +557,7 @@ def get_streak(target_date=None) -> int:
         return 0
     # For today-view: allow streak if last session was today or yesterday
     # For past days: require the anchor to be exactly the target date
-    if target_date == date.today():
+    if target_date == study_date():
         if anchor < target_date - timedelta(days=1):
             return 0
     else:

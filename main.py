@@ -32,7 +32,7 @@ from data_manager import (
     get_best_periods, get_all_streaks, get_best_days_for_skill,
     get_last_session_duration,
     get_today_stats,
-    load_settings, save_settings,
+    load_settings, save_settings, study_date,
 )
 from utils import calculate_level, format_hours
 from audio_manager import play_sound, play_main_levelup, play_skill_levelup, play_stat_levelup, play_click
@@ -228,7 +228,7 @@ def _save_rank_history(path: str, today_str: str, positions: dict):
 def _get_rank_changes(path: str, current: dict) -> dict:
     """Returns {key: (arrow, date_str)} for positions that changed in last 3 days."""
     h = _load_rank_history(path)
-    today = date.today()
+    today = study_date()
     changes = {}
     for days_ago in range(1, 4):
         day_str = (today - timedelta(days=days_ago)).isoformat()
@@ -615,7 +615,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("280x670")
+        dlg.geometry("280x740")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -850,6 +850,46 @@ class App(ctk.CTk):
 
             sq.bind("<Button-1>", _toggle)
             lbl.bind("<Button-1>", _toggle)
+
+        # ── Day ends at ───────────────────────────────────────────────────────
+        mk_label(dlg, "Day ends at", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+
+        _end_hours = [22, 23, 0, 1, 2, 3, 4, 5]
+        _eh_pill_w = 36
+        end_pill = ctk.CTkFrame(
+            dlg, fg_color=CARD, corner_radius=14,
+            height=32, width=len(_end_hours) * _eh_pill_w + 4,
+        )
+        end_pill.pack(pady=(6, 0))
+        end_pill.pack_propagate(False)
+
+        _cur_end_h = load_settings().get("day_end_hour", 3)
+        _eh_btns: dict = {}
+
+        def _set_end_hour(h):
+            save_settings("day_end_hour", h)
+            for hh, bb in _eh_btns.items():
+                bb.configure(
+                    fg_color=DARK if hh == h else "transparent",
+                    text_color=BG if hh == h else MUTED,
+                )
+            end_pill.configure(fg_color=BORDER)
+            dlg.after(180, lambda: end_pill.configure(fg_color=CARD))
+
+        for i, h in enumerate(_end_hours):
+            px = (2, 0) if i == 0 else (0, 2) if i == len(_end_hours) - 1 else (0, 0)
+            b = ctk.CTkButton(
+                end_pill, text=str(h), width=_eh_pill_w, height=32,
+                corner_radius=12,
+                fg_color=DARK if h == _cur_end_h else "transparent",
+                hover_color=DARK2,
+                text_color=BG if h == _cur_end_h else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                border_width=0,
+                command=lambda hh=h: _set_end_hour(hh),
+            )
+            b.pack(side="left", padx=px, pady=2)
+            _eh_btns[h] = b
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))
@@ -1905,7 +1945,7 @@ class App(ctk.CTk):
                             key=lambda x: lvl_prog(x[1])[:2], reverse=True)
         _sk_positions = {sk: i for i, (sk, _) in enumerate(_sk_sorted)}
         _sk_changes = _get_rank_changes(_SKILL_RANK_HISTORY_FILE, _sk_positions)
-        _save_rank_history(_SKILL_RANK_HISTORY_FILE, date.today().isoformat(), _sk_positions)
+        _save_rank_history(_SKILL_RANK_HISTORY_FILE, study_date().isoformat(), _sk_positions)
 
         for skill, hours in _sk_sorted:
             lvl, frac, next_t = lvl_prog(hours)
@@ -2125,7 +2165,7 @@ class App(ctk.CTk):
         current_positions = {s[1]: i for i, s in enumerate(stats)}
 
         rank_changes = _get_rank_changes(_STAT_RANK_HISTORY_FILE, current_positions)
-        _save_rank_history(_STAT_RANK_HISTORY_FILE, date.today().isoformat(), current_positions)
+        _save_rank_history(_STAT_RANK_HISTORY_FILE, study_date().isoformat(), current_positions)
 
         for name, key, val, thresholds, unit in stats:
             lvl_s, frac, next_t = _lvl_prog_stat(val, thresholds)
@@ -2225,7 +2265,7 @@ class App(ctk.CTk):
         STEP = CELL + GAP
         LM, TM = 26, 18
 
-        today_d = date.today()
+        today_d = study_date()
         past_d  = today_d - timedelta(days=364)
         past_d -= timedelta(days=past_d.weekday())  # snap to Monday
 
@@ -2392,7 +2432,7 @@ class App(ctk.CTk):
 
         data = get_chart_data(skill if skill != "All" else None)
 
-        today_d = date.today()
+        today_d = study_date()
         if period == "30d":
             n_days = 30
         elif period == "90d":
@@ -2563,7 +2603,7 @@ class App(ctk.CTk):
         data = get_chart_data(skill if skill != "All" else None)
 
         start_d = datetime.strptime(first, "%Y-%m-%d").date()
-        today_d = date.today()
+        today_d = study_date()
         num_days = (today_d - start_d).days + 1
         if num_days < 1:
             num_days = 1
@@ -3405,13 +3445,14 @@ class App(ctk.CTk):
 
         period = self._lb_period.get() if hasattr(self, "_lb_period") else "All Time"
         now = datetime.now()
+        _sd = study_date()
 
         if period == "Today":
-            date_filter = f"WHERE date = '{now.strftime('%Y-%m-%d')}'"
+            date_filter = f"WHERE date = '{_sd.isoformat()}'"
         elif period == "This Month":
-            date_filter = f"WHERE date LIKE '{now.strftime('%Y-%m')}%'"
+            date_filter = f"WHERE date LIKE '{_sd.strftime('%Y-%m')}%'"
         elif period == "This Year":
-            date_filter = f"WHERE date LIKE '{now.strftime('%Y')}%'"
+            date_filter = f"WHERE date LIKE '{_sd.strftime('%Y')}%'"
         else:
             date_filter = ""
 
@@ -3435,7 +3476,8 @@ class App(ctk.CTk):
                 continue
             if period == "This Week":
                 iso = dt.isocalendar()
-                if not (iso[1] == now.isocalendar()[1] and dt.year == now.year):
+                _sd_iso = _sd.isocalendar()
+                if not (iso[1] == _sd_iso[1] and iso[0] == _sd_iso[0]):
                     continue
             filtered.append((dur, dt, skill or "", intention or ""))
 
@@ -3516,10 +3558,10 @@ class App(ctk.CTk):
             w.destroy()
         sc = self._today_scroll
 
-        target_date = date.today() + timedelta(days=self._today_offset)
-        if target_date > date.today():
+        target_date = study_date() + timedelta(days=self._today_offset)
+        if target_date > study_date():
             self._today_offset = 0
-            target_date = date.today()
+            target_date = study_date()
 
         d = get_today_stats(target_date)
         streak = d["streak"]
@@ -3575,9 +3617,9 @@ class App(ctk.CTk):
                 try:
                     from datetime import datetime as _dt
                     picked = _dt.strptime(val, "%d-%m-%y").date()
-                    if picked > date.today():
+                    if picked > study_date():
                         raise ValueError("future")
-                    self._today_offset = (picked - date.today()).days
+                    self._today_offset = (picked - study_date()).days
                     self._refresh_today()
                 except ValueError:
                     entry.configure(border_color=DANGER)
