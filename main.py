@@ -3617,14 +3617,86 @@ class App(ctk.CTk):
         mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
         rank_detail = None
         if d["best_day_min"] > 0:
-            bar = progress_bar(left, color=DARK)
-            bar.set(min(d["total_min"] / d["best_day_min"], 1.0))
-            bar.pack(fill="x", pady=(8, 4))
-            pct_of_rec = d["total_min"] / d["best_day_min"] * 100
+            BAR_H   = 8
+            DOT_R   = 5
+            breakdown = d.get("skill_breakdown") or {}
+            total_today = d["total_min"]
+            best_min    = d["best_day_min"]
+            fill_ratio  = min(total_today / best_min, 1.0)
+
+            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=BAR_H + DOT_R * 2 + 4)
+            bar_host.pack(fill="x", pady=(8, 4))
+            bar_host.pack_propagate(False)
+            bar_cv = tk.Canvas(bar_host, bg=PANEL, highlightthickness=0, bd=0)
+            bar_cv.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+            skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
+            hover_lbl = mk_label(left, "", size=10, color=DIM)
+
+            def _draw_hero_bar(event=None, cv=bar_cv, sr=skills_sorted,
+                               tot=total_today, fr=fill_ratio, h=BAR_H, dr=DOT_R):
+                cv.delete("all")
+                W = cv.winfo_width()
+                H = cv.winfo_height()
+                if W < 2:
+                    return
+                yc      = H // 2
+                y0, y1  = yc - h // 2, yc + h // 2
+                filled_w = int(W * fr)
+
+                # track (unfilled)
+                cv.create_rectangle(0, y0, W, y1, fill=CARD, outline="")
+
+                # skill color segments within filled region
+                segments = []
+                x = 0
+                for sk, mins in sr:
+                    if mins <= 0 or tot <= 0:
+                        continue
+                    seg_w = max(1, int(filled_w * mins / tot))
+                    x1_seg = min(x + seg_w, filled_w)
+                    col = _skill_color(sk)
+                    cv.create_rectangle(x, y0, x1_seg, y1, fill=col, outline="")
+                    segments.append((sk, mins, x, x1_seg))
+                    x = x1_seg
+                    if x >= filled_w:
+                        break
+                # fill any rounding gap at filled edge
+                if segments and x < filled_w:
+                    cv.create_rectangle(x, y0, filled_w, y1,
+                                        fill=_skill_color(segments[-1][0]), outline="")
+
+                # dot at end of filled region
+                if filled_w > 0:
+                    dx = min(filled_w, W - dr)
+                    cv.create_oval(dx - dr, yc - dr, dx + dr, yc + dr,
+                                   fill=DARK, outline="")
+
+                def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl):
+                    hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
+                    if hit:
+                        pct = hit[1] / ftot * 100
+                        hval = hit[1] / 60
+                        hl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
+                    else:
+                        hl.configure(text="")
+
+                cv.bind("<Motion>", _on_move)
+                cv.bind("<Leave>", lambda e, hl=hover_lbl: hl.configure(text=""))
+
+            _hero_bar_pending = [None]
+            def _hero_bar_debounced(event=None, cv=bar_cv, _pend=_hero_bar_pending):
+                if _pend[0]:
+                    cv.after_cancel(_pend[0])
+                _pend[0] = cv.after(60, _draw_hero_bar)
+            bar_cv.bind("<Configure>", _hero_bar_debounced)
+            bar_cv.after(60, _draw_hero_bar)
+
+            pct_of_rec = total_today / best_min * 100
             bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
             bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
             mk_label(bottom_row,
-                     f"record {d['best_day_min']/60:.1f}h  ({pct_of_rec:.2f}%)",
+                     f"record {best_min/60:.1f}h  ({pct_of_rec:.2f}%)",
                      size=10, color=DIM).pack(side="left")
             rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
             rank_detail.pack(side="right")
