@@ -3619,33 +3619,35 @@ class App(ctk.CTk):
         if d["best_day_min"] > 0:
             BAR_H   = 4
             DOT_R   = 5
+            TXT_H   = 14   # height reserved below bar for canvas hover text
+            BAR_ZONE = DOT_R * 2 + 4          # = 14 px for bar + dots
+            CANVAS_H = BAR_ZONE + TXT_H        # = 28 px total, always fixed
+            BAR_YC   = DOT_R + 2               # = 7, bar vertical center
+            TXT_Y    = BAR_ZONE + 2            # = 16, baseline for hover text
             breakdown = d.get("skill_breakdown") or {}
             total_today = d["total_min"]
             best_min    = d["best_day_min"]
             fill_ratio  = min(total_today / best_min, 1.0)
-            CR = BAR_H // 2  # cap radius = half bar height
+            CR = BAR_H // 2
 
-            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=DOT_R * 2 + 4)
+            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=CANVAS_H)
             bar_host.pack(fill="x", pady=(8, 4))
             bar_host.pack_propagate(False)
             bar_cv = tk.Canvas(bar_host, bg=PANEL, highlightthickness=0, bd=0)
             bar_cv.place(relx=0, rely=0, relwidth=1, relheight=1)
 
             skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
-            hover_lbl = mk_label(left, "", size=10, color=DIM)
-            hover_lbl.pack(anchor="w", pady=(0, 2))
 
             def _cap(cv, cx, yc, r, fill):
                 cv.create_oval(cx - r, yc - r, cx + r, yc + r, fill=fill, outline="")
 
             def _draw_hero_bar(event=None, cv=bar_cv, sr=skills_sorted,
-                               tot=total_today, fr=fill_ratio, h=BAR_H, dr=DOT_R, cr=CR):
+                               tot=total_today, fr=fill_ratio, h=BAR_H, dr=DOT_R, cr=CR,
+                               yc=BAR_YC):
                 cv.delete("all")
                 W = cv.winfo_width()
-                H = cv.winfo_height()
                 if W < 2:
                     return
-                yc       = H // 2
                 y0, y1   = yc - h // 2, yc + h // 2
                 filled_w = int(W * fr)
 
@@ -3654,7 +3656,7 @@ class App(ctk.CTk):
                 _cap(cv, cr,     yc, cr, CARD)
                 _cap(cv, W - cr, yc, cr, CARD)
 
-                # skill segments (rectangular — caps added separately)
+                # skill segments
                 segments = []
                 x = 0
                 for sk, mins in sr:
@@ -3685,22 +3687,26 @@ class App(ctk.CTk):
                 _cap(cv, W - dr, yc, dr, MUTED)
 
                 _rec_txt = f"record {best_min/60:.1f}h  ({total_today/best_min*100:.2f}%)"
+                _txt_y   = TXT_Y
+                _dim     = DIM
 
-                def _on_move(e, segs=segments, ftot=tot, hl=hover_lbl,
-                             rec=_rec_txt, wr=W, ddr=dr):
+                def _on_move(e, segs=segments, ftot=tot,
+                             rec=_rec_txt, wr=W, ddr=dr, ty=_txt_y, dim=_dim):
+                    cv.delete("hover_tip")
                     if abs(e.x - (wr - ddr)) <= ddr + 4:
-                        hl.configure(text=rec)
+                        cv.create_text(0, ty, text=rec, fill=dim,
+                                       font=("Helvetica", 10), anchor="nw", tags="hover_tip")
                         return
                     hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
                     if hit:
                         pct  = hit[1] / ftot * 100
                         hval = hit[1] / 60
-                        hl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
-                    else:
-                        hl.configure(text="")
+                        cv.create_text(0, ty, text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h",
+                                       fill=dim, font=("Helvetica", 10),
+                                       anchor="nw", tags="hover_tip")
 
                 cv.bind("<Motion>", _on_move)
-                cv.bind("<Leave>", lambda e, hl=hover_lbl: hl.configure(text=""))
+                cv.bind("<Leave>", lambda e: cv.delete("hover_tip"))
 
             _hero_bar_pending = [None]
             def _hero_bar_debounced(event=None, cv=bar_cv, _pend=_hero_bar_pending):
