@@ -3449,10 +3449,11 @@ class App(ctk.CTk):
         _end_h = load_settings().get("day_end_hour", 3)
         _end_time_str = f"{_end_h:02d}:00:00" if _end_h else None
 
-        # For Today: fetch today + next calendar day (catches sessions saved with wall-clock date)
+        # For Today: fetch wall-clock date AND next calendar day (early-morning overflow)
         if period == "Today":
+            _wall_today = _sd.isoformat()
             _next = (_sd + timedelta(days=1)).isoformat()
-            date_filter = f"WHERE date = '{_sd.isoformat()}' OR date = '{_next}'"
+            date_filter = f"WHERE date = '{_wall_today}' OR date = '{_next}'"
         elif period == "This Month":
             date_filter = f"WHERE date LIKE '{_sd.strftime('%Y-%m')}%'"
         elif period == "This Year":
@@ -3478,19 +3479,25 @@ class App(ctk.CTk):
                 dt  = datetime.strptime(f"{date_s} {time_s}", "%Y-%m-%d %H:%M:%S")
             except Exception:
                 continue
+            stored_date = dt.date()
             if period == "Today":
-                # Accept: date == _sd (new-code session), or date == _sd+1 AND time < end_hour (old-code)
-                stored_date = dt.date()
-                if stored_date == _sd:
-                    pass  # new-code session correctly on study day
-                elif stored_date == _sd + timedelta(days=1) and _end_time_str and time_s < _end_time_str:
-                    pass  # old-code session on wall-clock next day but within study window
-                else:
+                # Include: wall-clock date=_sd AND time>=end_h (genuine today sessions)
+                #          wall-clock date=_sd+1 AND time<end_h (early-morning overflow)
+                if _end_time_str:
+                    if not ((stored_date == _sd and time_s >= _end_time_str) or
+                            (stored_date == _sd + timedelta(days=1) and time_s < _end_time_str)):
+                        continue
+                elif stored_date != _sd:
                     continue
             elif period == "This Week":
-                iso = dt.isocalendar()
+                # Normalize to study date before week comparison
+                from datetime import date as _dt_date, timedelta as _dt_td
+                if _end_time_str and time_s < _end_time_str:
+                    study_d = stored_date - timedelta(days=1)
+                else:
+                    study_d = stored_date
                 _sd_iso = _sd.isocalendar()
-                if not (iso[1] == _sd_iso[1] and iso[0] == _sd_iso[0]):
+                if not (study_d.isocalendar()[1] == _sd_iso[1] and study_d.isocalendar()[0] == _sd_iso[0]):
                     continue
             filtered.append((dur, dt, skill or "", intention or ""))
 

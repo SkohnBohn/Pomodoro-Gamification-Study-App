@@ -158,7 +158,7 @@ def save_session(duration, intention, result, skill="POMO"):
         INSERT INTO pomodoro_session
             (sessions, date, time, skill, duration, total_time, intention, result)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (last_id + 1, study_date(now).isoformat(), now.strftime("%H:%M:%S"),
+    ''', (last_id + 1, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
           skill, round(duration, 2), round(total_time, 2), intention, result))
     conn.commit()
     conn.close()
@@ -378,19 +378,22 @@ def get_chart_data(skill: str = None) -> dict:
 
 def _study_day_where(target_date, end_h):
     """
-    Returns (clause, params) that captures sessions belonging to a study day,
-    handling both old (wall-clock date) and new (study_date) saved sessions.
-    Old: session at 0:15 AM Tuesday saved as date='Tuesday', time='00:15:xx'
-    New: session at 0:15 AM Tuesday saved as date='Monday',  time='00:15:xx'
-    Both belong to Monday when day_end_hour=3.
+    Returns (clause, params) for sessions belonging to a study day.
+    All sessions use wall-clock dates. A study day owns:
+      - sessions whose wall-clock date IS target_date AND time >= end_h
+        (genuine daytime sessions on target_date)
+      - sessions whose wall-clock date IS target_date+1 AND time < end_h
+        (early-morning sessions on the next calendar day that still belong here)
+    Crucially, target_date sessions with time < end_h are EXCLUDED — they
+    belong to the PREVIOUS study day, preventing double-counting.
     """
     from datetime import timedelta as _td
     day_str      = target_date.isoformat()
     next_day_str = (target_date + _td(days=1)).isoformat()
     if end_h:
         end_time = f"{end_h:02d}:00:00"
-        clause = "(date=? OR (date=? AND time < ?))"
-        params = (day_str, next_day_str, end_time)
+        clause = "((date=? AND time >= ?) OR (date=? AND time < ?))"
+        params = (day_str, end_time, next_day_str, end_time)
     else:
         clause = "date=?"
         params = (day_str,)
