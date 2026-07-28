@@ -434,6 +434,32 @@ def get_today_stats(target_date=None) -> dict:
         for r in today_rows if r[0]
     ]
 
+    # Sessions that straddle the day boundary: they belong to tomorrow (end >= cutoff)
+    # but started before the cutoff, so they visually overlap today's timeline too.
+    timeline_next_overflow: list = []
+    if end_h:
+        from datetime import timedelta as _tdov
+        _next_cal = (target_date + _tdov(days=1)).isoformat()
+        _cutoff_str = f"{end_h:02d}:00:00"
+        c.execute(
+            "SELECT time, duration, skill FROM pomodoro_session"
+            " WHERE date=? AND time >= ? ORDER BY time",
+            (_next_cal, _cutoff_str),
+        )
+        for _r in c.fetchall():
+            if not _r[0] or not _r[1]:
+                continue
+            try:
+                _tp = _r[0].split(":")
+                _end_min = int(_tp[0]) * 60 + int(_tp[1])
+                _start_min = _end_min - _r[1]
+            except Exception:
+                continue
+            if _start_min < end_h * 60:
+                timeline_next_overflow.append(
+                    {"time": _r[0], "duration": _r[1], "skill": _r[2]}
+                )
+
     # All days for percentile + average
     c.execute(
         "SELECT SUM(duration) FROM pomodoro_session"
@@ -532,7 +558,8 @@ def get_today_stats(target_date=None) -> dict:
         "sessions":        sessions,
         "longest_min":     longest,
         "skill_breakdown": skill_breakdown,
-        "timeline":        timeline,
+        "timeline":               timeline,
+        "timeline_next_overflow": timeline_next_overflow,
         "best_day_min":    best_day_min,
         "avg_min":         avg_min,
         "percentile":      percentile,

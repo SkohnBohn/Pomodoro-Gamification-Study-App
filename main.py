@@ -3852,6 +3852,7 @@ class App(ctk.CTk):
         tl_canvas.pack(fill="x", padx=16, pady=(0, 12))
 
         snapshot = d["timeline"]
+        next_overflow = d.get("timeline_next_overflow", [])
         blocks: list = []
 
         def _draw_tl(event=None):
@@ -3937,15 +3938,38 @@ class App(ctk.CTk):
             end_h = load_settings().get("day_end_hour", 3)
             DAY_START_M = (end_h or 0) * 60
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
-            # Build axis labels starting from day_end_hour
+            # Axis labels starting from day_end_hour in 6-hour steps
             _label_offsets = [0, DAY // 4, DAY // 2, (DAY * 3) // 4, DAY]
             for i, offset in enumerate(_label_offsets):
                 clock_h = (DAY_START_M + offset) // 60 % 24
-                label = str(clock_h)
                 lx = int(offset / DAY * W)
                 anchor = "nw" if i == 0 else ("ne" if i == len(_label_offsets) - 1 else "n")
-                full_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
+                full_canvas.create_text(lx, yc + 12, text=str(clock_h), fill=DIM,
                                         font=("Helvetica", 9), anchor=anchor)
+
+            def _place_block(end_m_raw, dur, sk, dimmed=False):
+                """Convert a session to canvas coords and draw it."""
+                if DAY_START_M and end_m_raw < DAY_START_M:
+                    end_m_shifted = end_m_raw + DAY
+                else:
+                    end_m_shifted = end_m_raw
+                start_m_shifted = end_m_shifted - dur
+                vis_s = max(start_m_shifted - DAY_START_M, 0)
+                vis_e = min(end_m_shifted - DAY_START_M, DAY)
+                if vis_s >= DAY or vis_e <= 0:
+                    return
+                x0 = int(vis_s / DAY * W)
+                x1 = max(x0 + 4, int(vis_e / DAY * W))
+                color = _skill_color(sk)
+                if dimmed:
+                    full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                                 fill=CARD, outline=color, width=1)
+                else:
+                    full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                                 fill=color, outline="")
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
+
+            # Today's sessions
             for item in snapshot:
                 t_str = item.get("time") or ""
                 dur = item.get("duration") or 0
@@ -3955,23 +3979,38 @@ class App(ctk.CTk):
                 try:
                     p = t_str.split(":")
                     end_m_raw = int(p[0]) * 60 + int(p[1])
-                    # Shift post-midnight sessions to appear after evening sessions
-                    if DAY_START_M and end_m_raw < DAY_START_M:
-                        end_m_shifted = end_m_raw + DAY
-                    else:
-                        end_m_shifted = end_m_raw
-                    start_m_shifted = end_m_shifted - dur
                 except Exception:
                     continue
-                vis_s = max(start_m_shifted - DAY_START_M, 0)
-                vis_e = min(end_m_shifted - DAY_START_M, DAY)
-                if vis_s >= DAY or vis_e <= 0:
+                _place_block(end_m_raw, dur, sk, dimmed=False)
+
+            # Overflow: sessions that belong to tomorrow but started before the cutoff.
+            # Draw only the pre-cutoff portion as a ghost block at the right edge.
+            for item in next_overflow:
+                t_str = item.get("time") or ""
+                dur = item.get("duration") or 0
+                sk = item.get("skill") or ""
+                if not t_str or not dur:
                     continue
-                x0 = int(vis_s / DAY * W)
-                x1 = max(x0 + 4, int(vis_e / DAY * W))
-                full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
-                                             fill=_skill_color(sk), outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
+                try:
+                    p = t_str.split(":")
+                    end_m_raw = int(p[0]) * 60 + int(p[1])
+                    # These are on the next calendar day; shift by +DAY so they land
+                    # at the right edge of the current study-day axis.
+                    end_m_shifted = end_m_raw + DAY
+                    start_m_shifted = end_m_shifted - dur
+                    # Clip to right edge of today's axis (the cutoff)
+                    vis_s = max(start_m_shifted - DAY_START_M, 0)
+                    vis_e = min(end_m_shifted - DAY_START_M, DAY)
+                    if vis_s >= DAY or vis_e <= 0:
+                        continue
+                    x0 = int(vis_s / DAY * W)
+                    x1 = max(x0 + 4, int(vis_e / DAY * W))
+                    color = _skill_color(sk)
+                    full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
+                                                 fill=CARD, outline=color, width=1)
+                    full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
+                except Exception:
+                    continue
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
