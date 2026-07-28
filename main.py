@@ -3846,6 +3846,7 @@ class App(ctk.CTk):
         # Main timeline: 8:00 → 1:00 (next day = 25h)
         TL_START, TL_END = 8 * 60, 25 * 60
         TL_WIDTH = TL_END - TL_START
+        _tl_end_h = load_settings().get("day_end_hour", 3)
 
         tl_canvas = tk.Canvas(tl_card, height=80, bg=PANEL, highlightthickness=0)
         tl_canvas.pack(fill="x", padx=16, pady=(0, 12))
@@ -3875,8 +3876,8 @@ class App(ctk.CTk):
                 try:
                     p = t_str.split(":")
                     end_m = int(p[0]) * 60 + int(p[1])
-                    # stored time is END; post-midnight hours (0-5) are next-day on timeline
-                    if int(p[0]) < 6:
+                    # stored time is END; hours before day_end_hour wrap to next-day position
+                    if _tl_end_h and int(p[0]) < _tl_end_h:
                         end_m += 24 * 60
                     start_m = end_m - dur
                 except Exception:
@@ -3933,10 +3934,16 @@ class App(ctk.CTk):
             if W < 4:
                 return
             DAY, yc = 24 * 60, 54
+            end_h = load_settings().get("day_end_hour", 3)
+            DAY_START_M = (end_h or 0) * 60
             full_canvas.create_rectangle(0, yc - 4, W, yc + 4, fill=CARD, outline="")
-            for label, t_min in [("0", 0), ("6", 360), ("12", 720), ("18", 1080), ("24", 1440)]:
-                lx = int(t_min / DAY * W)
-                anchor = "nw" if t_min == 0 else ("ne" if t_min == 1440 else "n")
+            # Build axis labels starting from day_end_hour
+            _label_offsets = [0, DAY // 4, DAY // 2, (DAY * 3) // 4, DAY]
+            for i, offset in enumerate(_label_offsets):
+                clock_h = (DAY_START_M + offset) // 60 % 24
+                label = str(clock_h)
+                lx = int(offset / DAY * W)
+                anchor = "nw" if i == 0 else ("ne" if i == len(_label_offsets) - 1 else "n")
                 full_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
                                         font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
@@ -3947,19 +3954,24 @@ class App(ctk.CTk):
                     continue
                 try:
                     p = t_str.split(":")
-                    end_m = int(p[0]) * 60 + int(p[1])
-                    start_m = end_m - dur
+                    end_m_raw = int(p[0]) * 60 + int(p[1])
+                    # Shift post-midnight sessions to appear after evening sessions
+                    if DAY_START_M and end_m_raw < DAY_START_M:
+                        end_m_shifted = end_m_raw + DAY
+                    else:
+                        end_m_shifted = end_m_raw
+                    start_m_shifted = end_m_shifted - dur
                 except Exception:
                     continue
-                vis_s = max(start_m, 0)
-                vis_e = min(end_m, DAY)
+                vis_s = max(start_m_shifted - DAY_START_M, 0)
+                vis_e = min(end_m_shifted - DAY_START_M, DAY)
                 if vis_s >= DAY or vis_e <= 0:
                     continue
                 x0 = int(vis_s / DAY * W)
                 x1 = max(x0 + 4, int(vis_e / DAY * W))
                 full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                              fill=_skill_color(sk), outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
