@@ -1374,11 +1374,13 @@ class App(ctk.CTk):
                 self._sk_grid_frame.columnconfigure(i % 3, weight=1)
                 self._skill_btns[name] = b
 
-            # Re-highlight selected skill
+            # Re-highlight selected skill (no toggle — this is a programmatic restore)
             if self.selected_skill in self._skill_btns:
-                self._pick_skill(self.selected_skill)
-            elif skills:
-                self._pick_skill(skills[0][0])
+                self._pick_skill(self.selected_skill, toggle=False)
+            elif skills and self.selected_skill:
+                # Only auto-select first skill if a skill was previously set
+                # (not when user has explicitly deselected)
+                self._pick_skill(skills[0][0], toggle=False)
 
     def _toggle_skill_edit(self):
         self._skill_edit_mode = not self._skill_edit_mode
@@ -1397,7 +1399,14 @@ class App(ctk.CTk):
             self.selected_skill = skills[0][0] if skills else "TECH"
         self._build_skill_grid()
 
-    def _pick_skill(self, skill: str):
+    def _pick_skill(self, skill: str, toggle: bool = True):
+        if toggle and skill == self.selected_skill:
+            # Clicking the active skill deselects it; session will be saved as POMO
+            self.selected_skill = ""
+            save_settings("selected_skill", "")
+            for b in self._skill_btns.values():
+                b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
+            return
         self.selected_skill = skill
         save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
@@ -1722,7 +1731,7 @@ class App(ctk.CTk):
         hdr = ctk.CTkFrame(dlg, fg_color="transparent")
         hdr.pack(pady=(16, 4))
         mk_label(hdr, f"{total_so_far:.0f} min  · ", size=15, weight="bold", color=DARK).pack(side="left")
-        mk_label(hdr, self.selected_skill, size=15, color=DARK).pack(side="left")
+        mk_label(hdr, self.selected_skill or "POMO", size=15, color=DARK).pack(side="left")
 
         ctk.CTkFrame(dlg, height=1, fg_color=BORDER).pack(
             fill="x", padx=22, pady=(0, 6))
