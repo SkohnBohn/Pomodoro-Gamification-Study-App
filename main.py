@@ -2704,7 +2704,7 @@ class App(ctk.CTk):
             val  = cumulative[idx]
             txt  = f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h"
             tip_x = max(50, min(event.x, canvas_w - 50))
-            canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
+            canvas.create_text(tip_x, canvas_h - 1, text=txt, fill=TEXT,
                                font=("Helvetica", 10), anchor="s", tags="tip")
 
         canvas.bind("<Motion>", _hover)
