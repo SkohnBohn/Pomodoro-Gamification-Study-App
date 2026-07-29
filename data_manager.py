@@ -66,6 +66,10 @@ def initialize_db():
             intention TEXT, result TEXT
         )
     ''')
+    # Migrate: add pauses column (JSON) if it doesn't exist yet
+    _ps_cols = [r[1] for r in c.execute("PRAGMA table_info(pomodoro_session)").fetchall()]
+    if "pauses" not in _ps_cols:
+        c.execute("ALTER TABLE pomodoro_session ADD COLUMN pauses TEXT")
     c.execute('''
         CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,7 +149,8 @@ def calculate_total_time():
     return 0.0 if result is None else result / 60.0
 
 
-def save_session(duration, intention, result, skill="POMO"):
+def save_session(duration, intention, result, skill="POMO", pauses=None):
+    import json as _json
     now = datetime.now()
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
@@ -154,14 +159,25 @@ def save_session(duration, intention, result, skill="POMO"):
     c.execute("SELECT SUM(duration) FROM pomodoro_session")
     prev_total = c.fetchone()[0] or 0
     total_time = prev_total + duration
+    pauses_json = _json.dumps(pauses) if pauses else None
     c.execute('''
         INSERT INTO pomodoro_session
-            (sessions, date, time, skill, duration, total_time, intention, result)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (sessions, date, time, skill, duration, total_time, intention, result, pauses)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (last_id + 1, now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
-          skill, round(duration, 2), round(total_time, 2), intention, result))
+          skill, round(duration, 2), round(total_time, 2), intention, result, pauses_json))
     conn.commit()
     conn.close()
+
+
+def _parse_pauses(raw) -> list:
+    if not raw:
+        return []
+    import json as _json
+    try:
+        return _json.loads(raw)
+    except Exception:
+        return []
 
 
 # ── Notes ──────────────────────────────────────────────────────────────────────
@@ -415,7 +431,7 @@ def get_today_stats(target_date=None) -> dict:
 
     # Target day's total and session list
     c.execute(
-        f"SELECT time, duration, skill FROM pomodoro_session"
+        f"SELECT time, duration, skill, pauses FROM pomodoro_session"
         f" WHERE {day_clause} ORDER BY time",
         day_params,
     )
@@ -425,12 +441,12 @@ def get_today_stats(target_date=None) -> dict:
     longest   = max((r[1] for r in today_rows), default=0)
 
     skill_breakdown: dict = {}
-    for _, dur, sk in today_rows:
+    for _, dur, sk, _ in today_rows:
         if sk and dur:
             skill_breakdown[sk] = skill_breakdown.get(sk, 0) + dur
 
     timeline = [
-        {"time": r[0], "duration": r[1], "skill": r[2]}
+        {"time": r[0], "duration": r[1], "skill": r[2], "pauses": _parse_pauses(r[3])}
         for r in today_rows if r[0]
     ]
 
@@ -442,7 +458,7 @@ def get_today_stats(target_date=None) -> dict:
         _next_cal = (target_date + _tdov(days=1)).isoformat()
         _cutoff_str = f"{end_h:02d}:00:00"
         c.execute(
-            "SELECT time, duration, skill FROM pomodoro_session"
+            "SELECT time, duration, skill, pauses FROM pomodoro_session"
             " WHERE date=? AND time >= ? ORDER BY time",
             (_next_cal, _cutoff_str),
         )
@@ -457,7 +473,8 @@ def get_today_stats(target_date=None) -> dict:
                 continue
             if _start_min < end_h * 60:
                 timeline_next_overflow.append(
-                    {"time": _r[0], "duration": _r[1], "skill": _r[2]}
+                    {"time": _r[0], "duration": _r[1], "skill": _r[2],
+                     "pauses": _parse_pauses(_r[3])}
                 )
 
     # All days for percentile + average

@@ -1577,6 +1577,10 @@ class App(ctk.CTk):
             return
         self.intention_text = intention
 
+        from datetime import datetime as _dt_now
+        self._session_wall_start = _dt_now.now()
+        self._session_pauses: list = []
+
         if self.timer_mode == "Pomodoro":
             self.total_seconds  = int(self._pomo_mins * 60)
             self.seconds_left   = self.total_seconds
@@ -1598,16 +1602,28 @@ class App(ctk.CTk):
     def _on_pause(self):
         if not self.running:
             return
+        from datetime import datetime as _dt_now
         if not self.paused:
-            # going into pause: record when pause started
-            self._pause_started = _time.monotonic()
+            # going into pause: record monotonic + wall-clock start of pause
+            self._pause_started    = _time.monotonic()
+            self._pause_wall_start = _dt_now.now()
         else:
-            # resuming: accumulate pause duration
+            # resuming: accumulate pause duration into timer accounting
             pause_dur = _time.monotonic() - self._pause_started
             if self.timer_mode == "Pomodoro":
                 self._pomo_pause_t += pause_dur
             else:
                 self._open_pause_t += pause_dur
+            # Record in session pauses list if pause lasted > 3 min
+            wall_start = getattr(self, "_session_wall_start", None)
+            if wall_start is not None:
+                pause_wall_dur = (_dt_now.now() - self._pause_wall_start).total_seconds()
+                if pause_wall_dur > 180:
+                    offset_secs = (self._pause_wall_start - wall_start).total_seconds()
+                    self._session_pauses.append({
+                        "offset": int(offset_secs),
+                        "dur":    int(pause_wall_dur),
+                    })
         self.paused = not self.paused
         self.pause_btn.configure(text="▶" if self.paused else "⏸")
         if not self.paused:
@@ -1706,6 +1722,7 @@ class App(ctk.CTk):
     def _reset_timer(self):
         self.running = False
         self.paused  = False
+        self._session_pauses = []
         if self.timer_mode == "Pomodoro":
             total_s = int(self._pomo_mins * 60)
             m, s = divmod(total_s, 60)
@@ -1803,7 +1820,8 @@ class App(ctk.CTk):
             self._ext_result = ""
             old_lvl = calculate_level(calculate_total_time())
             save_session(total_so_far, self.intention_text, result,
-                         skill=self.selected_skill or "POMO")
+                         skill=self.selected_skill or "POMO",
+                         pauses=self._session_pauses or None)
             new_lvl = calculate_level(calculate_total_time())
             dlg.destroy()
             self._reset_timer()
@@ -3878,18 +3896,19 @@ class App(ctk.CTk):
                 tl_canvas.create_text(lx, yc + 12, text=label, fill=DIM,
                                       font=("Helvetica", 9), anchor=anchor)
             for item in snapshot:
-                t_str = item.get("time") or ""
-                dur = item.get("duration") or 0
-                sk = item.get("skill") or ""
+                t_str  = item.get("time") or ""
+                dur    = item.get("duration") or 0
+                sk     = item.get("skill") or ""
+                pauses = item.get("pauses") or []
                 if not t_str or not dur:
                     continue
                 try:
                     p = t_str.split(":")
                     end_m = int(p[0]) * 60 + int(p[1])
-                    # stored time is END; hours before day_end_hour wrap to next-day position
                     if _tl_end_h and int(p[0]) < _tl_end_h:
                         end_m += 24 * 60
-                    start_m = end_m - dur
+                    total_pause_min = sum(pa.get("dur", 0) for pa in pauses) / 60
+                    start_m = end_m - dur - total_pause_min  # wall-clock start
                 except Exception:
                     continue
                 if start_m >= TL_END or end_m <= TL_START:
@@ -3900,15 +3919,25 @@ class App(ctk.CTk):
                 x1 = max(x0 + 4, int((vis_e - TL_START) / TL_WIDTH * W))
                 tl_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                            fill=_skill_color(sk), outline="")
-                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m))
+                # Overlay pause segments as a "gap" within the block
+                for pa in pauses:
+                    pa_s = start_m + pa["offset"] / 60
+                    pa_e = pa_s + pa["dur"] / 60
+                    vis_ps = max(pa_s, TL_START)
+                    vis_pe = min(pa_e, TL_END)
+                    if vis_ps < vis_pe:
+                        px0 = int((vis_ps - TL_START) / TL_WIDTH * W)
+                        px1 = max(px0 + 2, int((vis_pe - TL_START) / TL_WIDTH * W))
+                        tl_canvas.create_rectangle(px0, yc - 8, px1, yc + 8,
+                                                   fill=PANEL, outline=_skill_color(sk), width=1)
+                blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m, end_m))
 
         def _tl_motion(e):
             tl_canvas.delete("tl_tip")
-            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in blocks
+            hit = next(((dur, sk, s, em) for x0, y0, x1, y1, dur, sk, s, em in blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk, start_m = hit
-                end_m = start_m + int(dur)
+                dur, sk, start_m, end_m = hit
                 fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
@@ -3956,13 +3985,14 @@ class App(ctk.CTk):
                 full_canvas.create_text(lx, yc + 12, text=str(clock_h), fill=DIM,
                                         font=("Helvetica", 9), anchor=anchor)
 
-            def _place_block(end_m_raw, dur, sk, dimmed=False):
-                """Convert a session to canvas coords and draw it."""
+            def _place_block(end_m_raw, dur, sk, pauses=None, dimmed=False):
+                total_pause_min = sum(pa.get("dur", 0) for pa in (pauses or [])) / 60
+                wall_dur = dur + total_pause_min
                 if DAY_START_M and end_m_raw < DAY_START_M:
                     end_m_shifted = end_m_raw + DAY
                 else:
                     end_m_shifted = end_m_raw
-                start_m_shifted = end_m_shifted - dur
+                start_m_shifted = end_m_shifted - wall_dur
                 vis_s = max(start_m_shifted - DAY_START_M, 0)
                 vis_e = min(end_m_shifted - DAY_START_M, DAY)
                 if vis_s >= DAY or vis_e <= 0:
@@ -3976,13 +4006,25 @@ class App(ctk.CTk):
                 else:
                     full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                                  fill=color, outline="")
-                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
+                    for pa in (pauses or []):
+                        pa_s = start_m_shifted + pa["offset"] / 60
+                        pa_e = pa_s + pa["dur"] / 60
+                        vis_ps = max(pa_s - DAY_START_M, 0)
+                        vis_pe = min(pa_e - DAY_START_M, DAY)
+                        if vis_ps < vis_pe:
+                            px0 = int(vis_ps / DAY * W)
+                            px1 = max(px0 + 2, int(vis_pe / DAY * W))
+                            full_canvas.create_rectangle(px0, yc - 8, px1, yc + 8,
+                                                         fill=PANEL, outline=color, width=1)
+                full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk,
+                                    start_m_shifted, end_m_shifted))
 
             # Today's sessions
             for item in snapshot:
-                t_str = item.get("time") or ""
-                dur = item.get("duration") or 0
-                sk = item.get("skill") or ""
+                t_str  = item.get("time") or ""
+                dur    = item.get("duration") or 0
+                sk     = item.get("skill") or ""
+                pauses = item.get("pauses") or []
                 if not t_str or not dur:
                     continue
                 try:
@@ -3990,24 +4032,24 @@ class App(ctk.CTk):
                     end_m_raw = int(p[0]) * 60 + int(p[1])
                 except Exception:
                     continue
-                _place_block(end_m_raw, dur, sk, dimmed=False)
+                _place_block(end_m_raw, dur, sk, pauses=pauses, dimmed=False)
 
             # Overflow: sessions that belong to tomorrow but started before the cutoff.
             # Draw only the pre-cutoff portion as a ghost block at the right edge.
             for item in next_overflow:
                 t_str = item.get("time") or ""
-                dur = item.get("duration") or 0
-                sk = item.get("skill") or ""
+                dur   = item.get("duration") or 0
+                sk    = item.get("skill") or ""
                 if not t_str or not dur:
                     continue
                 try:
                     p = t_str.split(":")
                     end_m_raw = int(p[0]) * 60 + int(p[1])
-                    # These are on the next calendar day; shift by +DAY so they land
-                    # at the right edge of the current study-day axis.
                     end_m_shifted = end_m_raw + DAY
-                    start_m_shifted = end_m_shifted - dur
-                    # Clip to right edge of today's axis (the cutoff)
+                    total_pause_min = sum(
+                        pa.get("dur", 0) for pa in (item.get("pauses") or [])
+                    ) / 60
+                    start_m_shifted = end_m_shifted - dur - total_pause_min
                     vis_s = max(start_m_shifted - DAY_START_M, 0)
                     vis_e = min(end_m_shifted - DAY_START_M, DAY)
                     if vis_s >= DAY or vis_e <= 0:
@@ -4017,17 +4059,17 @@ class App(ctk.CTk):
                     color = _skill_color(sk)
                     full_canvas.create_rectangle(x0, yc - 8, x1, yc + 8,
                                                  fill=CARD, outline=color, width=1)
-                    full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk, start_m_shifted))
+                    full_blocks.append((x0, yc - 8, x1, yc + 8, dur, sk,
+                                        start_m_shifted, end_m_shifted))
                 except Exception:
                     continue
 
         def _full_motion(e):
             full_canvas.delete("tl_tip")
-            hit = next(((dur, sk, s) for x0, y0, x1, y1, dur, sk, s in full_blocks
+            hit = next(((dur, sk, s, em) for x0, y0, x1, y1, dur, sk, s, em in full_blocks
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1), None)
             if hit:
-                dur, sk, start_m = hit
-                end_m = start_m + int(dur)
+                dur, sk, start_m, end_m = hit
                 fmt = lambda m: f"{int(m) // 60 % 24:02d}:{int(m) % 60:02d}"
                 line1 = f"{dur/60:.1f}h  {sk}" if sk else f"{dur/60:.1f}h"
                 line2 = f"{fmt(start_m)} - {fmt(end_m)}"
