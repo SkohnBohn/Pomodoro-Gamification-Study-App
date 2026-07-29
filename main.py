@@ -2429,11 +2429,11 @@ class App(ctk.CTk):
             variable=chart_period, width=90, **_opt_kw,
         ).pack(side="right")
 
-        canvas = tk.Canvas(parent, height=170, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 4))
+        canvas = tk.Canvas(parent, height=155, bg=PANEL, highlightthickness=0)
+        canvas.pack(fill="x", padx=16, pady=(0, 1))
 
         tip_row = ctk.CTkFrame(parent, height=22, fg_color="transparent")
-        tip_row.pack(fill="x", padx=16, pady=(0, 10))
+        tip_row.pack(fill="x", padx=16, pady=(0, 8))
         tip_row.pack_propagate(False)
         tip = mk_label(tip_row, "", size=11, color=MUTED)
 
@@ -2454,7 +2454,7 @@ class App(ctk.CTk):
 
     def _draw_bars(self, canvas, skill: str, period: str, canvas_w: int, tip_lbl):
         canvas.delete("all")
-        canvas_h = 170
+        canvas_h = 155
         LM, BM, TM, RM = 44, 32, 10, 10
         draw_w = canvas_w - LM - RM
         draw_h = canvas_h - TM - BM
@@ -2597,11 +2597,11 @@ class App(ctk.CTk):
         )
         opt.pack(side="right")
 
-        canvas = tk.Canvas(parent, height=180, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 4))
+        canvas = tk.Canvas(parent, height=165, bg=PANEL, highlightthickness=0)
+        canvas.pack(fill="x", padx=16, pady=(0, 1))
 
         tip_row = ctk.CTkFrame(parent, height=22, fg_color="transparent")
-        tip_row.pack(fill="x", padx=16, pady=(0, 10))
+        tip_row.pack(fill="x", padx=16, pady=(0, 8))
         tip_row.pack_propagate(False)
         tip = mk_label(tip_row, "", size=11, color=MUTED)
 
@@ -2621,7 +2621,7 @@ class App(ctk.CTk):
 
     def _draw_lines(self, canvas, skill: str, canvas_w: int, tip_lbl):
         canvas.delete("all")
-        canvas_h = 180
+        canvas_h = 165
         LM, BM, TM, RM = 44, 32, 10, 10
         draw_w = canvas_w - LM - RM
         draw_h = canvas_h - TM - BM
