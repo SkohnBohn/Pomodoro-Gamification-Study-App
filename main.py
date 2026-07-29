@@ -476,6 +476,8 @@ class App(ctk.CTk):
             b.pack(padx=10, pady=2, fill="x")
             self._nav_btns[key] = b
 
+        self._apply_tab_visibility()
+
         # Expand button — only shown when collapsed
         self._expand_btn = icon_btn(self.sidebar, "›", self._expand_sidebar, size=13)
 
@@ -566,7 +568,20 @@ class App(ctk.CTk):
         self._nav_frame.pack(fill="x")
         self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
 
+    def _apply_tab_visibility(self):
+        hidden = set(load_settings().get("hidden_tabs", []))
+        for btn in self._nav_btns.values():
+            btn.pack_forget()
+        for key, btn in self._nav_btns.items():
+            if key not in hidden:
+                btn.pack(padx=10, pady=2, fill="x")
+        if self._active_view in hidden:
+            self._nav("timer")
+
     def _nav(self, key: str):
+        hidden = set(load_settings().get("hidden_tabs", []))
+        if key in hidden:
+            key = "timer"
         play_click()
         for k, b in self._nav_btns.items():
             if k == key:
@@ -615,7 +630,7 @@ class App(ctk.CTk):
     def _show_settings(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("280x740")
+        dlg.geometry("280x820")
         dlg.configure(fg_color=PANEL)
         dlg.grab_set()
         dlg.lift()
@@ -890,6 +905,55 @@ class App(ctk.CTk):
             )
             b.pack(side="left", padx=px, pady=2)
             _eh_btns[h] = b
+
+        # ── Visible tabs ──────────────────────────────────────────────────────
+        mk_label(dlg, "Visible tabs", size=11, color=MUTED).pack(anchor="w", padx=20, pady=(14, 0))
+
+        _TAB_LABELS = [
+            ("Today",        "today"),
+            ("Skilltree",    "skills"),
+            ("Achievements", "achievements"),
+            ("Stats",        "stats"),
+            ("Records",      "records"),
+            ("Leaderboard",  "leaderboard"),
+        ]
+
+        tabs_row1 = ctk.CTkFrame(dlg, fg_color="transparent")
+        tabs_row1.pack(anchor="w", padx=20, pady=(6, 0))
+        tabs_row2 = ctk.CTkFrame(dlg, fg_color="transparent")
+        tabs_row2.pack(anchor="w", padx=20, pady=(4, 0))
+
+        def _redraw_tab_sq(c, key):
+            c.delete("all")
+            _h = set(load_settings().get("hidden_tabs", []))
+            fill = PANEL if key in _h else DARK
+            c.create_rectangle(0, 0, 11, 11, fill=fill, outline=DARK, width=1)
+
+        for i, (label, key) in enumerate(_TAB_LABELS):
+            row = tabs_row1 if i < 3 else tabs_row2
+            cell = ctk.CTkFrame(row, fg_color="transparent")
+            cell.pack(side="left", padx=(0, 14))
+
+            sq = tk.Canvas(cell, width=11, height=11, highlightthickness=0, bg=PANEL)
+            sq.pack(side="left", padx=(0, 5))
+
+            lbl = mk_label(cell, label, size=12, color=MUTED)
+            lbl.pack(side="left")
+
+            _redraw_tab_sq(sq, key)
+
+            def _toggle_tab(_, k=key, c=sq):
+                cur = set(load_settings().get("hidden_tabs", []))
+                if k in cur:
+                    cur.discard(k)
+                else:
+                    cur.add(k)
+                save_settings("hidden_tabs", list(cur))
+                _redraw_tab_sq(c, k)
+                self._apply_tab_visibility()
+
+            sq.bind("<Button-1>", _toggle_tab)
+            lbl.bind("<Button-1>", _toggle_tab)
 
         log_row = ctk.CTkFrame(dlg, fg_color="transparent")
         log_row.pack(padx=20, pady=(16, 0))

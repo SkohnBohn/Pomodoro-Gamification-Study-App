@@ -15,6 +15,7 @@ _SETTINGS_DEFAULTS = {
     "sound_levelup":  True,
     "sound_finish":   True,
     "day_end_hour":   3,
+    "hidden_tabs":    [],
 }
 
 def load_settings() -> dict:
