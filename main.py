@@ -2430,13 +2430,18 @@ class App(ctk.CTk):
         ).pack(side="right")
 
         canvas = tk.Canvas(parent, height=170, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 14))
+        canvas.pack(fill="x", padx=16, pady=(0, 4))
+
+        tip_row = ctk.CTkFrame(parent, height=22, fg_color="transparent")
+        tip_row.pack(fill="x", padx=16, pady=(0, 10))
+        tip_row.pack_propagate(False)
+        tip = mk_label(tip_row, "", size=11, color=MUTED)
 
         def _redraw(*_):
             w = canvas.winfo_width()
             if w < 50:
                 return
-            self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, None)
+            self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, tip)
 
         _bar_pending = [None]
         def _redraw_debounced_bar(*_):
@@ -2521,25 +2526,26 @@ class App(ctk.CTk):
                 canvas.create_text(x, TM + draw_h + 6, text=d.strftime("%d.%m"),
                                   fill=MUTED, font=("Helvetica", 8), anchor="n")
 
-        # Hover — draw tip inside canvas, centered on pointer X
+        # Hover — label below canvas, centered on bar's X with edge clamping
         btw = bar_total_w
 
         def _hover(event):
-            canvas.delete("tip")
             idx = int((event.x - LM) / btw)
             if 0 <= idx < n_days:
                 d   = days[idx]
                 val = values[idx]
                 txt = (f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h" if val > 0
                        else f"{d.strftime('%d-%m-%y')}  ·  —")
-                # Center on the bar's x_center, clamped so text stays inside
                 x_ctr = LM + (idx + 0.5) * btw
                 tip_x = max(50, min(x_ctr, canvas_w - 50))
-                canvas.create_text(tip_x, 5, text=txt, fill=TEXT,
-                                   font=("Helvetica", 10), anchor="n", tags="tip")
+                tip_lbl.configure(text=txt)
+                tip_lbl.place(x=tip_x, y=2, anchor="n")
+            else:
+                tip_lbl.configure(text="")
+                tip_lbl.place_forget()
 
         canvas.bind("<Motion>", _hover)
-        canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
+        canvas.bind("<Leave>", lambda _: (tip_lbl.configure(text=""), tip_lbl.place_forget()))
 
     # ── Stats View ────────────────────────────────────────────────────────────
     def _build_stats_view(self) -> ctk.CTkFrame:
@@ -2592,13 +2598,18 @@ class App(ctk.CTk):
         opt.pack(side="right")
 
         canvas = tk.Canvas(parent, height=180, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 14))
+        canvas.pack(fill="x", padx=16, pady=(0, 4))
+
+        tip_row = ctk.CTkFrame(parent, height=22, fg_color="transparent")
+        tip_row.pack(fill="x", padx=16, pady=(0, 10))
+        tip_row.pack_propagate(False)
+        tip = mk_label(tip_row, "", size=11, color=MUTED)
 
         def _redraw(*_):
             w = canvas.winfo_width()
             if w < 50:
                 return
-            self._draw_lines(canvas, line_skill.get(), w, None)
+            self._draw_lines(canvas, line_skill.get(), w, tip)
 
         _line_pending = [None]
         def _redraw_debounced_line(*_):
@@ -2694,9 +2705,8 @@ class App(ctk.CTk):
                     )
                     prev_month = m
 
-        # Hover: show cumulative total at nearest day, centered on pointer X
+        # Hover: label below canvas, centered on pointer X with edge clamping
         def _hover(event):
-            canvas.delete("tip")
             if num_days < 2:
                 return
             frac = (event.x - LM) / draw_w
@@ -2705,11 +2715,11 @@ class App(ctk.CTk):
             val  = cumulative[idx]
             txt  = f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h"
             tip_x = max(50, min(event.x, canvas_w - 50))
-            canvas.create_text(tip_x, 5, text=txt, fill=TEXT,
-                               font=("Helvetica", 10), anchor="n", tags="tip")
+            tip_lbl.configure(text=txt)
+            tip_lbl.place(x=tip_x, y=2, anchor="n")
 
         canvas.bind("<Motion>", _hover)
-        canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
+        canvas.bind("<Leave>", lambda _: (tip_lbl.configure(text=""), tip_lbl.place_forget()))
 
     # ── Leaderboard View ──────────────────────────────────────────────────────
     # ── Records ───────────────────────────────────────────────────────────────
