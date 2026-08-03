@@ -3679,83 +3679,67 @@ class App(ctk.CTk):
         rows = get_skill_log()
         active_skills = {name for name, _ in get_user_skills()}
 
-        ROW_H   = 26
-        PAD_X   = 28
-        HDR_H   = 28
-        SEP     = 1
-        COL_SES = 80   # width of Sessions column (right-aligned)
-        COL_DAT = 90   # width of Last used column (right-aligned)
+        ROW_H    = 24
+        HDR_H    = 22
+        TW       = 320   # fixed table width
+        COL_NAME = 160
+        COL_SES  = 70
+        COL_DAT  = 90
+        total_h  = HDR_H + 1 + ROW_H * len(rows) + 4
 
-        total_h = HDR_H + SEP + ROW_H * len(rows) + 10
+        cv = tk.Canvas(self._skilllog_view, bg=BG, highlightthickness=0,
+                       width=TW, height=total_h)
+        cv.place(relx=0.5, rely=0.0, anchor="n", y=28)
 
-        outer = ctk.CTkFrame(self._skilllog_view, fg_color=BG)
-        outer.pack(fill="both", expand=True)
+        x0 = 0
+        x1 = COL_NAME
+        x2 = COL_NAME + COL_SES
+        x3 = TW
 
-        cv = tk.Canvas(outer, bg=BG, highlightthickness=0, height=total_h)
-        cv.pack(fill="both", expand=True, padx=PAD_X, pady=(18, 8))
+        # Header
+        cv.create_text(x0, HDR_H // 2, text="Skill",
+                       anchor="w", fill=DIM, font=("Helvetica", 10))
+        cv.create_text(x2, HDR_H // 2, text="n",
+                       anchor="e", fill=DIM, font=("Helvetica", 10))
+        cv.create_text(x3, HDR_H // 2, text="Last used",
+                       anchor="e", fill=DIM, font=("Helvetica", 10))
+        cv.create_line(x0, HDR_H, x3, HDR_H, fill=BORDER, width=1)
 
-        def _draw(event=None):
-            cv.delete("all")
-            W = cv.winfo_width()
-            if W < 10:
-                return
+        y = HDR_H + 1
+        for skill, cnt, last_date in rows:
+            is_active = skill in active_skills
+            cy = y + ROW_H // 2
 
-            x_name = 0
-            x_ses  = W - COL_DAT - COL_SES
-            x_dat  = W - COL_DAT
-
-            # Header labels
-            cv.create_text(x_name, HDR_H // 2, text="Skill",
-                           anchor="w", fill=DIM, font=("Helvetica", 10))
-            cv.create_text(x_ses + COL_SES, HDR_H // 2, text="Sessions",
-                           anchor="e", fill=DIM, font=("Helvetica", 10))
-            cv.create_text(x_dat + COL_DAT, HDR_H // 2, text="Last used",
-                           anchor="e", fill=DIM, font=("Helvetica", 10))
-
-            # Separator
-            cv.create_line(0, HDR_H, W, HDR_H, fill=BORDER, width=1)
-
-            y0 = HDR_H + SEP
-            for skill, cnt, last_date in rows:
-                is_active = skill in active_skills
-                cy = y0 + ROW_H // 2
-
-                name_col = TEXT if is_active else MUTED
-                cv.create_text(x_name, cy, text=skill,
-                               anchor="w", fill=name_col, font=("Helvetica", 13))
-
-                if not is_active:
-                    # small dot after name to mark inactive
-                    txt_w = cv.bbox(cv.find_withtag("current")) or (0, 0, 80, 0)
-                    try:
-                        items = cv.find_all()
-                        bb = cv.bbox(items[-1]) if items else None
-                        dot_x = (bb[2] + 6) if bb else 60
-                    except Exception:
-                        dot_x = 60
-                    cv.create_oval(dot_x, cy - 3, dot_x + 5, cy + 2,
+            name_col = TEXT if is_active else MUTED
+            tid = cv.create_text(x0, cy, text=skill, anchor="w",
+                                 fill=name_col, font=("Helvetica", 13))
+            if not is_active:
+                bb = cv.bbox(tid)
+                if bb:
+                    cv.create_oval(bb[2] + 5, cy - 2, bb[2] + 10, cy + 3,
                                    fill=DIM, outline="")
 
-                cv.create_text(x_ses + COL_SES, cy, text=str(cnt),
-                               anchor="e", fill=MUTED, font=("Helvetica", 13))
+            cv.create_text(x2, cy, text=str(cnt),
+                           anchor="e", fill=MUTED, font=("Helvetica", 13))
 
-                if last_date:
-                    try:
-                        d = datetime.strptime(last_date, "%Y-%m-%d")
-                        date_str = d.strftime("%d.%m.%y")
-                    except Exception:
-                        date_str = last_date
-                else:
-                    date_str = "—"
-                cv.create_text(x_dat + COL_DAT, cy, text=date_str,
-                               anchor="e", fill=DIM, font=("Helvetica", 13))
+            if last_date:
+                try:
+                    d = datetime.strptime(last_date, "%Y-%m-%d")
+                    date_str = d.strftime("%d.%m.%y")
+                except Exception:
+                    date_str = last_date
+            else:
+                date_str = "—"
+            cv.create_text(x3, cy, text=date_str,
+                           anchor="e", fill=DIM, font=("Helvetica", 13))
 
-                y0 += ROW_H
+            y += ROW_H
 
-            cv.configure(height=y0 + 10)
+        cv.configure(height=y + 4)
 
-        cv.bind("<Configure>", _draw)
-        cv.after(50, _draw)
+        if not rows:
+            cv.create_text(TW // 2, 60, text="No skill data yet.",
+                           anchor="center", fill=MUTED, font=("Helvetica", 13))
 
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
