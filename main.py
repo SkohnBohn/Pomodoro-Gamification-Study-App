@@ -637,7 +637,6 @@ class App(ctk.CTk):
             "stats":        "_stats_scroll",
             "records":      "_rec_scroll",
             "leaderboard":  "_lb_scroll",
-            "skilllog":     "_skilllog_scroll",
         }
         sf_attr = _scroll_frames.get(key)
         if sf_attr and hasattr(self, sf_attr):
@@ -3668,74 +3667,95 @@ class App(ctk.CTk):
     # ── Skill Log tab ─────────────────────────────────────────────────────────
     def _build_skilllog_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
-        self._skilllog_scroll = ctk.CTkScrollableFrame(
-            view, fg_color=BG,
-            scrollbar_button_color=BG,
-            scrollbar_button_hover_color=BG,
-        )
-        self._skilllog_scroll.pack(fill="both", expand=True, padx=18, pady=(18, 18))
+        self._skilllog_view = view
         return view
 
     def _refresh_skilllog(self):
-        if not hasattr(self, "_skilllog_scroll"):
+        if not hasattr(self, "_skilllog_view"):
             return
-        for w in self._skilllog_scroll.winfo_children():
+        for w in self._skilllog_view.winfo_children():
             w.destroy()
-        sc = self._skilllog_scroll
 
         rows = get_skill_log()
         active_skills = {name for name, _ in get_user_skills()}
 
-        if not rows:
-            mk_label(sc, "No skill data yet.", color=MUTED, size=13).pack(pady=40)
-            return
+        ROW_H   = 26
+        PAD_X   = 28
+        HDR_H   = 28
+        SEP     = 1
+        COL_SES = 80   # width of Sessions column (right-aligned)
+        COL_DAT = 90   # width of Last used column (right-aligned)
 
-        # Column header
-        hdr = ctk.CTkFrame(sc, fg_color="transparent")
-        hdr.pack(fill="x", padx=4, pady=(0, 6))
-        hdr.columnconfigure(0, weight=1)
-        hdr.columnconfigure(1, minsize=70)
-        hdr.columnconfigure(2, minsize=88)
-        mk_label(hdr, "Skill", size=10, color=DIM).grid(row=0, column=0, sticky="w")
-        mk_label(hdr, "Sessions", size=10, color=DIM).grid(row=0, column=1, sticky="e")
-        mk_label(hdr, "Last used", size=10, color=DIM).grid(row=0, column=2, sticky="e")
+        total_h = HDR_H + SEP + ROW_H * len(rows) + 10
 
-        ctk.CTkFrame(sc, height=1, fg_color=BORDER).pack(fill="x", padx=4, pady=(0, 4))
+        outer = ctk.CTkFrame(self._skilllog_view, fg_color=BG)
+        outer.pack(fill="both", expand=True)
 
-        for skill, cnt, last_date in rows:
-            is_active = skill in active_skills
+        cv = tk.Canvas(outer, bg=BG, highlightthickness=0, height=total_h)
+        cv.pack(fill="both", expand=True, padx=PAD_X, pady=(18, 8))
 
-            row = ctk.CTkFrame(sc, fg_color="transparent")
-            row.pack(fill="x", padx=4, pady=2)
-            row.columnconfigure(0, weight=1)
-            row.columnconfigure(1, minsize=70)
-            row.columnconfigure(2, minsize=88)
+        def _draw(event=None):
+            cv.delete("all")
+            W = cv.winfo_width()
+            if W < 10:
+                return
 
-            # Name cell — inline dot for inactive skills
-            name_cell = ctk.CTkFrame(row, fg_color="transparent")
-            name_cell.grid(row=0, column=0, sticky="w")
-            name_color = TEXT if is_active else MUTED
-            mk_label(name_cell, skill, size=13, color=name_color).pack(
-                side="left")
-            if not is_active:
-                ctk.CTkFrame(name_cell, width=5, height=5, corner_radius=3,
-                             fg_color=DIM).pack(side="left", padx=(5, 0))
+            x_name = 0
+            x_ses  = W - COL_DAT - COL_SES
+            x_dat  = W - COL_DAT
 
-            # Session count
-            mk_label(row, str(cnt), size=13, color=MUTED).grid(
-                row=0, column=1, sticky="e")
+            # Header labels
+            cv.create_text(x_name, HDR_H // 2, text="Skill",
+                           anchor="w", fill=DIM, font=("Helvetica", 10))
+            cv.create_text(x_ses + COL_SES, HDR_H // 2, text="Sessions",
+                           anchor="e", fill=DIM, font=("Helvetica", 10))
+            cv.create_text(x_dat + COL_DAT, HDR_H // 2, text="Last used",
+                           anchor="e", fill=DIM, font=("Helvetica", 10))
 
-            # Last date — compact
-            if last_date:
-                try:
-                    d = datetime.strptime(last_date, "%Y-%m-%d")
-                    date_str = d.strftime("%d.%m.%y")
-                except Exception:
-                    date_str = last_date
-            else:
-                date_str = "—"
-            mk_label(row, date_str, size=13, color=DIM).grid(
-                row=0, column=2, sticky="e")
+            # Separator
+            cv.create_line(0, HDR_H, W, HDR_H, fill=BORDER, width=1)
+
+            y0 = HDR_H + SEP
+            for skill, cnt, last_date in rows:
+                is_active = skill in active_skills
+                cy = y0 + ROW_H // 2
+
+                name_col = TEXT if is_active else MUTED
+                cv.create_text(x_name, cy, text=skill,
+                               anchor="w", fill=name_col, font=("Helvetica", 13))
+
+                if not is_active:
+                    # small dot after name to mark inactive
+                    txt_w = cv.bbox(cv.find_withtag("current")) or (0, 0, 80, 0)
+                    try:
+                        items = cv.find_all()
+                        bb = cv.bbox(items[-1]) if items else None
+                        dot_x = (bb[2] + 6) if bb else 60
+                    except Exception:
+                        dot_x = 60
+                    cv.create_oval(dot_x, cy - 3, dot_x + 5, cy + 2,
+                                   fill=DIM, outline="")
+
+                cv.create_text(x_ses + COL_SES, cy, text=str(cnt),
+                               anchor="e", fill=MUTED, font=("Helvetica", 13))
+
+                if last_date:
+                    try:
+                        d = datetime.strptime(last_date, "%Y-%m-%d")
+                        date_str = d.strftime("%d.%m.%y")
+                    except Exception:
+                        date_str = last_date
+                else:
+                    date_str = "—"
+                cv.create_text(x_dat + COL_DAT, cy, text=date_str,
+                               anchor="e", fill=DIM, font=("Helvetica", 13))
+
+                y0 += ROW_H
+
+            cv.configure(height=y0 + 10)
+
+        cv.bind("<Configure>", _draw)
+        cv.after(50, _draw)
 
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
