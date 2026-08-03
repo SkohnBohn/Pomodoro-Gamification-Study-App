@@ -16,6 +16,7 @@ _SETTINGS_DEFAULTS = {
     "sound_finish":   True,
     "day_end_hour":   3,
     "hidden_tabs":    [],
+    "known_tabs":     [],
 }
 
 def load_settings() -> dict:
@@ -341,9 +342,9 @@ def get_skill_log() -> list:
     rows = c.execute(
         """
         SELECT skill,
-               COUNT(*)                              AS cnt,
-               MAX(DATE(timestamp))                 AS last_date
-        FROM   pomodoro_sessions
+               COUNT(*)   AS cnt,
+               MAX(date)  AS last_date
+        FROM   pomodoro_session
         WHERE  skill IS NOT NULL AND skill != ''
         GROUP  BY skill
         ORDER  BY cnt DESC

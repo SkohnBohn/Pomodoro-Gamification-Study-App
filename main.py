@@ -570,7 +570,20 @@ class App(ctk.CTk):
         self._sidebar_footer.pack(side="bottom", fill="x", padx=14, pady=(0, 20))
 
     def _apply_tab_visibility(self):
-        hidden = set(load_settings().get("hidden_tabs", []))
+        # One-time migration: hide tabs that are new since the user's settings
+        # were last written (they won't have them in hidden_tabs yet).
+        s = load_settings()
+        known = set(s.get("known_tabs", []))
+        _new_hidden_by_default = {"skilllog"}
+        newly_added = _new_hidden_by_default - known
+        if newly_added:
+            cur_hidden = set(s.get("hidden_tabs", []))
+            cur_hidden |= newly_added
+            save_settings("hidden_tabs", list(cur_hidden))
+            save_settings("known_tabs", list(known | newly_added))
+            s = load_settings()
+
+        hidden = set(s.get("hidden_tabs", []))
         for btn in self._nav_btns.values():
             btn.pack_forget()
         for key, btn in self._nav_btns.items():
