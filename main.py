@@ -1454,7 +1454,6 @@ class App(ctk.CTk):
         name = self._new_name.get().strip()
         if name:
             add_user_skill(name, "")
-            self._skill_edit_mode = False
             self._build_skill_grid()
 
     def _remove_skill(self, name: str):
