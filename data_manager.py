@@ -331,6 +331,28 @@ def delete_user_skill(name: str):
     conn.close()
 
 
+def get_skill_log() -> list:
+    """Return [(skill, session_count, last_date_str), ...] sorted by session count desc.
+
+    last_date_str is ISO 'YYYY-MM-DD' or None.
+    """
+    conn = sqlite3.connect(config.DB_FILE)
+    c = conn.cursor()
+    rows = c.execute(
+        """
+        SELECT skill,
+               COUNT(*)                              AS cnt,
+               MAX(DATE(timestamp))                 AS last_date
+        FROM   pomodoro_sessions
+        WHERE  skill IS NOT NULL AND skill != ''
+        GROUP  BY skill
+        ORDER  BY cnt DESC
+        """
+    ).fetchall()
+    conn.close()
+    return rows
+
+
 # ── Stat level confirmation ────────────────────────────────────────────────────
 
 def get_stat_confirmed_levels() -> dict:

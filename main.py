@@ -25,7 +25,7 @@ from data_manager import (
     get_skill_confirmed_levels, confirm_skill_level,
     get_achievements_collected, mark_achievement_collected,
     get_badge_unlock_date, get_badge_unlock_info,
-    get_user_skills, add_user_skill, delete_user_skill,
+    get_user_skills, add_user_skill, delete_user_skill, get_skill_log,
     get_heatmap_data,
     get_stat_confirmed_levels, confirm_stat_level, get_chart_data,
     get_first_session_date, get_streak,
@@ -464,6 +464,7 @@ class App(ctk.CTk):
             ("Stats",         "stats"),
             ("Records",       "records"),
             ("Leaderboard",   "leaderboard"),
+            ("Skill Log",     "skilllog"),
         ]:
             b = ctk.CTkButton(
                 self._nav_frame, text=text, anchor="w",
@@ -601,6 +602,7 @@ class App(ctk.CTk):
                 "stats":        self._build_stats_view,
                 "records":      self._build_records_view,
                 "leaderboard":  self._build_leaderboard_view,
+                "skilllog":     self._build_skilllog_view,
             }
             self._views[key] = builders[key]()
 
@@ -613,6 +615,7 @@ class App(ctk.CTk):
         elif key == "stats":        self._refresh_stats()
         elif key == "records":      self._refresh_records()
         elif key == "leaderboard":  self._refresh_leaderboard()
+        elif key == "skilllog":     self._refresh_skilllog()
 
         _scroll_frames = {
             "skills":       "_sk_scroll",
@@ -621,6 +624,7 @@ class App(ctk.CTk):
             "stats":        "_stats_scroll",
             "records":      "_rec_scroll",
             "leaderboard":  "_lb_scroll",
+            "skilllog":     "_skilllog_scroll",
         }
         sf_attr = _scroll_frames.get(key)
         if sf_attr and hasattr(self, sf_attr):
@@ -916,12 +920,15 @@ class App(ctk.CTk):
             ("Stats",        "stats"),
             ("Records",      "records"),
             ("Leaderboard",  "leaderboard"),
+            ("Skill Log",    "skilllog"),
         ]
 
         tabs_row1 = ctk.CTkFrame(dlg, fg_color="transparent")
         tabs_row1.pack(anchor="w", padx=20, pady=(6, 0))
         tabs_row2 = ctk.CTkFrame(dlg, fg_color="transparent")
         tabs_row2.pack(anchor="w", padx=20, pady=(4, 0))
+        tabs_row3 = ctk.CTkFrame(dlg, fg_color="transparent")
+        tabs_row3.pack(anchor="w", padx=20, pady=(4, 0))
 
         def _redraw_tab_sq(c, key):
             c.delete("all")
@@ -930,7 +937,7 @@ class App(ctk.CTk):
             c.create_rectangle(0, 0, 11, 11, fill=fill, outline=DARK, width=1)
 
         for i, (label, key) in enumerate(_TAB_LABELS):
-            row = tabs_row1 if i < 3 else tabs_row2
+            row = tabs_row1 if i < 3 else tabs_row2 if i < 6 else tabs_row3
             cell = ctk.CTkFrame(row, fg_color="transparent")
             cell.pack(side="left", padx=(0, 14))
 
@@ -3645,6 +3652,77 @@ class App(ctk.CTk):
                 width=220, height=36,
             ).pack(pady=14)
 
+    # ── Skill Log tab ─────────────────────────────────────────────────────────
+    def _build_skilllog_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+        self._skilllog_scroll = ctk.CTkScrollableFrame(
+            view, fg_color=BG,
+            scrollbar_button_color=BG,
+            scrollbar_button_hover_color=BG,
+        )
+        self._skilllog_scroll.pack(fill="both", expand=True, padx=18, pady=(18, 18))
+        return view
+
+    def _refresh_skilllog(self):
+        if not hasattr(self, "_skilllog_scroll"):
+            return
+        for w in self._skilllog_scroll.winfo_children():
+            w.destroy()
+        sc = self._skilllog_scroll
+
+        rows = get_skill_log()
+        active_skills = {name for name, _ in get_user_skills()}
+
+        if not rows:
+            mk_label(sc, "No skill data yet.", color=MUTED, size=13).pack(pady=40)
+            return
+
+        # Column header
+        hdr = ctk.CTkFrame(sc, fg_color="transparent")
+        hdr.pack(fill="x", padx=4, pady=(0, 6))
+        hdr.columnconfigure(0, weight=1)
+        hdr.columnconfigure(1, minsize=70)
+        hdr.columnconfigure(2, minsize=88)
+        mk_label(hdr, "Skill", size=10, color=DIM).grid(row=0, column=0, sticky="w")
+        mk_label(hdr, "Sessions", size=10, color=DIM).grid(row=0, column=1, sticky="e")
+        mk_label(hdr, "Last used", size=10, color=DIM).grid(row=0, column=2, sticky="e")
+
+        ctk.CTkFrame(sc, height=1, fg_color=BORDER).pack(fill="x", padx=4, pady=(0, 4))
+
+        for skill, cnt, last_date in rows:
+            is_active = skill in active_skills
+
+            row = ctk.CTkFrame(sc, fg_color="transparent")
+            row.pack(fill="x", padx=4, pady=2)
+            row.columnconfigure(0, weight=1)
+            row.columnconfigure(1, minsize=70)
+            row.columnconfigure(2, minsize=88)
+
+            # Name cell — inline dot for inactive skills
+            name_cell = ctk.CTkFrame(row, fg_color="transparent")
+            name_cell.grid(row=0, column=0, sticky="w")
+            name_color = TEXT if is_active else MUTED
+            mk_label(name_cell, skill, size=13, color=name_color).pack(
+                side="left")
+            if not is_active:
+                ctk.CTkFrame(name_cell, width=5, height=5, corner_radius=3,
+                             fg_color=DIM).pack(side="left", padx=(5, 0))
+
+            # Session count
+            mk_label(row, str(cnt), size=13, color=MUTED).grid(
+                row=0, column=1, sticky="e")
+
+            # Last date — compact
+            if last_date:
+                try:
+                    d = datetime.strptime(last_date, "%Y-%m-%d")
+                    date_str = d.strftime("%d.%m.%y")
+                except Exception:
+                    date_str = last_date
+            else:
+                date_str = "—"
+            mk_label(row, date_str, size=13, color=DIM).grid(
+                row=0, column=2, sticky="e")
 
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
