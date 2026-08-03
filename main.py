@@ -1415,15 +1415,14 @@ class App(ctk.CTk):
                 font=ctk.CTkFont(size=12),
             )
             self._new_name.pack(side="left", fill="x", expand=True, padx=(0, 6))
-            plus_lbl = ctk.CTkLabel(
-                add_row, text="+", width=20, height=28,
-                font=ctk.CTkFont(size=18, weight="bold"),
-                text_color=MUTED, fg_color="transparent",
+            plus_btn = ctk.CTkButton(
+                add_row, text="+", width=28, height=28, corner_radius=8,
+                fg_color="transparent", hover_color=BORDER, text_color=MUTED,
+                border_width=0, font=ctk.CTkFont(size=18, weight="bold"),
+                command=self._add_skill,
             )
-            plus_lbl.pack(side="right")
-            plus_lbl.bind("<Button-1>", lambda _: self._add_skill())
-            plus_lbl.bind("<Enter>", lambda _: plus_lbl.configure(text_color=DARK))
-            plus_lbl.bind("<Leave>", lambda _: plus_lbl.configure(text_color=MUTED))
+            plus_btn.pack(side="right")
+            self._new_name.bind("<Return>", lambda _: self._add_skill())
         else:
             # Normal mode: 3-col grid
             for i, (name, emoji) in enumerate(skills):
@@ -1455,6 +1454,7 @@ class App(ctk.CTk):
         if name:
             add_user_skill(name, "")
             self._build_skill_grid()
+            self._new_name.focus_set()
 
     def _remove_skill(self, name: str):
         delete_user_skill(name)
