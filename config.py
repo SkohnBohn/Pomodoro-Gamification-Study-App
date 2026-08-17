@@ -1,11 +1,31 @@
 import os
 
-BASE_DIR    = os.path.expanduser("~/Desktop/Pomodoro/NEWUI")
+# Load .env file if present (dev only, never committed)
+def _load_dotenv():
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
 
-DB_NEWUI = os.path.expanduser("~/Desktop/Pomodoro/NEWUI/DB/pomodoro_sessions.db")
-DB_MAIN  = os.path.expanduser("~/Desktop/Pomodoro/DB/pomodoro_sessions.db")
+_load_dotenv()
 
-DB_FILE       = DB_MAIN  # active DB — reassigned at runtime by _switch_db()
+DEV_MODE = os.environ.get("POMODORO_DEV") == "1"
+
+if DEV_MODE:
+    BASE_DIR = os.path.expanduser("~/Desktop/Pomodoro/NEWUI")
+    DB_NEWUI = os.path.expanduser("~/Desktop/Pomodoro/NEWUI/DB/pomodoro_sessions.db")
+    DB_MAIN  = os.path.expanduser("~/Desktop/Pomodoro/DB/pomodoro_sessions.db")
+else:
+    BASE_DIR = os.path.join(os.path.expanduser("~"), ".pomodoro")
+    DB_MAIN  = os.path.join(BASE_DIR, "pomodoro_sessions.db")
+    DB_NEWUI = DB_MAIN
+
+DB_FILE = DB_MAIN  # active DB — reassigned at runtime by _switch_db()
 BADGE_DIR     = os.path.expanduser("~/Desktop/Pomodoro/badges")
 SETTINGS_FILE = "/Users/sky/Desktop/Pomodoro/global_settings"
 
