@@ -1806,7 +1806,7 @@ class App(ctk.CTk):
         mk_label(int_card, "INTENTION", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.intention_entry = ctk.CTkEntry(
             int_card, height=34, placeholder_text="",
-            corner_radius=6, fg_color=BG, border_color=BORDER,
+            corner_radius=6, fg_color=CARD, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
@@ -1817,7 +1817,7 @@ class App(ctk.CTk):
         notes_card.pack(fill="both", expand=True)
         mk_label(notes_card, "NOTES", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.notes_box = ctk.CTkTextbox(
-            notes_card, corner_radius=6, fg_color=BG,
+            notes_card, corner_radius=6, fg_color=CARD,
             text_color=TEXT, font=ctk.CTkFont(size=13),
             border_color=BORDER, border_width=1,
         )
@@ -1882,7 +1882,7 @@ class App(ctk.CTk):
                 b = ctk.CTkButton(
                     self._sk_grid_frame,
                     text=name, width=82, height=28, corner_radius=6,
-                    fg_color=BG, hover_color=BG, text_color=MUTED,
+                    fg_color=CARD, hover_color=CARD, text_color=MUTED,
                     border_width=1, border_color=BORDER, font=ctk.CTkFont(size=11),
                     command=lambda s=name: self._pick_skill(s),
                 )
@@ -1922,15 +1922,15 @@ class App(ctk.CTk):
             self.selected_skill = ""
             save_settings("selected_skill", "")
             for b in self._skill_btns.values():
-                b.configure(fg_color=BG, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
             return
         self.selected_skill = skill
         save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
             if sk == skill:
-                b.configure(fg_color=BG, text_color=DARK2, border_color=MUTED)
+                b.configure(fg_color=CARD, text_color=DARK2, border_color=MUTED)
             else:
-                b.configure(fg_color=BG, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
 
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
