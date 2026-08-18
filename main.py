@@ -1034,10 +1034,9 @@ class App(ctk.CTk):
     def _build_settings_view(self):
         outer = ctk.CTkFrame(self.content, fg_color=BG, corner_radius=0)
 
-        # ── Optional close button (temp mode only) ───────────────────────────
         if not self._settings_permanent:
             close_bar = ctk.CTkFrame(outer, fg_color="transparent")
-            close_bar.pack(fill="x", padx=20, pady=(20, 0))
+            close_bar.pack(fill="x", padx=16, pady=(14, 0))
             ctk.CTkButton(
                 close_bar, text="×", width=28, height=28, corner_radius=8,
                 fg_color="transparent", hover_color=CARD,
@@ -1046,75 +1045,78 @@ class App(ctk.CTk):
                 command=self._close_settings_tab,
             ).pack(side="right")
 
-        # ── Two-column layout ────────────────────────────────────────────────
         body = ctk.CTkFrame(outer, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=0, pady=(12, 0))
+        body.pack(fill="both", expand=True, padx=0, pady=(8, 0))
 
-        # Left nav column (~120px)
-        nav_col = ctk.CTkFrame(body, fg_color="transparent", width=120)
-        nav_col.pack(side="left", fill="y", padx=(20, 0), pady=(0, 20))
+        nav_col = ctk.CTkFrame(body, fg_color="transparent", width=100)
+        nav_col.pack(side="left", fill="y", padx=(12, 0), pady=(0, 16))
         nav_col.pack_propagate(False)
 
-        # Right scrollable content
-        scroll = ctk.CTkScrollableFrame(body, fg_color="transparent", corner_radius=0)
-        scroll.pack(side="left", fill="both", expand=True, padx=(12, 8), pady=(0, 20))
+        scroll = ctk.CTkScrollableFrame(
+            body, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=BG, scrollbar_button_hover_color=BG,
+        )
+        scroll.pack(side="left", fill="both", expand=True, padx=(8, 4), pady=(0, 16))
         _fix_scroll(scroll)
 
-        _subtabs = [
-            ("Timer",      "timer"),
-            ("Appearance", "appearance"),
-            ("Sound",      "sound"),
-            ("Data",       "data"),
-            ("App",        "app"),
-        ]
+        _subtabs    = [("Timer","timer"),("Appearance","appearance"),
+                       ("Sound","sound"),("Data","data"),("App","app")]
         _active_sub = {"key": None}
-        _built      = {}   # lazy cache: key → frame
+        _built      = {}
         sub_btns    = {}
 
-        # ── Shared helpers (available to all builders) ────────────────────────
+        # ── Helpers ────────────────────────────────────────────────────────────
         def _section(parent, title):
-            mk_label(parent, title, size=11, color=MUTED).pack(anchor="w", pady=(18, 6))
+            mk_label(parent, title, size=10, color=MUTED).pack(anchor="w", pady=(14, 4))
 
-        def _pill_row(parent, width=220):
-            f = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=14, height=34, width=width)
-            f.pack(anchor="w")
-            f.pack_propagate(False)
-            return f
+        def _seg(parent, options, current, on_select):
+            """Plain-text segmented selector — no pill backgrounds."""
+            row = ctk.CTkFrame(parent, fg_color="transparent")
+            row.pack(anchor="w")
+            btns = {}
 
-        def _pill_btn(parent, text, width, active, command):
-            return ctk.CTkButton(
-                parent, text=text, width=width, height=34, corner_radius=12,
-                fg_color=DARK if active else "transparent", hover_color=DARK2,
-                text_color=BG if active else MUTED, border_width=0,
-                font=ctk.CTkFont(size=11, weight="bold"), command=command,
-            )
+            def _sel(val):
+                on_select(val)
+                for v, b in btns.items():
+                    active = v == val
+                    b.configure(
+                        text_color=DARK if active else MUTED,
+                        font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
+                    )
 
-        # ── Lazy builders ─────────────────────────────────────────────────────
+            for label, val in options:
+                active = val == current
+                b = ctk.CTkButton(
+                    row, text=label, width=0, height=26,
+                    fg_color="transparent", hover_color="transparent",
+                    text_color=DARK if active else MUTED, border_width=0,
+                    font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
+                    command=lambda v=val: _sel(v),
+                )
+                b.pack(side="left", padx=(0, 14))
+                btns[val] = b
+
+            return btns
+
+        # ── Lazy builders ──────────────────────────────────────────────────────
         def _build_timer(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
 
             _section(f, "Max Pomo Duration")
-            presets = [25, 45, 60, 90, 120]
-            pill_w = 44
-            pc = ctk.CTkFrame(f, fg_color=CARD, corner_radius=14,
-                              height=34, width=len(presets)*pill_w+4)
-            pc.pack(anchor="w")
-            pc.pack_propagate(False)
+            preset_vals = [25, 45, 60, 90, 120]
             preset_btns = {}
 
-            def _flash_pc():
-                pc.configure(fg_color=BORDER)
-                outer.after(180, lambda: pc.configure(fg_color=CARD))
-
-            def _select_preset(v, deselect_custom=True):
+            def _select_preset(v, reset_custom=True):
                 self._pomo_max_mins = float(v)
                 save_settings("pomo_max_mins", float(v))
-                for val, btn in preset_btns.items():
-                    btn.configure(fg_color=DARK if val==v else "transparent",
-                                  text_color=BG if val==v else MUTED)
-                if deselect_custom:
+                for pv, pb in preset_btns.items():
+                    active = pv == v
+                    pb.configure(
+                        text_color=DARK if active else MUTED,
+                        font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
+                    )
+                if reset_custom:
                     custom_entry.configure(border_color=BORDER)
-                _flash_pc()
                 if not self.running:
                     self._pomo_mins = min(self._pomo_mins, self._pomo_max_mins)
                     total_s = int(self._pomo_mins * 60)
@@ -1122,28 +1124,30 @@ class App(ctk.CTk):
                     self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
 
             current_pomo = int(self._pomo_max_mins)
-            for i, p in enumerate(presets):
-                px = (2, 0) if i==0 else (0, 2) if i==len(presets)-1 else (0, 0)
+            preset_row = ctk.CTkFrame(f, fg_color="transparent")
+            preset_row.pack(anchor="w")
+            for p in preset_vals:
+                active = p == current_pomo
                 b = ctk.CTkButton(
-                    pc, text=f"{p}", width=pill_w, height=34, corner_radius=12,
-                    fg_color=DARK if p==current_pomo else "transparent", hover_color=DARK2,
-                    text_color=BG if p==current_pomo else MUTED,
-                    font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+                    preset_row, text=str(p), width=0, height=26,
+                    fg_color="transparent", hover_color="transparent",
+                    text_color=DARK if active else MUTED, border_width=0,
+                    font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
                     command=lambda v=p: _select_preset(v),
                 )
-                b.pack(side="left", padx=px, pady=2)
+                b.pack(side="left", padx=(0, 14))
                 preset_btns[p] = b
 
             custom_row = ctk.CTkFrame(f, fg_color="transparent")
-            custom_row.pack(anchor="w", pady=(10, 0))
+            custom_row.pack(anchor="w", pady=(6, 0))
             custom_entry = ctk.CTkEntry(
-                custom_row, width=72, height=30, placeholder_text="custom",
-                corner_radius=10, fg_color=CARD, border_color=BORDER,
+                custom_row, width=60, height=26, placeholder_text="min",
+                corner_radius=8, fg_color=CARD, border_color=BORDER,
                 text_color=TEXT, placeholder_text_color=DIM,
                 font=ctk.CTkFont(size=12), justify="center",
             )
-            custom_entry.pack(side="left", padx=(0, 8))
-            if current_pomo not in presets:
+            custom_entry.pack(side="left", padx=(0, 6))
+            if current_pomo not in preset_vals:
                 custom_entry.insert(0, str(current_pomo))
 
             def _apply_custom(*_):
@@ -1151,10 +1155,11 @@ class App(ctk.CTk):
                 try:
                     v = float(val)
                     if v > 0:
-                        for btn in preset_btns.values():
-                            btn.configure(fg_color="transparent", text_color=MUTED)
+                        for pb in preset_btns.values():
+                            pb.configure(text_color=MUTED,
+                                         font=ctk.CTkFont(size=12, weight="normal"))
                         custom_entry.configure(border_color=DARK)
-                        _select_preset(v, deselect_custom=False)
+                        _select_preset(v, reset_custom=False)
                     else:
                         raise ValueError
                 except ValueError:
@@ -1162,73 +1167,31 @@ class App(ctk.CTk):
                     outer.after(1200, lambda: custom_entry.configure(border_color=BORDER))
 
             ctk.CTkButton(
-                custom_row, text="✓", width=30, height=30, corner_radius=10,
-                fg_color=DARK, hover_color=DARK2, text_color=BG,
-                font=ctk.CTkFont(size=13, weight="bold"), border_width=0,
+                custom_row, text="✓", width=26, height=26, corner_radius=8,
+                fg_color=CARD, hover_color=DARK2, text_color=DARK,
+                font=ctk.CTkFont(size=12, weight="bold"), border_width=0,
                 command=_apply_custom,
             ).pack(side="left")
             custom_entry.bind("<Return>", _apply_custom)
 
             _section(f, "Timer Direction")
-            dir_row = _pill_row(f, 176)
-            fill_btn = _pill_btn(dir_row, "Fill", 86, self._timer_fills, lambda: _set_dir(True))
-            fill_btn.pack(side="left", padx=(2, 0), pady=2)
-            emp_btn = _pill_btn(dir_row, "Empty", 86, not self._timer_fills, lambda: _set_dir(False))
-            emp_btn.pack(side="left", padx=(0, 2), pady=2)
-
-            def _set_dir(fills):
-                self._timer_fills = fills
-                save_settings("timer_fills", fills)
-                fill_btn.configure(fg_color=DARK if fills else "transparent",
-                                   text_color=BG if fills else MUTED)
-                emp_btn.configure(fg_color=DARK if not fills else "transparent",
-                                  text_color=BG if not fills else MUTED)
-                dir_row.configure(fg_color=BORDER)
-                outer.after(180, lambda: dir_row.configure(fg_color=CARD))
+            _seg(f, [("Fill", True), ("Empty", False)], self._timer_fills,
+                 lambda v: (setattr(self, "_timer_fills", v),
+                            save_settings("timer_fills", v)))
 
             _section(f, "Day ends at")
-            _end_hours = [22, 23, 0, 1, 2, 3, 4, 5]
-            _eh_pill_w = 36
-            end_pill = ctk.CTkFrame(f, fg_color=CARD, corner_radius=14,
-                                    height=34, width=len(_end_hours)*_eh_pill_w+4)
-            end_pill.pack(anchor="w")
-            end_pill.pack_propagate(False)
-            _cur_end_h = load_settings().get("day_end_hour", 3)
-            _eh_btns: dict = {}
-
-            def _set_end_hour(h):
-                save_settings("day_end_hour", h)
-                for hh, bb in _eh_btns.items():
-                    bb.configure(fg_color=DARK if hh==h else "transparent",
-                                 text_color=BG if hh==h else MUTED)
-                end_pill.configure(fg_color=BORDER)
-                outer.after(180, lambda: end_pill.configure(fg_color=CARD))
-
-            for i, h in enumerate(_end_hours):
-                px = (2, 0) if i==0 else (0, 2) if i==len(_end_hours)-1 else (0, 0)
-                b = ctk.CTkButton(
-                    end_pill, text=str(h), width=_eh_pill_w, height=34, corner_radius=12,
-                    fg_color=DARK if h==_cur_end_h else "transparent", hover_color=DARK2,
-                    text_color=BG if h==_cur_end_h else MUTED,
-                    font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
-                    command=lambda hh=h: _set_end_hour(hh),
-                )
-                b.pack(side="left", padx=px, pady=2)
-                _eh_btns[h] = b
+            _seg(f,
+                 [(str(h), h) for h in [22, 23, 0, 1, 2, 3, 4, 5]],
+                 load_settings().get("day_end_hour", 3),
+                 lambda v: save_settings("day_end_hour", v))
 
             return f
 
         def _build_appearance(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Theme")
-            theme_row = _pill_row(f, 264)
-            for t_key, t_label in [("yellow", "Yellow"), ("light", "White"), ("dark", "Dark")]:
-                _pill_btn(theme_row, t_label, 86, self._theme==t_key,
-                          lambda k=t_key: self._switch_theme(k)).pack(
-                    side="left",
-                    padx=(2, 0) if t_key=="yellow" else (0, 2) if t_key=="dark" else 0,
-                    pady=2,
-                )
+            _seg(f, [("Yellow","yellow"),("White","light"),("Dark","dark")],
+                 self._theme, lambda k: self._switch_theme(k))
             return f
 
         def _build_sound(parent):
@@ -1240,17 +1203,17 @@ class App(ctk.CTk):
                 ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
             ]:
                 row = ctk.CTkFrame(f, fg_color="transparent")
-                row.pack(anchor="w", pady=4)
-                sq = tk.Canvas(row, width=11, height=11, highlightthickness=0, bg=PANEL)
+                row.pack(anchor="w", pady=3)
+                sq = tk.Canvas(row, width=10, height=10, highlightthickness=0, bg=BG)
                 sq.pack(side="left", padx=(0, 8))
-                lbl = mk_label(row, label, size=13, color=TEXT)
+                lbl = mk_label(row, label, size=12, color=TEXT)
                 lbl.pack(side="left")
 
                 def _draw(c=sq, a=attr):
                     c.delete("all")
-                    c.create_rectangle(0, 0, 11, 11,
-                                       fill=DARK if getattr(_audio, a) else PANEL,
-                                       outline=DARK, width=1)
+                    c.create_rectangle(0, 0, 10, 10,
+                                       fill=DARK if getattr(_audio, a) else BG,
+                                       outline=MUTED, width=1)
                 _draw()
 
                 def _toggle(_, a=attr, sk=setting_key, d=_draw, fn=preview_fn):
@@ -1267,49 +1230,39 @@ class App(ctk.CTk):
         def _build_data(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Database")
-            db_row = _pill_row(f, 220)
-            db_btns = {}
-
-            def _select_db(key):
-                for k, b in db_btns.items():
-                    b.configure(fg_color=DARK if k==key else "transparent",
-                                text_color=BG if k==key else MUTED)
-                self._switch_db(key)
-
             _cur_db = "newui" if config.DB_FILE == DB_NEWUI else "main"
-            for key, label in [("newui", "DB New UI"), ("main", "DB Main")]:
-                b = _pill_btn(db_row, label, 106, _cur_db==key, lambda k=key: _select_db(k))
-                b.pack(side="left", padx=2, pady=2)
-                db_btns[key] = b
+            db_btns = _seg(f, [("DB New UI","newui"),("DB Main","main")], _cur_db,
+                           lambda k: self._switch_db(k))
 
             _section(f, "Log")
             log_row = ctk.CTkFrame(f, fg_color="transparent")
             log_row.pack(anchor="w")
-            mk_btn(log_row, "Open Log", self._open_log, width=120, height=34).pack(side="left")
-            info_lbl = ctk.CTkLabel(log_row, text="ⓘ", width=20, height=20,
+            mk_btn(log_row, "Open Log", self._open_log, width=90, height=26).pack(side="left")
+            info_lbl = ctk.CTkLabel(log_row, text="ⓘ", width=18, height=18,
                                     fg_color="transparent", text_color=DIM,
-                                    font=ctk.CTkFont(size=12))
-            info_lbl.pack(side="left", padx=(8, 0))
+                                    font=ctk.CTkFont(size=11))
+            info_lbl.pack(side="left", padx=(6, 0))
             tip_lbl = mk_label(f, "", size=10, color=DIM)
             tip_lbl.pack(anchor="w")
-            info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log"))
+            info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="needs a SQLite reader"))
             info_lbl.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
             return f
 
         def _build_app(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Settings Tab")
+
             perm_row = ctk.CTkFrame(f, fg_color="transparent")
-            perm_row.pack(anchor="w", pady=4)
-            perm_sq = tk.Canvas(perm_row, width=11, height=11, highlightthickness=0, bg=PANEL)
+            perm_row.pack(anchor="w", pady=3)
+            perm_sq = tk.Canvas(perm_row, width=10, height=10, highlightthickness=0, bg=BG)
             perm_sq.pack(side="left", padx=(0, 8))
-            mk_label(perm_row, "Always show in sidebar", size=13, color=TEXT).pack(side="left")
+            mk_label(perm_row, "Always show in sidebar", size=12, color=TEXT).pack(side="left")
 
             def _draw_perm():
                 perm_sq.delete("all")
-                perm_sq.create_rectangle(0, 0, 11, 11,
-                                         fill=DARK if self._settings_permanent else PANEL,
-                                         outline=DARK, width=1)
+                perm_sq.create_rectangle(0, 0, 10, 10,
+                                         fill=DARK if self._settings_permanent else BG,
+                                         outline=MUTED, width=1)
             _draw_perm()
 
             def _toggle_perm(_):
@@ -1322,36 +1275,32 @@ class App(ctk.CTk):
 
             _section(f, "Visible tabs")
             _TAB_LABELS = [
-                ("Today",        "today"),
-                ("Skilltree",    "skills"),
-                ("Achievements", "achievements"),
-                ("Stats",        "stats"),
-                ("Records",      "records"),
-                ("Leaderboard",  "leaderboard"),
-                ("Skill Log",    "skilllog"),
+                ("Today","today"),("Skilltree","skills"),("Achievements","achievements"),
+                ("Stats","stats"),("Records","records"),("Leaderboard","leaderboard"),
+                ("Skill Log","skilllog"),
             ]
 
-            def _redraw_tab_sq(c, key):
+            def _redraw_sq(c, key):
                 c.delete("all")
                 _h = set(load_settings().get("hidden_tabs", []))
-                c.create_rectangle(0, 0, 11, 11,
-                                   fill=PANEL if key in _h else DARK,
-                                   outline=DARK, width=1)
+                c.create_rectangle(0, 0, 10, 10,
+                                   fill=BG if key in _h else DARK,
+                                   outline=MUTED, width=1)
 
             for label, key in _TAB_LABELS:
                 row = ctk.CTkFrame(f, fg_color="transparent")
                 row.pack(anchor="w", pady=3)
-                sq = tk.Canvas(row, width=11, height=11, highlightthickness=0, bg=PANEL)
+                sq = tk.Canvas(row, width=10, height=10, highlightthickness=0, bg=BG)
                 sq.pack(side="left", padx=(0, 8))
-                lbl = mk_label(row, label, size=13, color=TEXT)
+                lbl = mk_label(row, label, size=12, color=TEXT)
                 lbl.pack(side="left")
-                _redraw_tab_sq(sq, key)
+                _redraw_sq(sq, key)
 
                 def _toggle_tab(_, k=key, c=sq):
                     cur = set(load_settings().get("hidden_tabs", []))
                     cur.discard(k) if k in cur else cur.add(k)
                     save_settings("hidden_tabs", list(cur))
-                    _redraw_tab_sq(c, k)
+                    _redraw_sq(c, k)
                     self._apply_tab_visibility()
 
                 sq.bind("<Button-1>", _toggle_tab)
@@ -1366,7 +1315,6 @@ class App(ctk.CTk):
             "app":        _build_app,
         }
 
-        # ── Switch sub-tab (lazy) ─────────────────────────────────────────────
         def _switch_sub(key):
             prev = _active_sub["key"]
             if prev and prev in _built:
@@ -1379,25 +1327,23 @@ class App(ctk.CTk):
                 )
             if key not in _built:
                 _built[key] = _builders[key](scroll)
-            _built[key].pack(fill="x", padx=28, pady=(4, 20))
+            _built[key].pack(fill="x", padx=20, pady=(4, 16))
 
-        # ── Nav sidebar buttons ───────────────────────────────────────────────
         for label, key in _subtabs:
             b = ctk.CTkButton(
                 nav_col, text=label, anchor="w",
-                height=34, corner_radius=8,
+                height=30, corner_radius=6,
                 fg_color="transparent", hover_color=CARD,
                 text_color=MUTED, border_width=0,
-                font=ctk.CTkFont(size=13),
+                font=ctk.CTkFont(size=12),
                 command=lambda k=key: _switch_sub(k),
             )
-            b.pack(fill="x", padx=4, pady=2)
+            b.pack(fill="x", padx=2, pady=1)
             sub_btns[key] = b
 
         _switch_sub("timer")
         return outer
 
-    # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
         total = calculate_total_time()
         level = calculate_level(total)
