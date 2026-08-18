@@ -1034,29 +1034,26 @@ class App(ctk.CTk):
     def _build_settings_view(self):
         outer = ctk.CTkFrame(self.content, fg_color=BG, corner_radius=0)
 
-        if not self._settings_permanent:
-            close_bar = ctk.CTkFrame(outer, fg_color="transparent")
-            close_bar.pack(fill="x", padx=16, pady=(14, 0))
-            ctk.CTkButton(
-                close_bar, text="×", width=28, height=28, corner_radius=8,
-                fg_color="transparent", hover_color=CARD,
-                text_color=MUTED, border_width=0,
-                font=ctk.CTkFont(size=16),
-                command=self._close_settings_tab,
-            ).pack(side="right")
-
-        body = ctk.CTkFrame(outer, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=0, pady=(8, 0))
-
-        nav_col = ctk.CTkFrame(body, fg_color="transparent", width=100)
-        nav_col.pack(side="left", fill="y", padx=(12, 0), pady=(0, 16))
+        # Nav column — packs first so it sits left; scroll fills the rest
+        nav_col = ctk.CTkFrame(outer, fg_color="transparent", width=100)
+        nav_col.pack(side="left", fill="y", padx=(12, 0), pady=(16, 16))
         nav_col.pack_propagate(False)
 
+        # Close button at bottom of nav (temp/non-permanent mode only)
+        if not self._settings_permanent:
+            ctk.CTkButton(
+                nav_col, text="×", width=28, height=28, corner_radius=6,
+                fg_color="transparent", hover_color=CARD,
+                text_color=MUTED, border_width=0,
+                font=ctk.CTkFont(size=14),
+                command=self._close_settings_tab,
+            ).pack(side="bottom", pady=(0, 4))
+
         scroll = ctk.CTkScrollableFrame(
-            body, fg_color="transparent", corner_radius=0,
+            outer, fg_color="transparent", corner_radius=0,
             scrollbar_button_color=BG, scrollbar_button_hover_color=BG,
         )
-        scroll.pack(side="left", fill="both", expand=True, padx=(8, 4), pady=(0, 16))
+        scroll.pack(side="left", fill="both", expand=True, padx=(8, 4), pady=(16, 16))
         _fix_scroll(scroll)
 
         _subtabs    = [("Timer","timer"),("Appearance","appearance"),
