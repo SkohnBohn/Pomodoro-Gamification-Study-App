@@ -1668,7 +1668,7 @@ class App(ctk.CTk):
         body.pack(fill="both", expand=True, padx=20, pady=(22, 18))
 
         # ── Left ─────────────────────────────────────────────────────────────
-        left = mk_card(body)
+        left = ctk.CTkFrame(body, fg_color="transparent")
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
         self._mode_state = "Pomodoro"
@@ -1755,22 +1755,31 @@ class App(ctk.CTk):
         self._brow.pack(pady=(16, 28))
 
         self.start_btn = ctk.CTkButton(
-            self._brow, text="▶", width=100, height=56, corner_radius=16,
-            fg_color=DARK, hover_color=DARK2, text_color=BG,
-            border_width=0, font=ctk.CTkFont(size=32, weight="bold"),
+            self._brow, text="▶", width=80, height=44, corner_radius=8,
+            fg_color=BG, hover_color=BG, text_color=DARK,
+            border_width=1, border_color=MUTED,
+            font=ctk.CTkFont(size=22),
             command=self._on_start,
         )
-        self.start_btn.pack(side="left", padx=5)
+        self.start_btn.pack(side="left", padx=4)
 
-        self.pause_btn = mk_btn(self._brow, "⏸", self._on_pause,
-                                width=100, height=56, state="disabled")
-        self.pause_btn.configure(font=ctk.CTkFont(size=28, weight="bold"), corner_radius=16)
-        self.pause_btn.pack(side="left", padx=5)
+        self.pause_btn = ctk.CTkButton(
+            self._brow, text="⏸", width=80, height=44, corner_radius=8,
+            fg_color=BG, hover_color=BG, text_color=MUTED,
+            border_width=1, border_color=BORDER,
+            font=ctk.CTkFont(size=20), state="disabled",
+            command=self._on_pause,
+        )
+        self.pause_btn.pack(side="left", padx=4)
 
-        self.stop_btn = mk_btn(self._brow, "⏹", self._on_stop,
-                               width=100, height=56, danger=True, state="disabled")
-        self.stop_btn.configure(font=ctk.CTkFont(size=28, weight="bold"), corner_radius=16)
-        self.stop_btn.pack(side="left", padx=5)
+        self.stop_btn = ctk.CTkButton(
+            self._brow, text="⏹", width=80, height=44, corner_radius=8,
+            fg_color=BG, hover_color=BG, text_color=MUTED,
+            border_width=1, border_color=BORDER,
+            font=ctk.CTkFont(size=20), state="disabled",
+            command=self._on_stop,
+        )
+        self.stop_btn.pack(side="left", padx=4)
 
         # ── Right ─────────────────────────────────────────────────────────────
         right = ctk.CTkFrame(body, fg_color="transparent", width=290)
@@ -1778,46 +1787,46 @@ class App(ctk.CTk):
         right.pack_propagate(False)
 
         # Skill section
-        self._sk_card = mk_card(right)
-        self._sk_card.pack(fill="x", pady=(0, 10))
+        self._sk_card = ctk.CTkFrame(right, fg_color="transparent")
+        self._sk_card.pack(fill="x", pady=(0, 12))
 
         sk_hdr = ctk.CTkFrame(self._sk_card, fg_color="transparent")
-        sk_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        sk_hdr.pack(fill="x", pady=(0, 6))
         mk_label(sk_hdr, "SKILL", size=10, color=MUTED).pack(side="left")
         icon_btn(sk_hdr, "○", self._toggle_skill_edit, size=13).pack(side="right")
 
         self._sk_grid_frame = ctk.CTkFrame(self._sk_card, fg_color="transparent")
-        self._sk_grid_frame.pack(padx=12, pady=(0, 14), fill="x")
+        self._sk_grid_frame.pack(fill="x")
         self._skill_btns: dict = {}
         self._build_skill_grid()
 
         # Intention
-        int_card = mk_card(right)
-        int_card.pack(fill="x", pady=(0, 10))
-        sec_title(int_card, "Intention")
+        int_card = ctk.CTkFrame(right, fg_color="transparent")
+        int_card.pack(fill="x", pady=(0, 12))
+        mk_label(int_card, "INTENTION", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.intention_entry = ctk.CTkEntry(
-            int_card, height=38, placeholder_text="",
-            corner_radius=10, fg_color=CARD, border_color=BORDER,
+            int_card, height=34, placeholder_text="",
+            corner_radius=6, fg_color=BG, border_color=BORDER,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
-        self.intention_entry.pack(fill="x", padx=12, pady=(0, 14))
+        self.intention_entry.pack(fill="x")
 
         # Notes
-        notes_card = mk_card(right)
+        notes_card = ctk.CTkFrame(right, fg_color="transparent")
         notes_card.pack(fill="both", expand=True)
-        sec_title(notes_card, "Notes")
+        mk_label(notes_card, "NOTES", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.notes_box = ctk.CTkTextbox(
-            notes_card, corner_radius=10, fg_color=CARD,
+            notes_card, corner_radius=6, fg_color=BG,
             text_color=TEXT, font=ctk.CTkFont(size=13),
             border_color=BORDER, border_width=1,
         )
-        self.notes_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        self.notes_box.pack(fill="both", expand=True)
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
-        note_btns.pack(fill="x", padx=12, pady=(0, 12))
-        _arrow_btn(note_btns, "up",   self._load_notes_dialog, bg=PANEL).pack(side="left")
-        _arrow_btn(note_btns, "down", self._save_note,         bg=PANEL).pack(side="right")
+        note_btns.pack(fill="x", pady=(4, 0))
+        _arrow_btn(note_btns, "up",   self._load_notes_dialog, bg=BG).pack(side="left")
+        _arrow_btn(note_btns, "down", self._save_note,         bg=BG).pack(side="right")
 
         return view
 
@@ -1872,9 +1881,9 @@ class App(ctk.CTk):
             for i, (name, emoji) in enumerate(skills):
                 b = ctk.CTkButton(
                     self._sk_grid_frame,
-                    text=name, width=82, height=32, corner_radius=8,
-                    fg_color=CARD, hover_color=BORDER, text_color=MUTED,
-                    border_width=1, border_color=BORDER, font=ctk.CTkFont(size=12),
+                    text=name, width=82, height=28, corner_radius=6,
+                    fg_color=BG, hover_color=BG, text_color=MUTED,
+                    border_width=1, border_color=BORDER, font=ctk.CTkFont(size=11),
                     command=lambda s=name: self._pick_skill(s),
                 )
                 b.grid(row=i // 3, column=i % 3, padx=3, pady=3, sticky="ew")
@@ -1913,15 +1922,15 @@ class App(ctk.CTk):
             self.selected_skill = ""
             save_settings("selected_skill", "")
             for b in self._skill_btns.values():
-                b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color=BG, text_color=MUTED, border_color=BORDER)
             return
         self.selected_skill = skill
         save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
             if sk == skill:
-                b.configure(fg_color=DARK, text_color=BG, border_color=DARK)
+                b.configure(fg_color=BG, text_color=DARK2, border_color=MUTED)
             else:
-                b.configure(fg_color=CARD, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color=BG, text_color=MUTED, border_color=BORDER)
 
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
@@ -2214,17 +2223,17 @@ class App(ctk.CTk):
         self.after(50, self._tick_open)
 
     def _btns_running(self):
-        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=DIM,
+        self.start_btn.configure(state="disabled", fg_color=BG, text_color=BORDER,
                                   border_color=BORDER, border_width=1)
-        self.pause_btn.configure(state="normal", text_color=TEXT, text="⏸")
-        self.stop_btn.configure(state="normal", fg_color=DARK, text_color=BG,
-                                border_color=DARK, border_width=0)
+        self.pause_btn.configure(state="normal", text_color=DARK, border_color=MUTED, text="⏸")
+        self.stop_btn.configure(state="normal", fg_color=BG, text_color=DARK,
+                                border_color=MUTED, border_width=1)
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=DARK, text_color=BG,
-                                  border_width=0)
-        self.pause_btn.configure(state="disabled", text_color=MUTED, text="⏸")
-        self.stop_btn.configure(state="disabled", fg_color=CARD, text_color=DANGER,
+        self.start_btn.configure(state="normal", fg_color=BG, text_color=DARK,
+                                  border_color=MUTED, border_width=1)
+        self.pause_btn.configure(state="disabled", text_color=MUTED, border_color=BORDER, text="⏸")
+        self.stop_btn.configure(state="disabled", fg_color=BG, text_color=MUTED,
                                 border_color=BORDER, border_width=1)
 
     def _reset_timer(self):
