@@ -478,12 +478,12 @@ class App(ctk.CTk):
         _nav_items = [
             ("Timer",         "timer"),
             ("Today",         "today"),
+            ("Stats",         "stats"),
             ("Skilltree",     "skills"),
             ("Achievements",  "achievements"),
-            ("Stats",         "stats"),
             ("Records",       "records"),
-            ("Leaderboard",   "leaderboard"),
             ("Skill Log",     "skilllog"),
+            ("Leaderboard",   "leaderboard"),
         ]
         if self._settings_permanent:
             _nav_items.append(("Settings", "settings"))
@@ -981,12 +981,12 @@ class App(ctk.CTk):
 
         _TAB_LABELS = [
             ("Today",        "today"),
+            ("Stats",        "stats"),
             ("Skilltree",    "skills"),
             ("Achievements", "achievements"),
-            ("Stats",        "stats"),
             ("Records",      "records"),
-            ("Leaderboard",  "leaderboard"),
             ("Skill Log",    "skilllog"),
+            ("Leaderboard",  "leaderboard"),
         ]
 
         tabs_row1 = ctk.CTkFrame(dlg, fg_color="transparent")
@@ -1288,9 +1288,9 @@ class App(ctk.CTk):
 
             _section(f, "Visible tabs")
             _TAB_LABELS = [
-                ("Today","today"),("Skilltree","skills"),("Achievements","achievements"),
-                ("Stats","stats"),("Records","records"),("Leaderboard","leaderboard"),
-                ("Skill Log","skilllog"),
+                ("Today","today"),("Stats","stats"),("Skilltree","skills"),
+                ("Achievements","achievements"),("Records","records"),
+                ("Skill Log","skilllog"),("Leaderboard","leaderboard"),
             ]
 
             def _redraw_sq(c, key):
