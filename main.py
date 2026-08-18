@@ -1037,7 +1037,6 @@ class App(ctk.CTk):
         # ── Top bar ──────────────────────────────────────────────────────────
         top_bar = ctk.CTkFrame(outer, fg_color="transparent")
         top_bar.pack(fill="x", padx=28, pady=(28, 16))
-        mk_label(top_bar, "Settings", size=18, weight="bold", color=DARK).pack(side="left")
         if not self._settings_permanent:
             ctk.CTkButton(
                 top_bar, text="×", width=28, height=28, corner_radius=8,
