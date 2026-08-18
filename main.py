@@ -1204,6 +1204,36 @@ class App(ctk.CTk):
             dir_row.configure(fg_color=BORDER)
             outer.after(180, lambda: dir_row.configure(fg_color=CARD))
 
+        _section(f_timer, "Day ends at")
+        _end_hours = [22, 23, 0, 1, 2, 3, 4, 5]
+        _eh_pill_w = 36
+        end_pill = ctk.CTkFrame(f_timer, fg_color=CARD, corner_radius=14,
+                                height=34, width=len(_end_hours)*_eh_pill_w+4)
+        end_pill.pack(anchor="w")
+        end_pill.pack_propagate(False)
+        _cur_end_h = load_settings().get("day_end_hour", 3)
+        _eh_btns: dict = {}
+
+        def _set_end_hour(h):
+            save_settings("day_end_hour", h)
+            for hh, bb in _eh_btns.items():
+                bb.configure(fg_color=DARK if hh==h else "transparent",
+                             text_color=BG if hh==h else MUTED)
+            end_pill.configure(fg_color=BORDER)
+            outer.after(180, lambda: end_pill.configure(fg_color=CARD))
+
+        for i, h in enumerate(_end_hours):
+            px = (2, 0) if i==0 else (0, 2) if i==len(_end_hours)-1 else (0, 0)
+            b = ctk.CTkButton(
+                end_pill, text=str(h), width=_eh_pill_w, height=34, corner_radius=12,
+                fg_color=DARK if h==_cur_end_h else "transparent", hover_color=DARK2,
+                text_color=BG if h==_cur_end_h else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+                command=lambda hh=h: _set_end_hour(hh),
+            )
+            b.pack(side="left", padx=px, pady=2)
+            _eh_btns[h] = b
+
         # ── Appearance sub-tab ───────────────────────────────────────────────
         f_appearance = ctk.CTkFrame(scroll, fg_color="transparent")
         content_frames["appearance"] = f_appearance
@@ -1315,6 +1345,45 @@ class App(ctk.CTk):
             self._rebuild_ui()
 
         perm_sq.bind("<Button-1>", _toggle_perm)
+
+        _section(f_app, "Visible tabs")
+        _TAB_LABELS = [
+            ("Today",        "today"),
+            ("Skilltree",    "skills"),
+            ("Achievements", "achievements"),
+            ("Stats",        "stats"),
+            ("Records",      "records"),
+            ("Leaderboard",  "leaderboard"),
+            ("Skill Log",    "skilllog"),
+        ]
+
+        def _redraw_tab_sq(c, key):
+            c.delete("all")
+            _h = set(load_settings().get("hidden_tabs", []))
+            fill = PANEL if key in _h else DARK
+            c.create_rectangle(0, 0, 11, 11, fill=fill, outline=DARK, width=1)
+
+        for label, key in _TAB_LABELS:
+            row = ctk.CTkFrame(f_app, fg_color="transparent")
+            row.pack(anchor="w", pady=3)
+            sq = tk.Canvas(row, width=11, height=11, highlightthickness=0, bg=PANEL)
+            sq.pack(side="left", padx=(0, 8))
+            lbl = mk_label(row, label, size=13, color=TEXT)
+            lbl.pack(side="left")
+            _redraw_tab_sq(sq, key)
+
+            def _toggle_tab(_, k=key, c=sq):
+                cur = set(load_settings().get("hidden_tabs", []))
+                if k in cur:
+                    cur.discard(k)
+                else:
+                    cur.add(k)
+                save_settings("hidden_tabs", list(cur))
+                _redraw_tab_sq(c, k)
+                self._apply_tab_visibility()
+
+            sq.bind("<Button-1>", _toggle_tab)
+            lbl.bind("<Button-1>", _toggle_tab)
 
         # Show first sub-tab
         _switch_sub("timer")
