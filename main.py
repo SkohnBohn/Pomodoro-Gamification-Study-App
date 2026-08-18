@@ -430,6 +430,7 @@ class App(ctk.CTk):
         self._active_view = ""
         self._theme = "yellow"
         self._startup_settings = _s
+        self._settings_permanent = bool(_s.get("settings_permanent", False))
 
         self._build_ui()
         self._nav("timer")
@@ -450,13 +451,15 @@ class App(ctk.CTk):
         mk_label(hdr, "Pomodoro", size=18, weight="bold", color=DARK).pack(side="left")
         self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
         self._collapse_btn.pack(side="right")
-        icon_btn(hdr, "○", self._show_settings, size=13).pack(side="right", padx=(0, 0))
+        self._settings_circle_btn = icon_btn(hdr, "○", self._show_settings, size=13)
+        if not self._settings_permanent:
+            self._settings_circle_btn.pack(side="right", padx=(0, 0))
 
         # Nav buttons in a collapsible sub-frame
         self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self._nav_frame.pack(fill="x")
         self._nav_btns: dict = {}
-        for text, key in [
+        _nav_items = [
             ("Timer",         "timer"),
             ("Today",         "today"),
             ("Skilltree",     "skills"),
@@ -465,7 +468,11 @@ class App(ctk.CTk):
             ("Records",       "records"),
             ("Leaderboard",   "leaderboard"),
             ("Skill Log",     "skilllog"),
-        ]:
+        ]
+        if self._settings_permanent:
+            _nav_items.append(("Settings", "settings"))
+
+        for text, key in _nav_items:
             b = ctk.CTkButton(
                 self._nav_frame, text=text, anchor="w",
                 height=42, corner_radius=10,
@@ -616,6 +623,7 @@ class App(ctk.CTk):
                 "records":      self._build_records_view,
                 "leaderboard":  self._build_leaderboard_view,
                 "skilllog":     self._build_skilllog_view,
+                "settings":     self._build_settings_view,
             }
             self._views[key] = builders[key]()
 
@@ -642,8 +650,38 @@ class App(ctk.CTk):
         if sf_attr and hasattr(self, sf_attr):
             _fix_scroll(getattr(self, sf_attr))
 
-    # ── Settings popup ────────────────────────────────────────────────────────
+    # ── Settings ──────────────────────────────────────────────────────────────
     def _show_settings(self):
+        # Add temp Settings button to nav if not already present
+        if "settings" not in self._nav_btns:
+            b = ctk.CTkButton(
+                self._nav_frame, text="Settings", anchor="w",
+                height=42, corner_radius=10,
+                fg_color="transparent", hover_color=BORDER,
+                text_color=DIM, border_width=0,
+                font=ctk.CTkFont(size=14),
+                command=lambda: self._nav("settings"),
+            )
+            b.pack(padx=10, pady=2, fill="x")
+            self._nav_btns["settings"] = b
+        # Collapse sidebar to make room
+        self._collapse_sidebar()
+        self._nav("settings")
+
+    def _close_settings_tab(self):
+        if self._settings_permanent:
+            return
+        # Remove temp nav button
+        if "settings" in self._nav_btns:
+            self._nav_btns["settings"].destroy()
+            del self._nav_btns["settings"]
+        if "settings" in self._views:
+            self._views["settings"].destroy()
+            del self._views["settings"]
+        self._expand_sidebar()
+        self._nav("timer")
+
+    def _old_settings_popup(self):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Settings")
         dlg.geometry("280x820")
@@ -992,6 +1030,295 @@ class App(ctk.CTk):
         info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log"))
         info_lbl.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
 
+    # ── Settings Tab View ─────────────────────────────────────────────────────
+    def _build_settings_view(self):
+        outer = ctk.CTkFrame(self.content, fg_color=BG, corner_radius=0)
+
+        # ── Top bar: title + close button (temp mode) ────────────────────────
+        top_bar = ctk.CTkFrame(outer, fg_color="transparent")
+        top_bar.pack(fill="x", padx=28, pady=(28, 0))
+        mk_label(top_bar, "Settings", size=18, weight="bold", color=DARK).pack(side="left")
+        if not self._settings_permanent:
+            close_btn = ctk.CTkButton(
+                top_bar, text="×", width=28, height=28, corner_radius=8,
+                fg_color="transparent", hover_color=CARD,
+                text_color=MUTED, border_width=0,
+                font=ctk.CTkFont(size=16),
+                command=self._close_settings_tab,
+            )
+            close_btn.pack(side="right")
+
+        # ── Sub-tab pill bar ─────────────────────────────────────────────────
+        _subtabs = [("Timer", "timer"), ("Appearance", "appearance"),
+                    ("Sound", "sound"), ("Data", "data"), ("App", "app")]
+        _active_sub = {"key": "timer"}
+
+        pill_bar = ctk.CTkFrame(outer, fg_color=CARD, corner_radius=14, height=34)
+        pill_bar.pack(fill="x", padx=28, pady=(18, 0))
+        pill_bar.pack_propagate(False)
+
+        sub_btns = {}
+        content_frames = {}
+
+        scroll = ctk.CTkScrollableFrame(outer, fg_color="transparent", corner_radius=0)
+        scroll.pack(fill="both", expand=True, padx=0, pady=(16, 0))
+        _fix_scroll(scroll)
+
+        def _switch_sub(key):
+            _active_sub["key"] = key
+            for k, b in sub_btns.items():
+                b.configure(
+                    fg_color=DARK if k == key else "transparent",
+                    text_color=BG if k == key else MUTED,
+                )
+            for k, f in content_frames.items():
+                if k == key:
+                    f.pack(fill="x", padx=28, pady=(4, 20))
+                else:
+                    f.pack_forget()
+
+        for label, key in _subtabs:
+            b = ctk.CTkButton(
+                pill_bar, text=label, height=34, corner_radius=12,
+                fg_color="transparent", hover_color=DARK2,
+                text_color=MUTED, border_width=0,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                command=lambda k=key: _switch_sub(k),
+            )
+            b.pack(side="left", padx=2, pady=2, expand=True, fill="x")
+            sub_btns[key] = b
+
+        def _section(parent, title):
+            mk_label(parent, title, size=11, color=MUTED).pack(anchor="w", pady=(18, 6))
+
+        def _pill_row(parent, width=220):
+            f = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=14, height=34, width=width)
+            f.pack(anchor="w")
+            f.pack_propagate(False)
+            return f
+
+        def _pill_btn(parent, text, width, active, command):
+            return ctk.CTkButton(
+                parent, text=text, width=width, height=34, corner_radius=12,
+                fg_color=DARK if active else "transparent", hover_color=DARK2,
+                text_color=BG if active else MUTED, border_width=0,
+                font=ctk.CTkFont(size=11, weight="bold"), command=command,
+            )
+
+        # ── Timer sub-tab ────────────────────────────────────────────────────
+        f_timer = ctk.CTkFrame(scroll, fg_color="transparent")
+        content_frames["timer"] = f_timer
+
+        _section(f_timer, "Max Pomo Duration")
+        presets = [25, 45, 60, 90, 120]
+        pill_w = 44
+        pc = ctk.CTkFrame(f_timer, fg_color=CARD, corner_radius=14,
+                          height=34, width=len(presets)*pill_w+4)
+        pc.pack(anchor="w")
+        pc.pack_propagate(False)
+        preset_btns = {}
+
+        def _flash_pc():
+            pc.configure(fg_color=BORDER)
+            outer.after(180, lambda: pc.configure(fg_color=CARD))
+
+        def _select_preset(v, deselect_custom=True):
+            self._pomo_max_mins = float(v)
+            save_settings("pomo_max_mins", float(v))
+            for val, btn in preset_btns.items():
+                btn.configure(fg_color=DARK if val==v else "transparent",
+                              text_color=BG if val==v else MUTED)
+            if deselect_custom:
+                custom_entry.configure(border_color=BORDER)
+            _flash_pc()
+            if not self.running:
+                self._pomo_mins = min(self._pomo_mins, self._pomo_max_mins)
+                total_s = int(self._pomo_mins * 60)
+                m, s = divmod(total_s, 60)
+                self.ring.update_ring(self._pomo_mins / self._pomo_max_mins, f"{m:02d}:{s:02d}")
+
+        current_pomo = int(self._pomo_max_mins)
+        for i, p in enumerate(presets):
+            px = (2, 0) if i == 0 else (0, 2) if i == len(presets)-1 else (0, 0)
+            b = ctk.CTkButton(
+                pc, text=f"{p}", width=pill_w, height=34, corner_radius=12,
+                fg_color=DARK if p==current_pomo else "transparent", hover_color=DARK2,
+                text_color=BG if p==current_pomo else MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"), border_width=0,
+                command=lambda v=p: _select_preset(v),
+            )
+            b.pack(side="left", padx=px, pady=2)
+            preset_btns[p] = b
+
+        custom_row = ctk.CTkFrame(f_timer, fg_color="transparent")
+        custom_row.pack(anchor="w", pady=(10, 0))
+        custom_entry = ctk.CTkEntry(
+            custom_row, width=72, height=30, placeholder_text="custom",
+            corner_radius=10, fg_color=CARD, border_color=BORDER,
+            text_color=TEXT, placeholder_text_color=DIM,
+            font=ctk.CTkFont(size=12), justify="center",
+        )
+        custom_entry.pack(side="left", padx=(0, 8))
+        if current_pomo not in presets:
+            custom_entry.insert(0, str(current_pomo))
+
+        def _apply_custom(*_):
+            val = custom_entry.get().strip()
+            try:
+                v = float(val)
+                if v > 0:
+                    for btn in preset_btns.values():
+                        btn.configure(fg_color="transparent", text_color=MUTED)
+                    custom_entry.configure(border_color=DARK)
+                    _select_preset(v, deselect_custom=False)
+                else:
+                    raise ValueError
+            except ValueError:
+                custom_entry.configure(border_color=DANGER)
+                outer.after(1200, lambda: custom_entry.configure(border_color=BORDER))
+
+        ctk.CTkButton(
+            custom_row, text="✓", width=30, height=30, corner_radius=10,
+            fg_color=DARK, hover_color=DARK2, text_color=BG,
+            font=ctk.CTkFont(size=13, weight="bold"), border_width=0,
+            command=_apply_custom,
+        ).pack(side="left")
+        custom_entry.bind("<Return>", _apply_custom)
+
+        _section(f_timer, "Timer Direction")
+        dir_row = _pill_row(f_timer, 176)
+        fill_btn = _pill_btn(dir_row, "Fill", 86, self._timer_fills,
+                             lambda: _set_dir(True))
+        fill_btn.pack(side="left", padx=(2, 0), pady=2)
+        emp_btn = _pill_btn(dir_row, "Empty", 86, not self._timer_fills,
+                            lambda: _set_dir(False))
+        emp_btn.pack(side="left", padx=(0, 2), pady=2)
+
+        def _set_dir(fills: bool):
+            self._timer_fills = fills
+            save_settings("timer_fills", fills)
+            fill_btn.configure(fg_color=DARK if fills else "transparent",
+                               text_color=BG if fills else MUTED)
+            emp_btn.configure(fg_color=DARK if not fills else "transparent",
+                              text_color=BG if not fills else MUTED)
+            dir_row.configure(fg_color=BORDER)
+            outer.after(180, lambda: dir_row.configure(fg_color=CARD))
+
+        # ── Appearance sub-tab ───────────────────────────────────────────────
+        f_appearance = ctk.CTkFrame(scroll, fg_color="transparent")
+        content_frames["appearance"] = f_appearance
+
+        _section(f_appearance, "Theme")
+        theme_row = _pill_row(f_appearance, 264)
+        for t_key, t_label in [("yellow", "Yellow"), ("light", "White"), ("dark", "Dark")]:
+            _pill_btn(theme_row, t_label, 86, self._theme == t_key,
+                      lambda k=t_key: self._switch_theme(k)).pack(
+                side="left",
+                padx=(2, 0) if t_key == "yellow" else (0, 2) if t_key == "dark" else 0,
+                pady=2,
+            )
+
+        # ── Sound sub-tab ────────────────────────────────────────────────────
+        f_sound = ctk.CTkFrame(scroll, fg_color="transparent")
+        content_frames["sound"] = f_sound
+
+        _section(f_sound, "Sounds")
+        _snd_cfg = [
+            ("element click", "sound_click",   "sound_click_enabled",   _audio.play_click),
+            ("level up",      "sound_levelup",  "sound_levelup_enabled", _audio.play_main_levelup),
+            ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
+        ]
+        for label, setting_key, attr, preview_fn in _snd_cfg:
+            row = ctk.CTkFrame(f_sound, fg_color="transparent")
+            row.pack(anchor="w", pady=4)
+            sq = tk.Canvas(row, width=11, height=11, highlightthickness=0, bg=PANEL)
+            sq.pack(side="left", padx=(0, 8))
+            lbl = mk_label(row, label, size=13, color=TEXT)
+            lbl.pack(side="left")
+
+            def _draw(c=sq, a=attr):
+                c.delete("all")
+                val = getattr(_audio, a)
+                c.create_rectangle(0, 0, 11, 11,
+                                   fill=DARK if val else PANEL,
+                                   outline=DARK, width=1)
+            _draw()
+
+            def _toggle(_, a=attr, sk=setting_key, d=_draw, fn=preview_fn):
+                setattr(_audio, a, not getattr(_audio, a))
+                save_settings(sk, getattr(_audio, a))
+                d()
+                if getattr(_audio, a):
+                    fn()
+
+            sq.bind("<Button-1>", _toggle)
+            lbl.bind("<Button-1>", _toggle)
+
+        # ── Data sub-tab ─────────────────────────────────────────────────────
+        f_data = ctk.CTkFrame(scroll, fg_color="transparent")
+        content_frames["data"] = f_data
+
+        _section(f_data, "Database")
+        db_row = _pill_row(f_data, 220)
+        db_btns = {}
+
+        def _select_db(key):
+            for k, b in db_btns.items():
+                b.configure(fg_color=DARK if k==key else "transparent",
+                            text_color=BG if k==key else MUTED)
+            self._switch_db(key)
+
+        _cur_db = "newui" if config.DB_FILE == DB_NEWUI else "main"
+        for key, label in [("newui", "DB New UI"), ("main", "DB Main")]:
+            b = _pill_btn(db_row, label, 106, _cur_db == key,
+                         lambda k=key: _select_db(k))
+            b.pack(side="left", padx=2, pady=2)
+            db_btns[key] = b
+
+        _section(f_data, "Log")
+        log_row = ctk.CTkFrame(f_data, fg_color="transparent")
+        log_row.pack(anchor="w")
+        mk_btn(log_row, "Open Log", self._open_log, width=120, height=34).pack(side="left")
+        info_lbl = ctk.CTkLabel(log_row, text="ⓘ", width=20, height=20,
+                                fg_color="transparent", text_color=DIM,
+                                font=ctk.CTkFont(size=12))
+        info_lbl.pack(side="left", padx=(8, 0))
+        tip_lbl = mk_label(f_data, "", size=10, color=DIM)
+        tip_lbl.pack(anchor="w")
+        info_lbl.bind("<Enter>", lambda _: tip_lbl.configure(text="You need a SQLite reader to open the log"))
+        info_lbl.bind("<Leave>", lambda _: tip_lbl.configure(text=""))
+
+        # ── App sub-tab ──────────────────────────────────────────────────────
+        f_app = ctk.CTkFrame(scroll, fg_color="transparent")
+        content_frames["app"] = f_app
+
+        _section(f_app, "Settings Tab")
+        perm_row = ctk.CTkFrame(f_app, fg_color="transparent")
+        perm_row.pack(anchor="w", pady=4)
+        perm_sq = tk.Canvas(perm_row, width=11, height=11, highlightthickness=0, bg=PANEL)
+        perm_sq.pack(side="left", padx=(0, 8))
+        mk_label(perm_row, "Always show in sidebar", size=13, color=TEXT).pack(side="left")
+
+        def _draw_perm():
+            perm_sq.delete("all")
+            perm_sq.create_rectangle(0, 0, 11, 11,
+                                     fill=DARK if self._settings_permanent else PANEL,
+                                     outline=DARK, width=1)
+
+        _draw_perm()
+
+        def _toggle_perm(_):
+            self._settings_permanent = not self._settings_permanent
+            save_settings("settings_permanent", self._settings_permanent)
+            _draw_perm()
+            # Rebuild UI to reflect permanent state change
+            self._rebuild_ui()
+
+        perm_sq.bind("<Button-1>", _toggle_perm)
+
+        # Show first sub-tab
+        _switch_sub("timer")
+        return outer
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     def _refresh_sidebar(self):
@@ -1173,6 +1500,19 @@ class App(ctk.CTk):
         self.after(delay, lambda: self._animate_odometer(start, end, steps, delay, step + 1))
 
     # ── Theme switch ─────────────────────────────────────────────────────────
+    def _rebuild_ui(self):
+        prev_view = self._active_view
+        self.running = False
+        for v in self._views.values():
+            v.destroy()
+        self._views = {}
+        self.sidebar.destroy()
+        self.content.destroy()
+        self.configure(fg_color=BG)
+        self._build_ui()
+        self._nav("settings")
+        self.after(100, self._refresh_sidebar)
+
     def _switch_theme(self, name: str):
         if name == self._theme:
             return

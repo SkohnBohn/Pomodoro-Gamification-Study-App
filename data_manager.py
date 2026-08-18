@@ -58,6 +58,7 @@ def save_settings(key: str, value) -> None:
 
 
 def initialize_db():
+    os.makedirs(os.path.dirname(config.DB_FILE), exist_ok=True)
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
     c.execute('''
