@@ -1085,7 +1085,7 @@ class App(ctk.CTk):
                 active = val == current
                 b = ctk.CTkButton(
                     row, text=label, width=0, height=26,
-                    fg_color="transparent", hover_color="transparent",
+                    fg_color="transparent", hover_color=BG,
                     text_color=DARK if active else MUTED, border_width=0,
                     font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
                     command=lambda v=val: _sel(v),
@@ -1127,7 +1127,7 @@ class App(ctk.CTk):
                 active = p == current_pomo
                 b = ctk.CTkButton(
                     preset_row, text=str(p), width=0, height=26,
-                    fg_color="transparent", hover_color="transparent",
+                    fg_color="transparent", hover_color=BG,
                     text_color=DARK if active else MUTED, border_width=0,
                     font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
                     command=lambda v=p: _select_preset(v),
