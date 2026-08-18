@@ -368,11 +368,7 @@ def box_seg(parent, options, current, on_select, size=11, btn_w=0):
         for v, b in btns.items():
             active = v == val
             b.configure(
-                fg_color=BG,
                 border_color=MUTED if active else BORDER,
-                border_width=1,
-                text_color=DARK2 if active else MUTED,
-                font=ctk.CTkFont(size=size, weight="normal"),
             )
     for label, val in options:
         active = val == current
@@ -380,7 +376,7 @@ def box_seg(parent, options, current, on_select, size=11, btn_w=0):
             row, text=label, width=btn_w, height=28, corner_radius=4,
             fg_color=BG, hover_color=CARD,
             border_color=MUTED if active else BORDER, border_width=1,
-            text_color=DARK2 if active else MUTED,
+            text_color=MUTED,
             font=ctk.CTkFont(size=size, weight="normal"),
             command=lambda v=val: _sel(v),
         )
