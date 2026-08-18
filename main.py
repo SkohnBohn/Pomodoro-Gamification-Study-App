@@ -59,9 +59,9 @@ _PALETTES = {
         TEXT="#e8e6e1", SUCCESS="#4ade80", DANGER="#f87171",
     ),
     "warm": dict(
-        BG="#f9e079", PANEL="#f7e48d", CARD="#f2e4b4", BORDER="#e0cc6a",
-        DARK="#201c12", DARK2="#4b4428", MUTED="#5a4c2c", DIM="#6c5a2e",
-        TEXT="#201c12", SUCCESS="#14532d", DANGER="#991b1b",
+        BG="#fcf6e3", PANEL="#f3ecda", CARD="#e6e5e5", BORDER="#d0c8b0",
+        DARK="#262626", DARK2="#3d3d3d", MUTED="#595959", DIM="#8b7040",
+        TEXT="#262626", SUCCESS="#14532d", DANGER="#991b1b",
     ),
 }
 _active_palette = "yellow"
