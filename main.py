@@ -374,7 +374,7 @@ def box_seg(parent, options, current, on_select, size=11, btn_w=0):
         active = val == current
         b = ctk.CTkButton(
             row, text=label, width=btn_w, height=28, corner_radius=4,
-            fg_color=BG, hover_color=CARD,
+            fg_color=BG, hover_color=BG,
             border_color=MUTED if active else BORDER, border_width=1,
             text_color=MUTED,
             font=ctk.CTkFont(size=size, weight="normal"),
