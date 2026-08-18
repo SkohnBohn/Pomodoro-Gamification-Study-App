@@ -1286,6 +1286,32 @@ class App(ctk.CTk):
 
             perm_sq.bind("<Button-1>", _toggle_perm)
 
+            _section(f, "Display")
+
+            hide_badge_row = ctk.CTkFrame(f, fg_color="transparent")
+            hide_badge_row.pack(anchor="w", pady=3)
+            hide_badge_sq = tk.Canvas(hide_badge_row, width=10, height=10, highlightthickness=0, bg=BG)
+            hide_badge_sq.pack(side="left", padx=(0, 8))
+            mk_label(hide_badge_row, "Hide badge features", size=12, color=TEXT).pack(side="left")
+
+            def _draw_hide_badge():
+                hide_badge_sq.delete("all")
+                hide_badge_sq.create_rectangle(0, 0, 10, 10,
+                    fill=DARK if load_settings().get("hide_badges") else BG,
+                    outline=MUTED, width=1)
+            _draw_hide_badge()
+
+            def _toggle_hide_badge(_):
+                cur = load_settings().get("hide_badges", False)
+                save_settings("hide_badges", not cur)
+                _draw_hide_badge()
+                self._refresh_sidebar_level()
+                if self._active_view == "achievements":
+                    self._refresh_achievements()
+
+            hide_badge_sq.bind("<Button-1>", _toggle_hide_badge)
+            hide_badge_row.winfo_children()[-1].bind("<Button-1>", _toggle_hide_badge)
+
             _section(f, "Visible tabs")
             _TAB_LABELS = [
                 ("Today","today"),("Stats","stats"),("Skilltree","skills"),
@@ -1381,6 +1407,7 @@ class App(ctk.CTk):
                 self._badge_lbl.configure(image=self._badge_img, text="")
             except Exception:
                 pass
+        self._refresh_sidebar_level()
 
         # Odometer + delta animation
         prev = getattr(self, "_prev_total", total)
@@ -1409,6 +1436,25 @@ class App(ctk.CTk):
         self._prev_streak = streak
         if self._active_view == "today":
             self._refresh_today()
+
+    def _refresh_sidebar_level(self):
+        hide = load_settings().get("hide_badges", False)
+        if hide:
+            self._badge_lbl.pack_forget()
+            self._level_lbl.configure(font=ctk.CTkFont(size=20, weight="bold"), anchor="center")
+            self._next_lbl.configure(font=ctk.CTkFont(size=12))
+            # re-pack lvl_col centered if badge is hidden
+            lvl_col = self._level_lbl.master
+            lvl_col.pack_configure(anchor="center", padx=0)
+            mid = lvl_col.master
+            for w in mid.winfo_children():
+                w.pack_configure(anchor="center")
+        else:
+            self._badge_lbl.pack(side="left")
+            self._level_lbl.configure(font=ctk.CTkFont(size=15, weight="bold"), anchor="w")
+            self._next_lbl.configure(font=ctk.CTkFont(size=10))
+            lvl_col = self._level_lbl.master
+            lvl_col.pack_configure(anchor="center", padx=(8, 0))
 
     def _animate_streak_bump(self, step=0, steps=10):
         if step > steps:
@@ -2567,7 +2613,7 @@ class App(ctk.CTk):
         lvl = calculate_level(total_h)
 
         # ── Badges ────────────────────────────────────────────────────────────
-        if lvl > 0:
+        if lvl > 0 and not load_settings().get("hide_badges"):
             bc = mk_card(self._ach_scroll)
             bc.pack(fill="x", pady=5, padx=6)
             mk_label(bc, "Freigeschaltete Badges", size=13, weight="bold",
