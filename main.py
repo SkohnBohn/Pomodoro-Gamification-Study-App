@@ -63,6 +63,11 @@ _PALETTES = {
         DARK="#262626", DARK2="#3d3d3d", MUTED="#595959", DIM="#8b7040",
         TEXT="#262626", SUCCESS="#14532d", DANGER="#991b1b",
     ),
+    "twinkle": dict(
+        BG="#a2d8f8", PANEL="#b4c4f8", CARD="#ccb8fa", BORDER="#7888e0",
+        DARK="#160840", DARK2="#32106e", MUTED="#5828a0", DIM="#7840b8",
+        TEXT="#160840", SUCCESS="#0a6e5c", DANGER="#c0134e",
+    ),
 }
 _active_palette = "yellow"
 
@@ -104,6 +109,9 @@ def _apply_palette(name: str):
     elif name == "warm":
         _ARROW_FG       = "#7a6830"
         _ARROW_FG_HOVER = "#4b4428"
+    elif name == "twinkle":
+        _ARROW_FG       = "#5040a0"
+        _ARROW_FG_HOVER = "#32106e"
     elif name == "dark":
         _ARROW_FG       = "#666666"
         _ARROW_FG_HOVER = "#cccccc"
@@ -1195,7 +1203,7 @@ class App(ctk.CTk):
         def _build_appearance(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Theme")
-            _seg(f, [("Yellow","yellow"),("Warm Yel","warm"),("White","light"),("Dark","dark")],
+            _seg(f, [("Yellow","yellow"),("Warm Yel","warm"),("White","light"),("Dark","dark"),("Twinkle Ocean","twinkle")],
                  self._theme, lambda k: self._switch_theme(k))
             return f
 
