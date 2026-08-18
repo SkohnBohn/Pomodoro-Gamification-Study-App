@@ -359,6 +359,35 @@ def sec_title(parent, text):
         anchor="w", padx=16, pady=(14, 6))
 
 
+def box_seg(parent, options, current, on_select, size=11, btn_w=0):
+    """Rectangular bordered segmented selector matching the monochrome design."""
+    row = ctk.CTkFrame(parent, fg_color="transparent")
+    btns = {}
+    def _sel(val):
+        on_select(val)
+        for v, b in btns.items():
+            active = v == val
+            b.configure(
+                fg_color=BG,
+                border_color=DARK if active else BORDER,
+                border_width=1,
+                text_color=DARK if active else MUTED,
+                font=ctk.CTkFont(size=size, weight="bold" if active else "normal"),
+            )
+    for label, val in options:
+        active = val == current
+        b = ctk.CTkButton(
+            row, text=label, width=btn_w, height=28, corner_radius=4,
+            fg_color=BG, hover_color=CARD,
+            border_color=DARK if active else BORDER, border_width=1,
+            text_color=DARK if active else MUTED,
+            font=ctk.CTkFont(size=size, weight="bold" if active else "normal"),
+            command=lambda v=val: _sel(v),
+        )
+        b.pack(side="left", padx=(0, 6))
+        btns[val] = b
+    return row, btns
+
 def seg_btn(parent, values, variable=None, command=None) -> ctk.CTkSegmentedButton:
     return ctk.CTkSegmentedButton(
         parent, values=values, variable=variable, command=command,
@@ -1097,33 +1126,9 @@ class App(ctk.CTk):
             mk_label(parent, title, size=10, color=MUTED).pack(anchor="w", pady=(14, 4))
 
         def _seg(parent, options, current, on_select):
-            """Plain-text segmented selector — no pill backgrounds."""
-            row = ctk.CTkFrame(parent, fg_color="transparent")
-            row.pack(anchor="w")
-            btns = {}
-
-            def _sel(val):
-                on_select(val)
-                for v, b in btns.items():
-                    active = v == val
-                    b.configure(
-                        text_color=DARK if active else MUTED,
-                        font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
-                    )
-
-            for label, val in options:
-                active = val == current
-                b = ctk.CTkButton(
-                    row, text=label, width=0, height=26,
-                    fg_color="transparent", hover_color=BG,
-                    text_color=DARK if active else MUTED, border_width=0,
-                    font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
-                    command=lambda v=val: _sel(v),
-                )
-                b.pack(side="left", padx=(0, 14))
-                btns[val] = b
-
-            return btns
+            row, _ = box_seg(parent, options, current, on_select, size=12)
+            row.pack(anchor="w", pady=(2, 4))
+            return row
 
         # ── Lazy builders ──────────────────────────────────────────────────────
         def _build_timer(parent):
@@ -1671,36 +1676,16 @@ class App(ctk.CTk):
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
         self._mode_state = "Pomodoro"
-        toggle = ctk.CTkFrame(left, fg_color=CARD, corner_radius=20, height=36,
-                              width=172)
-        toggle.pack(pady=(16, 0))
-        toggle.pack_propagate(False)
-
-        def _mode_btn(text, mode):
-            def _click():
-                self._mode_btn_pomo.configure(
-                    fg_color=DARK if mode == "Pomodoro" else "transparent",
-                    text_color=BG if mode == "Pomodoro" else MUTED,
-                )
-                self._mode_btn_open.configure(
-                    fg_color=DARK if mode == "Open Timer" else "transparent",
-                    text_color=BG if mode == "Open Timer" else MUTED,
-                )
-                self._mode_state = mode
-                self._on_mode_change(mode)
-            return ctk.CTkButton(
-                toggle, text=text, width=84, height=32, corner_radius=18,
-                fg_color=DARK if mode == "Pomodoro" else "transparent",
-                hover_color=DARK2,
-                text_color=BG if mode == "Pomodoro" else MUTED,
-                font=ctk.CTkFont(size=14, weight="bold"),
-                border_width=0, command=_click,
-            )
-
-        self._mode_btn_pomo = _mode_btn("POMO", "Pomodoro")
-        self._mode_btn_open = _mode_btn("OPEN", "Open Timer")
-        self._mode_btn_pomo.pack(side="left", padx=(2, 1), pady=2)
-        self._mode_btn_open.pack(side="left", padx=(1, 2), pady=2)
+        _mode_row, _mode_btns = box_seg(
+            left,
+            [("POMO", "Pomodoro"), ("OPEN", "Open Timer")],
+            "Pomodoro",
+            lambda mode: (setattr(self, "_mode_state", mode), self._on_mode_change(mode)),
+            size=13,
+        )
+        _mode_row.pack(pady=(16, 0))
+        self._mode_btn_pomo = _mode_btns["Pomodoro"]
+        self._mode_btn_open = _mode_btns["Open Timer"]
 
         # keep a dummy .set() / .get() interface so _on_mode_change still works
         class _FakeSeg:
@@ -3943,36 +3928,13 @@ class App(ctk.CTk):
         f.pack(padx=28, pady=(22, 8), fill="x")
         self._lb_period_val = "All Time"
         _lb_periods = ["Today", "This Week", "This Month", "This Year", "All Time"]
-        _lb_btn_w = 90
-        _lb_pill = ctk.CTkFrame(
-            f, fg_color=BORDER, corner_radius=17,
-            height=30, width=len(_lb_periods) * _lb_btn_w + 4,
-        )
-        _lb_pill.pack(anchor="center")
-        _lb_pill.pack_propagate(False)
-        self._lb_btns = {}
         def _lb_select(period):
             self._lb_period_val = period
-            for p, b in self._lb_btns.items():
-                b.configure(
-                    fg_color=DARK if p == period else "transparent",
-                    text_color=BG if p == period else MUTED,
-                )
             self._refresh_leaderboard()
-        for i, p in enumerate(_lb_periods):
-            active = p == "All Time"
-            px = (2, 0) if i == 0 else (0, 2) if i == len(_lb_periods) - 1 else (0, 0)
-            b = ctk.CTkButton(
-                _lb_pill, text=p, width=_lb_btn_w, height=30, corner_radius=15,
-                fg_color=DARK if active else "transparent",
-                hover_color=DARK2,
-                text_color=BG if active else MUTED,
-                font=ctk.CTkFont(size=11, weight="bold"),
-                border_width=0,
-                command=lambda p=p: _lb_select(p),
-            )
-            b.pack(side="left", padx=px, pady=2)
-            self._lb_btns[p] = b
+        _lb_row, self._lb_btns = box_seg(
+            f, [(p, p) for p in _lb_periods], "All Time", _lb_select, size=11,
+        )
+        _lb_row.pack(anchor="center")
         # compat shim so _refresh_leaderboard can read period
         class _LbPeriod:
             def __init__(self, ref): self._r = ref
