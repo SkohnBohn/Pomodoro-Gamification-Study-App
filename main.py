@@ -44,7 +44,7 @@ ctk.set_default_color_theme("blue")
 
 _PALETTES = {
     "yellow": dict(
-        BG="#f7c90f", PANEL="#f9d340", CARD="#fce380", BORDER="#ddb800",
+        BG="#f5d120", PANEL="#f9dc4a", CARD="#fce880", BORDER="#ddc800",
         DARK="#1a1200", DARK2="#3d3000", MUTED="#5c4300", DIM="#7a5f00",
         TEXT="#1a1200", SUCCESS="#14532d", DANGER="#991b1b",
     ),
