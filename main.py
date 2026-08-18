@@ -2624,7 +2624,7 @@ class App(ctk.CTk):
         if lvl > 0 and not load_settings().get("hide_badges"):
             bc = mk_card(self._ach_scroll)
             bc.pack(fill="x", pady=5, padx=6)
-            mk_label(bc, "Freigeschaltete Badges", size=13, weight="bold",
+            mk_label(bc, "Unlocked Badges", size=13, weight="bold",
                      color=TEXT).pack(anchor="w", padx=16, pady=(14, 8))
             badge_frame = ctk.CTkFrame(bc, fg_color="transparent")
             badge_frame.pack(padx=14, pady=(0, 14), fill="x")
