@@ -1035,7 +1035,7 @@ class App(ctk.CTk):
         outer = ctk.CTkFrame(self.content, fg_color=BG, corner_radius=0)
 
         # Nav column — packs first so it sits left; scroll fills the rest
-        nav_col = ctk.CTkFrame(outer, fg_color="transparent", width=100)
+        nav_col = ctk.CTkFrame(outer, fg_color=BG, width=100)
         nav_col.pack(side="left", fill="y", padx=(12, 0), pady=(16, 16))
         nav_col.pack_propagate(False)
 
@@ -1050,7 +1050,7 @@ class App(ctk.CTk):
             ).pack(side="bottom", pady=(0, 4))
 
         scroll = ctk.CTkScrollableFrame(
-            outer, fg_color="transparent", corner_radius=0,
+            outer, fg_color=BG, corner_radius=0,
             scrollbar_button_color=BG, scrollbar_button_hover_color=BG,
         )
         scroll.pack(side="left", fill="both", expand=True, padx=(8, 4), pady=(16, 16))
