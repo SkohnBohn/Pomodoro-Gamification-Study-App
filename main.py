@@ -493,8 +493,7 @@ class App(ctk.CTk):
         self._collapse_btn = icon_btn(hdr, "‹", self._collapse_sidebar, size=13)
         self._collapse_btn.pack(side="right")
         self._settings_circle_btn = icon_btn(hdr, "○", self._show_settings, size=13)
-        if not self._settings_permanent:
-            self._settings_circle_btn.pack(side="right", padx=(0, 0))
+        # settings is always in the nav now; circle button hidden
 
         # Nav buttons in a collapsible sub-frame
         self._nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -509,9 +508,8 @@ class App(ctk.CTk):
             ("Records",       "records"),
             ("Skill Log",     "skilllog"),
             ("Leaderboard",   "leaderboard"),
+            ("Settings",      "settings"),
         ]
-        if self._settings_permanent:
-            _nav_items.append(("Settings", "settings"))
 
         for text, key in _nav_items:
             b = ctk.CTkButton(
@@ -707,33 +705,9 @@ class App(ctk.CTk):
 
     # ── Settings ──────────────────────────────────────────────────────────────
     def _show_settings(self):
-        # Add temp Settings button to nav if not already present
-        if "settings" not in self._nav_btns:
-            b = ctk.CTkButton(
-                self._nav_frame, text="Settings", anchor="w",
-                height=42, corner_radius=10,
-                fg_color="transparent", hover_color=BORDER,
-                text_color=DIM, border_width=0,
-                font=ctk.CTkFont(size=14),
-                command=lambda: self._nav("settings"),
-            )
-            b.pack(padx=10, pady=2, fill="x")
-            self._nav_btns["settings"] = b
-        # Collapse sidebar to make room
-        self._collapse_sidebar()
         self._nav("settings")
 
     def _close_settings_tab(self):
-        if self._settings_permanent:
-            return
-        # Remove temp nav button
-        if "settings" in self._nav_btns:
-            self._nav_btns["settings"].destroy()
-            del self._nav_btns["settings"]
-        if "settings" in self._views:
-            self._views["settings"].destroy()
-            del self._views["settings"]
-        self._expand_sidebar()
         self._nav("timer")
 
     def _old_settings_popup(self):
@@ -1119,11 +1093,11 @@ class App(ctk.CTk):
 
         # ── Helpers ────────────────────────────────────────────────────────────
         def _section(parent, title):
-            mk_label(parent, title, size=10, color=MUTED).pack(anchor="w", pady=(14, 4))
+            mk_label(parent, title, size=11, color=MUTED).pack(anchor="w", pady=(20, 6))
 
         def _seg(parent, options, current, on_select):
-            row, _ = box_seg(parent, options, current, on_select, size=12)
-            row.pack(anchor="w", pady=(2, 4))
+            row, _ = box_seg(parent, options, current, on_select, size=13)
+            row.pack(anchor="w", pady=(2, 6))
             return row
 
         # ── Lazy builders ──────────────────────────────────────────────────────
@@ -1157,22 +1131,22 @@ class App(ctk.CTk):
             for p in preset_vals:
                 active = p == current_pomo
                 b = ctk.CTkButton(
-                    preset_row, text=str(p), width=0, height=26,
+                    preset_row, text=str(p), width=0, height=32,
                     fg_color="transparent", hover_color=BG,
                     text_color=DARK if active else MUTED, border_width=0,
-                    font=ctk.CTkFont(size=12, weight="bold" if active else "normal"),
+                    font=ctk.CTkFont(size=14, weight="bold" if active else "normal"),
                     command=lambda v=p: _select_preset(v),
                 )
-                b.pack(side="left", padx=(0, 14))
+                b.pack(side="left", padx=(0, 16))
                 preset_btns[p] = b
 
             custom_row = ctk.CTkFrame(f, fg_color="transparent")
             custom_row.pack(anchor="w", pady=(6, 0))
             custom_entry = ctk.CTkEntry(
-                custom_row, width=60, height=26, placeholder_text="min",
+                custom_row, width=70, height=32, placeholder_text="min",
                 corner_radius=8, fg_color=CARD, border_color=BORDER,
                 text_color=TEXT, placeholder_text_color=DIM,
-                font=ctk.CTkFont(size=12), justify="center",
+                font=ctk.CTkFont(size=13), justify="center",
             )
             custom_entry.pack(side="left", padx=(0, 6))
             if current_pomo not in preset_vals:
@@ -1195,9 +1169,9 @@ class App(ctk.CTk):
                     outer.after(1200, lambda: custom_entry.configure(border_color=BORDER))
 
             ctk.CTkButton(
-                custom_row, text="✓", width=26, height=26, corner_radius=8,
+                custom_row, text="✓", width=32, height=32, corner_radius=8,
                 fg_color=CARD, hover_color=DARK2, text_color=DARK,
-                font=ctk.CTkFont(size=12, weight="bold"), border_width=0,
+                font=ctk.CTkFont(size=13, weight="bold"), border_width=0,
                 command=_apply_custom,
             ).pack(side="left")
             custom_entry.bind("<Return>", _apply_custom)
@@ -1231,15 +1205,15 @@ class App(ctk.CTk):
                 ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
             ]:
                 row = ctk.CTkFrame(f, fg_color="transparent")
-                row.pack(anchor="w", pady=3)
-                sq = tk.Canvas(row, width=10, height=10, highlightthickness=0, bg=BG)
-                sq.pack(side="left", padx=(0, 8))
-                lbl = mk_label(row, label, size=12, color=TEXT)
+                row.pack(anchor="w", pady=5)
+                sq = tk.Canvas(row, width=13, height=13, highlightthickness=0, bg=BG)
+                sq.pack(side="left", padx=(0, 10))
+                lbl = mk_label(row, label, size=13, color=TEXT)
                 lbl.pack(side="left")
 
                 def _draw(c=sq, a=attr):
                     c.delete("all")
-                    c.create_rectangle(0, 0, 10, 10,
+                    c.create_rectangle(0, 0, 13, 13,
                                        fill=DARK if getattr(_audio, a) else BG,
                                        outline=MUTED, width=1)
                 _draw()
@@ -1281,14 +1255,14 @@ class App(ctk.CTk):
             _section(f, "Settings Tab")
 
             perm_row = ctk.CTkFrame(f, fg_color="transparent")
-            perm_row.pack(anchor="w", pady=3)
-            perm_sq = tk.Canvas(perm_row, width=10, height=10, highlightthickness=0, bg=BG)
-            perm_sq.pack(side="left", padx=(0, 8))
-            mk_label(perm_row, "Always show in sidebar", size=12, color=TEXT).pack(side="left")
+            perm_row.pack(anchor="w", pady=5)
+            perm_sq = tk.Canvas(perm_row, width=13, height=13, highlightthickness=0, bg=BG)
+            perm_sq.pack(side="left", padx=(0, 10))
+            mk_label(perm_row, "Always show in sidebar", size=13, color=TEXT).pack(side="left")
 
             def _draw_perm():
                 perm_sq.delete("all")
-                perm_sq.create_rectangle(0, 0, 10, 10,
+                perm_sq.create_rectangle(0, 0, 13, 13,
                                          fill=DARK if self._settings_permanent else BG,
                                          outline=MUTED, width=1)
             _draw_perm()
@@ -1304,14 +1278,14 @@ class App(ctk.CTk):
             _section(f, "Display")
 
             hide_badge_row = ctk.CTkFrame(f, fg_color="transparent")
-            hide_badge_row.pack(anchor="w", pady=3)
-            hide_badge_sq = tk.Canvas(hide_badge_row, width=10, height=10, highlightthickness=0, bg=BG)
-            hide_badge_sq.pack(side="left", padx=(0, 8))
-            mk_label(hide_badge_row, "Hide badge feature", size=12, color=TEXT).pack(side="left")
+            hide_badge_row.pack(anchor="w", pady=5)
+            hide_badge_sq = tk.Canvas(hide_badge_row, width=13, height=13, highlightthickness=0, bg=BG)
+            hide_badge_sq.pack(side="left", padx=(0, 10))
+            mk_label(hide_badge_row, "Hide badge feature", size=13, color=TEXT).pack(side="left")
 
             def _draw_hide_badge():
                 hide_badge_sq.delete("all")
-                hide_badge_sq.create_rectangle(0, 0, 10, 10,
+                hide_badge_sq.create_rectangle(0, 0, 13, 13,
                     fill=DARK if load_settings().get("hide_badges") else BG,
                     outline=MUTED, width=1)
             _draw_hide_badge()
@@ -1337,16 +1311,16 @@ class App(ctk.CTk):
             def _redraw_sq(c, key):
                 c.delete("all")
                 _h = set(load_settings().get("hidden_tabs", []))
-                c.create_rectangle(0, 0, 10, 10,
+                c.create_rectangle(0, 0, 13, 13,
                                    fill=BG if key in _h else DARK,
                                    outline=MUTED, width=1)
 
             for label, key in _TAB_LABELS:
                 row = ctk.CTkFrame(f, fg_color="transparent")
-                row.pack(anchor="w", pady=3)
-                sq = tk.Canvas(row, width=10, height=10, highlightthickness=0, bg=BG)
-                sq.pack(side="left", padx=(0, 8))
-                lbl = mk_label(row, label, size=12, color=TEXT)
+                row.pack(anchor="w", pady=5)
+                sq = tk.Canvas(row, width=13, height=13, highlightthickness=0, bg=BG)
+                sq.pack(side="left", padx=(0, 10))
+                lbl = mk_label(row, label, size=13, color=TEXT)
                 lbl.pack(side="left")
                 _redraw_sq(sq, key)
 
@@ -1381,18 +1355,18 @@ class App(ctk.CTk):
                 )
             if key not in _built:
                 _built[key] = _builders[key](scroll)
-            _built[key].pack(fill="x", padx=20, pady=(4, 16))
+            _built[key].pack(fill="x", padx=28, pady=(6, 20))
 
         for label, key in _subtabs:
             b = ctk.CTkButton(
                 nav_col, text=label, anchor="w",
-                height=30, corner_radius=6,
+                height=36, corner_radius=6,
                 fg_color="transparent", hover_color=CARD,
                 text_color=MUTED, border_width=0,
-                font=ctk.CTkFont(size=12),
+                font=ctk.CTkFont(size=13),
                 command=lambda k=key: _switch_sub(k),
             )
-            b.pack(fill="x", padx=2, pady=1)
+            b.pack(fill="x", padx=2, pady=2)
             sub_btns[key] = b
 
         _switch_sub("timer")
