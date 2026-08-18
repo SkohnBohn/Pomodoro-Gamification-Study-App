@@ -4436,7 +4436,19 @@ class App(ctk.CTk):
         s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         s_in = ctk.CTkFrame(s_card, fg_color="transparent")
         s_in.pack(expand=True, fill="both", padx=10, pady=18)
-        mk_label(s_in, f"🔥 {streak}", size=28, weight="bold", color=DARK).pack()
+        _s_row = ctk.CTkFrame(s_in, fg_color="transparent")
+        _s_row.pack()
+        _flame_path2 = os.path.join(os.path.dirname(__file__), "images", "flame.png")
+        if os.path.exists(_flame_path2):
+            try:
+                _fi2 = Image.open(_flame_path2).resize((28, 28), Image.Resampling.LANCZOS)
+                _flame_img2 = ctk.CTkImage(_fi2, size=(28, 28))
+                ctk.CTkLabel(_s_row, image=_flame_img2, text="").pack(side="left", padx=(0, 6))
+            except Exception:
+                mk_label(_s_row, "🔥", size=28).pack(side="left", padx=(0, 4))
+        else:
+            mk_label(_s_row, "🔥", size=28).pack(side="left", padx=(0, 4))
+        mk_label(_s_row, str(streak), size=28, weight="bold", color=DARK).pack(side="left")
         mk_label(s_in, "days in row", size=11, color=MUTED).pack(pady=(4, 0))
 
         # Days unbeaten card
