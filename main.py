@@ -568,8 +568,22 @@ class App(ctk.CTk):
         self._lvl_bar.pack(fill="x", pady=(4, 0))
         self._lvl_bar.set(0)
 
-        self._streak_lbl = mk_label(footer, "", size=11, color=MUTED)
-        self._streak_lbl.pack(anchor="center", pady=(4, 0))
+        streak_row = ctk.CTkFrame(footer, fg_color="transparent")
+        streak_row.pack(anchor="center", pady=(4, 0))
+        _flame_path = os.path.join(os.path.dirname(__file__), "images", "flame.png")
+        self._streak_flame_lbl = ctk.CTkLabel(streak_row, text="")
+        if os.path.exists(_flame_path):
+            try:
+                _fi = Image.open(_flame_path).resize((14, 14), Image.Resampling.LANCZOS)
+                self._flame_img = ctk.CTkImage(_fi, size=(14, 14))
+                self._streak_flame_lbl.configure(image=self._flame_img)
+            except Exception:
+                self._streak_flame_lbl.configure(text="🔥", font=ctk.CTkFont(size=11))
+        else:
+            self._streak_flame_lbl.configure(text="🔥", font=ctk.CTkFont(size=11))
+        self._streak_flame_lbl.pack(side="left", padx=(0, 3))
+        self._streak_lbl = mk_label(streak_row, "", size=11, color=MUTED)
+        self._streak_lbl.pack(side="left")
         self._prev_streak = 0
 
         self._prev_total = 0.0  # for delta calculation
@@ -1430,7 +1444,7 @@ class App(ctk.CTk):
         # Streak
         streak = get_streak()
         prev_streak = getattr(self, "_prev_streak", streak)
-        self._streak_lbl.configure(text=f"🔥{streak}d streak")
+        self._streak_lbl.configure(text=f"{streak}d streak")
         if streak > prev_streak and prev_streak > 0:
             self._animate_streak_bump()
         self._prev_streak = streak
