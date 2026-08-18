@@ -1292,7 +1292,7 @@ class App(ctk.CTk):
             hide_badge_row.pack(anchor="w", pady=3)
             hide_badge_sq = tk.Canvas(hide_badge_row, width=10, height=10, highlightthickness=0, bg=BG)
             hide_badge_sq.pack(side="left", padx=(0, 8))
-            mk_label(hide_badge_row, "Hide badge features", size=12, color=TEXT).pack(side="left")
+            mk_label(hide_badge_row, "Hide badge feature", size=12, color=TEXT).pack(side="left")
 
             def _draw_hide_badge():
                 hide_badge_sq.delete("all")
@@ -1439,22 +1439,30 @@ class App(ctk.CTk):
 
     def _refresh_sidebar_level(self):
         hide = load_settings().get("hide_badges", False)
+        lvl_col = self._level_lbl.master
+        mid = lvl_col.master
         if hide:
             self._badge_lbl.pack_forget()
-            self._level_lbl.configure(font=ctk.CTkFont(size=20, weight="bold"), anchor="center")
-            self._next_lbl.configure(font=ctk.CTkFont(size=12))
-            # re-pack lvl_col centered if badge is hidden
-            lvl_col = self._level_lbl.master
-            lvl_col.pack_configure(anchor="center", padx=0)
-            mid = lvl_col.master
-            for w in mid.winfo_children():
-                w.pack_configure(anchor="center")
+            # unpack lvl_col, repack it filling the full mid width so it centers
+            lvl_col.pack_forget()
+            lvl_col.pack(fill="x", expand=True)
+            self._level_lbl.configure(
+                font=ctk.CTkFont(size=19, weight="bold"), anchor="center")
+            self._next_lbl.configure(
+                font=ctk.CTkFont(size=11), anchor="center")
+            self._level_lbl.pack_configure(anchor="center")
+            self._next_lbl.pack_configure(anchor="center")
         else:
+            self._badge_lbl.pack_forget()
             self._badge_lbl.pack(side="left")
-            self._level_lbl.configure(font=ctk.CTkFont(size=15, weight="bold"), anchor="w")
-            self._next_lbl.configure(font=ctk.CTkFont(size=10))
-            lvl_col = self._level_lbl.master
-            lvl_col.pack_configure(anchor="center", padx=(8, 0))
+            lvl_col.pack_forget()
+            lvl_col.pack(side="left", padx=(8, 0), anchor="center")
+            self._level_lbl.configure(
+                font=ctk.CTkFont(size=15, weight="bold"), anchor="w")
+            self._next_lbl.configure(
+                font=ctk.CTkFont(size=10), anchor="w")
+            self._level_lbl.pack_configure(anchor="w")
+            self._next_lbl.pack_configure(anchor="w")
 
     def _animate_streak_bump(self, step=0, steps=10):
         if step > steps:
