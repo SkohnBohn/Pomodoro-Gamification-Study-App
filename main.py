@@ -2505,7 +2505,7 @@ class App(ctk.CTk):
             top.pack(fill="x")
             name_row = ctk.CTkFrame(top, fg_color="transparent")
             name_row.pack(side="left")
-            mk_label(name_row, f"{emoji}  {skill}", size=15, weight="bold",
+            mk_label(name_row, skill, size=15, weight="bold",
                      color=card_text).pack(side="left")
             sk_change = _sk_changes.get(skill)
             if sk_change:
