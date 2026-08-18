@@ -287,17 +287,16 @@ class RingTimer(tk.Canvas):
     DOT_COLOR = "#9a9690"
 
     def update_ring(self, fraction: float, time_str: str, sub: str = "",
-                    arc_color: str = DARK, dot_color: str | None = None):
+                    arc_color: str = DARK2, dot_color: str | None = None):
         self._draw(fraction, time_str, sub, arc_color, dot_color or self.DOT_COLOR)
 
     def _draw(self, fraction: float, time_str: str, sub: str,
-              arc_color: str = DARK, dot_color: str | None = None):
+              arc_color: str = DARK2, dot_color: str | None = None):
         dot_color = dot_color or self.DOT_COLOR
         self.delete("all")
         cx = cy = self.SIZE // 2
-        pad, w = 14, 8
+        pad, w = 14, 6
         r = (self.SIZE - pad * 2) / 2
-        # Fill inner circle with CARD so the ring frames a soft card
         ir = r - w / 2
         self.create_oval(cx - ir, cy - ir, cx + ir, cy + ir, fill=CARD, outline="")
         self._arc(pad, w, BORDER, 359.99)
@@ -306,15 +305,15 @@ class RingTimer(tk.Canvas):
         angle = math.radians(90 - fraction * 360)
         dx = cx + r * math.cos(angle)
         dy = cy - r * math.sin(angle)
-        dot_r = 5
+        dot_r = 4
         self.create_oval(dx - dot_r, dy - dot_r, dx + dot_r, dy + dot_r,
-                         fill=dot_color, outline="")
+                         fill=MUTED, outline="")
         self.create_text(cx, cy - (14 if sub else 0),
-                         text=time_str, fill=TEXT,
-                         font=("Helvetica", 42, "bold"))
+                         text=time_str, fill=MUTED,
+                         font=("Helvetica", 44))
         if sub:
             self.create_text(cx, cy + 28, text=sub,
-                             fill=MUTED, font=("Helvetica", 13))
+                             fill=DIM, font=("Helvetica", 13))
 
     def _arc(self, pad, width, color, extent):
         self.create_arc(
