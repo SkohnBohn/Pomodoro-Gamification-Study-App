@@ -279,8 +279,8 @@ class RingTimer(tk.Canvas):
 
     def __init__(self, parent, **kw):
         super().__init__(
-            parent, width=self.SIZE, height=self.SIZE,
-            bg=PANEL, highlightthickness=0, **kw,
+            parent, width=self.SIZE + 100, height=self.SIZE + 100,
+            bg=BG, highlightthickness=0, **kw,
         )
         self._draw(1.0, "00:00", "")
 
@@ -294,11 +294,15 @@ class RingTimer(tk.Canvas):
               arc_color: str = DARK, dot_color: str | None = None):
         dot_color = dot_color or self.DOT_COLOR
         self.delete("all")
-        cx = cy = self.SIZE // 2
+        off = 50  # canvas padding for halo
+        cx = cy = self.SIZE // 2 + off
         pad, w = 14, 20
-        self._arc(pad, w, BORDER, 359.99)
+        # Halo circle: 50px beyond outer ring edge
+        hr = (self.SIZE - pad * 2) / 2 + w / 2 + 50
+        self.create_oval(cx - hr, cy - hr, cx + hr, cy + hr, fill=CARD, outline="")
+        self._arc(pad, w, off, BORDER, 359.99)
         if fraction > 0.001:
-            self._arc(pad, w, arc_color, fraction * 359.99)
+            self._arc(pad, w, off, arc_color, fraction * 359.99)
         angle = math.radians(90 - fraction * 360)
         r = (self.SIZE - pad * 2) / 2
         dx = cx + r * math.cos(angle)
@@ -313,9 +317,9 @@ class RingTimer(tk.Canvas):
             self.create_text(cx, cy + 28, text=sub,
                              fill=MUTED, font=("Helvetica", 13))
 
-    def _arc(self, pad, width, color, extent):
+    def _arc(self, pad, width, off, color, extent):
         self.create_arc(
-            pad, pad, self.SIZE - pad, self.SIZE - pad,
+            pad + off, pad + off, self.SIZE - pad + off, self.SIZE - pad + off,
             start=90, extent=-extent,
             style="arc", outline=color, width=width,
         )
@@ -1708,7 +1712,7 @@ class App(ctk.CTk):
 
         def _angle_to_mins(e):
             # 12 o'clock = 0 min, clockwise; full circle = _pomo_max_mins
-            cx = cy = RingTimer.SIZE // 2
+            cx = cy = RingTimer.SIZE // 2 + 50  # +50 for halo canvas offset
             a    = math.degrees(math.atan2(e.x - cx, cy - e.y)) % 360
             mins = a / 360.0 * self._pomo_max_mins
             # clamp at max: if already near max and angle wraps near 0, hold at max
@@ -1756,7 +1760,7 @@ class App(ctk.CTk):
 
         self.start_btn = ctk.CTkButton(
             self._brow, text="▶", width=80, height=44, corner_radius=8,
-            fg_color=BG, hover_color=BG, text_color=DARK,
+            fg_color=CARD, hover_color=CARD, text_color=DARK,
             border_width=1, border_color=MUTED,
             font=ctk.CTkFont(size=22),
             command=self._on_start,
@@ -1765,7 +1769,7 @@ class App(ctk.CTk):
 
         self.pause_btn = ctk.CTkButton(
             self._brow, text="⏸", width=80, height=44, corner_radius=8,
-            fg_color=BG, hover_color=BG, text_color=MUTED,
+            fg_color=CARD, hover_color=CARD, text_color=MUTED,
             border_width=1, border_color=BORDER,
             font=ctk.CTkFont(size=20), state="disabled",
             command=self._on_pause,
@@ -1774,7 +1778,7 @@ class App(ctk.CTk):
 
         self.stop_btn = ctk.CTkButton(
             self._brow, text="⏹", width=80, height=44, corner_radius=8,
-            fg_color=BG, hover_color=BG, text_color=MUTED,
+            fg_color=CARD, hover_color=CARD, text_color=MUTED,
             border_width=1, border_color=BORDER,
             font=ctk.CTkFont(size=20), state="disabled",
             command=self._on_stop,
@@ -2216,24 +2220,24 @@ class App(ctk.CTk):
         # Lap badge
         if laps >= 1:
             self._lap_lbl.configure(text=f"×{laps + 1}")
-            rs = RingTimer.SIZE
-            self._lap_lbl.place(x=rs - 38, y=6)
+            rs = RingTimer.SIZE + 50
+            self._lap_lbl.place(x=rs - 38, y=56)
         else:
             self._lap_lbl.place_forget()
         self.after(50, self._tick_open)
 
     def _btns_running(self):
-        self.start_btn.configure(state="disabled", fg_color=BG, text_color=BORDER,
+        self.start_btn.configure(state="disabled", fg_color=CARD, text_color=BORDER,
                                   border_color=BORDER, border_width=1)
         self.pause_btn.configure(state="normal", text_color=DARK, border_color=MUTED, text="⏸")
-        self.stop_btn.configure(state="normal", fg_color=BG, text_color=DARK,
+        self.stop_btn.configure(state="normal", fg_color=CARD, text_color=DARK,
                                 border_color=MUTED, border_width=1)
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=BG, text_color=DARK,
+        self.start_btn.configure(state="normal", fg_color=CARD, text_color=DARK,
                                   border_color=MUTED, border_width=1)
         self.pause_btn.configure(state="disabled", text_color=MUTED, border_color=BORDER, text="⏸")
-        self.stop_btn.configure(state="disabled", fg_color=BG, text_color=MUTED,
+        self.stop_btn.configure(state="disabled", fg_color=CARD, text_color=MUTED,
                                 border_color=BORDER, border_width=1)
 
     def _reset_timer(self):
