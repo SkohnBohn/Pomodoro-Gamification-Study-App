@@ -1757,8 +1757,8 @@ class App(ctk.CTk):
 
         self.start_btn = ctk.CTkButton(
             self._brow, text="▶", width=80, height=44, corner_radius=8,
-            fg_color=CARD, hover_color=CARD, text_color=DARK,
-            border_width=1, border_color=MUTED,
+            fg_color=CARD, hover_color=CARD, text_color=MUTED,
+            border_width=1, border_color=BORDER,
             font=ctk.CTkFont(size=22),
             command=self._on_start,
         )
@@ -2226,13 +2226,13 @@ class App(ctk.CTk):
     def _btns_running(self):
         self.start_btn.configure(state="disabled", fg_color=CARD, text_color=BORDER,
                                   border_color=BORDER, border_width=1)
-        self.pause_btn.configure(state="normal", text_color=DARK, border_color=MUTED, text="⏸")
-        self.stop_btn.configure(state="normal", fg_color=CARD, text_color=DARK,
-                                border_color=MUTED, border_width=1)
+        self.pause_btn.configure(state="normal", text_color=MUTED, border_color=BORDER, text="⏸")
+        self.stop_btn.configure(state="normal", fg_color=CARD, text_color=MUTED,
+                                border_color=BORDER, border_width=1)
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=CARD, text_color=DARK,
-                                  border_color=MUTED, border_width=1)
+        self.start_btn.configure(state="normal", fg_color=CARD, text_color=MUTED,
+                                  border_color=BORDER, border_width=1)
         self.pause_btn.configure(state="disabled", text_color=MUTED, border_color=BORDER, text="⏸")
         self.stop_btn.configure(state="disabled", fg_color=CARD, text_color=MUTED,
                                 border_color=BORDER, border_width=1)
