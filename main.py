@@ -1034,37 +1034,31 @@ class App(ctk.CTk):
     def _build_settings_view(self):
         outer = ctk.CTkFrame(self.content, fg_color=BG, corner_radius=0)
 
-        # ── Top bar ──────────────────────────────────────────────────────────
-        top_bar = ctk.CTkFrame(outer, fg_color="transparent")
-        top_bar.pack(fill="x", padx=28, pady=(28, 16))
+        # ── Optional close button (temp mode only) ───────────────────────────
         if not self._settings_permanent:
+            close_bar = ctk.CTkFrame(outer, fg_color="transparent")
+            close_bar.pack(fill="x", padx=20, pady=(20, 0))
             ctk.CTkButton(
-                top_bar, text="×", width=28, height=28, corner_radius=8,
+                close_bar, text="×", width=28, height=28, corner_radius=8,
                 fg_color="transparent", hover_color=CARD,
                 text_color=MUTED, border_width=0,
                 font=ctk.CTkFont(size=16),
                 command=self._close_settings_tab,
             ).pack(side="right")
 
-        # ── Two-column layout: nav sidebar | content ──────────────────────────
+        # ── Two-column layout ────────────────────────────────────────────────
         body = ctk.CTkFrame(outer, fg_color="transparent")
-        body.pack(fill="both", expand=True)
+        body.pack(fill="both", expand=True, padx=0, pady=(12, 0))
 
-        # Left nav column
-        nav_col = ctk.CTkFrame(body, fg_color="transparent", width=130)
+        # Left nav column (~120px)
+        nav_col = ctk.CTkFrame(body, fg_color="transparent", width=120)
         nav_col.pack(side="left", fill="y", padx=(20, 0), pady=(0, 20))
         nav_col.pack_propagate(False)
 
-        # Right content column with scrollable frame
+        # Right scrollable content
         scroll = ctk.CTkScrollableFrame(body, fg_color="transparent", corner_radius=0)
-        scroll.pack(side="left", fill="both", expand=True, padx=(16, 8), pady=(0, 20))
+        scroll.pack(side="left", fill="both", expand=True, padx=(12, 8), pady=(0, 20))
         _fix_scroll(scroll)
-
-        # Content placeholder — only one frame visible at a time
-        _active_sub = {"key": None}
-        _built = {}   # lazy cache: key → frame
-
-        sub_btns = {}
 
         _subtabs = [
             ("Timer",      "timer"),
@@ -1073,8 +1067,11 @@ class App(ctk.CTk):
             ("Data",       "data"),
             ("App",        "app"),
         ]
+        _active_sub = {"key": None}
+        _built      = {}   # lazy cache: key → frame
+        sub_btns    = {}
 
-        # ── Helpers ──────────────────────────────────────────────────────────
+        # ── Shared helpers (available to all builders) ────────────────────────
         def _section(parent, title):
             mk_label(parent, title, size=11, color=MUTED).pack(anchor="w", pady=(18, 6))
 
@@ -1105,6 +1102,10 @@ class App(ctk.CTk):
             pc.pack_propagate(False)
             preset_btns = {}
 
+            def _flash_pc():
+                pc.configure(fg_color=BORDER)
+                outer.after(180, lambda: pc.configure(fg_color=CARD))
+
             def _select_preset(v, deselect_custom=True):
                 self._pomo_max_mins = float(v)
                 save_settings("pomo_max_mins", float(v))
@@ -1113,8 +1114,7 @@ class App(ctk.CTk):
                                   text_color=BG if val==v else MUTED)
                 if deselect_custom:
                     custom_entry.configure(border_color=BORDER)
-                pc.configure(fg_color=BORDER)
-                outer.after(180, lambda: pc.configure(fg_color=CARD))
+                _flash_pc()
                 if not self.running:
                     self._pomo_mins = min(self._pomo_mins, self._pomo_max_mins)
                     total_s = int(self._pomo_mins * 60)
@@ -1235,9 +1235,9 @@ class App(ctk.CTk):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Sounds")
             for label, setting_key, attr, preview_fn in [
-                ("element click", "sound_click",  "sound_click_enabled",   _audio.play_click),
-                ("level up",      "sound_levelup", "sound_levelup_enabled", _audio.play_main_levelup),
-                ("finish",        "sound_finish",  "sound_finish_enabled",  _audio.play_sound),
+                ("element click", "sound_click",   "sound_click_enabled",   _audio.play_click),
+                ("level up",      "sound_levelup",  "sound_levelup_enabled", _audio.play_main_levelup),
+                ("finish",        "sound_finish",   "sound_finish_enabled",  _audio.play_sound),
             ]:
                 row = ctk.CTkFrame(f, fg_color="transparent")
                 row.pack(anchor="w", pady=4)
@@ -1374,18 +1374,18 @@ class App(ctk.CTk):
             _active_sub["key"] = key
             for k, b in sub_btns.items():
                 b.configure(
-                    fg_color=PANEL if k==key else "transparent",
+                    fg_color=CARD   if k==key else "transparent",
                     text_color=DARK if k==key else MUTED,
                 )
             if key not in _built:
                 _built[key] = _builders[key](scroll)
-            _built[key].pack(fill="x", padx=4, pady=(4, 20))
+            _built[key].pack(fill="x", padx=28, pady=(4, 20))
 
         # ── Nav sidebar buttons ───────────────────────────────────────────────
         for label, key in _subtabs:
             b = ctk.CTkButton(
                 nav_col, text=label, anchor="w",
-                height=36, corner_radius=8,
+                height=34, corner_radius=8,
                 fg_color="transparent", hover_color=CARD,
                 text_color=MUTED, border_width=0,
                 font=ctk.CTkFont(size=13),
@@ -1394,7 +1394,6 @@ class App(ctk.CTk):
             b.pack(fill="x", padx=4, pady=2)
             sub_btns[key] = b
 
-        # Show first sub-tab immediately
         _switch_sub("timer")
         return outer
 
