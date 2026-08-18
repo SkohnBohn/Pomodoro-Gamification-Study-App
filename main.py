@@ -58,6 +58,11 @@ _PALETTES = {
         DARK="#e8e6e1", DARK2="#c0bdb8", MUTED="#888888", DIM="#555555",
         TEXT="#e8e6e1", SUCCESS="#4ade80", DANGER="#f87171",
     ),
+    "warm": dict(
+        BG="#f9e079", PANEL="#f7e48d", CARD="#f2e4b4", BORDER="#e0cc6a",
+        DARK="#201c12", DARK2="#4b4428", MUTED="#5a4c2c", DIM="#6c5a2e",
+        TEXT="#201c12", SUCCESS="#14532d", DANGER="#991b1b",
+    ),
 }
 _active_palette = "yellow"
 
@@ -96,6 +101,9 @@ def _apply_palette(name: str):
     if name == "yellow":
         _ARROW_FG       = "#8a7340"
         _ARROW_FG_HOVER = "#3d3000"
+    elif name == "warm":
+        _ARROW_FG       = "#7a6830"
+        _ARROW_FG_HOVER = "#4b4428"
     elif name == "dark":
         _ARROW_FG       = "#666666"
         _ARROW_FG_HOVER = "#cccccc"
@@ -1187,7 +1195,7 @@ class App(ctk.CTk):
         def _build_appearance(parent):
             f = ctk.CTkFrame(parent, fg_color="transparent")
             _section(f, "Theme")
-            _seg(f, [("Yellow","yellow"),("White","light"),("Dark","dark")],
+            _seg(f, [("Yellow","yellow"),("Warm Yel","warm"),("White","light"),("Dark","dark")],
                  self._theme, lambda k: self._switch_theme(k))
             return f
 
