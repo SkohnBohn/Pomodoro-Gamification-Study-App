@@ -1339,12 +1339,7 @@ class App(ctk.CTk):
                     text_color=DARK if k==key else MUTED,
                 )
             if key not in _built:
-                try:
-                    _built[key] = _builders[key](scroll)
-                except Exception as _e:
-                    import traceback, sys
-                    traceback.print_exc(file=sys.stderr)
-                    return
+                _built[key] = _builders[key](scroll)
             _built[key].pack(fill="x", padx=20, pady=(4, 16))
 
         for label, key in _subtabs:
