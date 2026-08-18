@@ -153,43 +153,43 @@ def _skill_color(sk: str) -> str:
         return _SKILL_COLORS_DARK.get(sk, "#aaaaaa")
     return _SKILL_COLORS.get(sk, DARK)
 
-# (bg, border, text) — one entry per level 0-15, smooth gradient
+# (bg, border, text) — level 0-15, warm yellow → dark gold, no hue drift
 _SKILL_CARD_PALETTE = [
-    ("#fffcf5", "#c6c4bf", "#1a1200"),        # 0  — warm white
-    ("#feefcb", "#c6ba9e", "#1a1200"),        # 1
-    ("#fde3a1", "#c5b17d", "#1a1200"),        # 2
-    ("#fcd777", "#c4a75c", "#1a1200"),        # 3
-    ("#fbcb4d", "#c39e3c", "#1a1200"),        # 4
-    ("#fbbf24", "#c3941c", "#1a1200"),        # 5  — golden yellow
-    ("#fbaf37", "#c3882a", "#1a1200"),        # 6
-    ("#fb9f4a", "#c37c39", "#1a1200"),        # 7
-    ("#fb905e", "#c37049", "#1a1200"),        # 8
-    ("#fb8071", "#c36358", "#1a1200"),        # 9
-    ("#fb7185", "#c35867", "#fff8e7"),        # 10 — soft rose
-    ("#e25e71", "#b04958", "#fff8e7"),        # 11
-    ("#c94b5e", "#9c3a49", "#fff8e7"),        # 12
-    ("#b0384b", "#892b3a", "#fff8e7"),        # 13
-    ("#972538", "#751c2b", "#fff8e7"),        # 14
-    ("#7f1225", "#630e1c", "#fff8e7"),        # 15 — dark ruby
+    ("#fefce8", "#e8e4d0", "#1a1200"),        # 0  — near-white cream
+    ("#fef9c3", "#ddd89e", "#1a1200"),        # 1
+    ("#fef08a", "#d4cc6a", "#1a1200"),        # 2
+    ("#fde047", "#cab83c", "#1a1200"),        # 3
+    ("#facc15", "#c09a10", "#1a1200"),        # 4
+    ("#eab308", "#b08600", "#1a1200"),        # 5  — golden yellow
+    ("#d4a000", "#a07800", "#1a1200"),        # 6
+    ("#bc8e00", "#8c6800", "#1a1200"),        # 7
+    ("#a07800", "#785800", "#fef9c3"),        # 8  — text flips light
+    ("#886400", "#604800", "#fef9c3"),        # 9
+    ("#6f5200", "#4e3a00", "#fef9c3"),        # 10
+    ("#5a4200", "#3c2c00", "#fef9c3"),        # 11
+    ("#473400", "#2e2000", "#fef9c3"),        # 12
+    ("#362800", "#201600", "#fef9c3"),        # 13
+    ("#281e00", "#160e00", "#fef9c3"),        # 14
+    ("#1a1400", "#0a0600", "#fef9c3"),        # 15 — near-black warm
 ]
 
 _SKILL_CARD_PALETTE_DARK = [
-    ("#242424", "#383838", "#c8c6c0"),        # 0
-    ("#2a2418", "#3d3520", "#c8c6c0"),        # 1
-    ("#302c1a", "#443e25", "#d0cdc5"),        # 2
-    ("#38331e", "#4d4628", "#d0cdc5"),        # 3
-    ("#423c22", "#59502c", "#d8d5cc"),        # 4
-    ("#4d4426", "#665830", "#e0ddd4"),        # 5  — warm amber
-    ("#553a22", "#6e4a2e", "#e0ddd4"),        # 6
-    ("#5c301e", "#75401e", "#e8e5dc"),        # 7
-    ("#60261a", "#7a3520", "#e8e5dc"),        # 8
-    ("#621c1e", "#7c2a28", "#ffe8e8"),        # 9
-    ("#641428", "#7e2035", "#ffe8e8"),        # 10
-    ("#5e1230", "#782040", "#ffe8e8"),        # 11
-    ("#581038", "#722048", "#ffe8e8"),        # 12
-    ("#520e3e", "#6c1e50", "#ffe8ee"),        # 13
-    ("#4a0c42", "#641858", "#ffe8ee"),        # 14
-    ("#3e0a44", "#581660", "#ffe8ee"),        # 15 — deep plum
+    ("#242420", "#383830", "#d4d0b8"),        # 0
+    ("#2a2810", "#3a3818", "#d4d0b8"),        # 1
+    ("#313010", "#424020", "#d8d4bc"),        # 2
+    ("#3a3812", "#4e4c22", "#dcd8c0"),        # 3
+    ("#454214", "#5c5824", "#e0dcc4"),        # 4
+    ("#504e16", "#6a6628", "#e8e4cc"),        # 5
+    ("#5a5618", "#78742c", "#eee9d2"),        # 6
+    ("#665e1a", "#88802e", "#f4f0d8"),        # 7
+    ("#726820", "#968e38", "#fefce8"),        # 8
+    ("#7e7428", "#a89e44", "#fefce8"),        # 9
+    ("#8a8030", "#b4aa50", "#fefce8"),        # 10
+    ("#968c38", "#c0b65c", "#fefce8"),        # 11
+    ("#a29840", "#ccc268", "#1a1200"),        # 12 — text flips dark
+    ("#b0a84c", "#d8d074", "#1a1200"),        # 13
+    ("#beb858", "#e4dc80", "#1a1200"),        # 14
+    ("#ccc864", "#f0ec8c", "#1a1200"),        # 15 — bright gold on dark
 ]
 
 
@@ -2527,7 +2527,8 @@ class App(ctk.CTk):
             mk_label(top, cap_label, size=14, weight="bold",
                      color=card_text).pack(side="right")
 
-            bar = progress_bar(inner, color=card_text)
+            bar = ctk.CTkProgressBar(inner, height=6, corner_radius=3,
+                                     progress_color=card_text, fg_color=card_border)
             bar.pack(fill="x", pady=(8, 4))
             bar.set(1.0 if at_cap else max(0.0, frac))
 
