@@ -370,15 +370,13 @@ def box_seg(parent, options, current, on_select, size=11, btn_w=0):
         on_select(val)
         for v, b in btns.items():
             active = v == val
-            b.configure(
-                border_color=MUTED if active else BORDER,
-            )
+            b.configure(border_color=BORDER if active else CARD)
     for label, val in options:
         active = val == current
         b = ctk.CTkButton(
             row, text=label, width=btn_w, height=28, corner_radius=4,
-            fg_color=BG, hover_color=BG,
-            border_color=MUTED if active else BORDER, border_width=1,
+            fg_color=CARD, hover_color=CARD,
+            border_color=BORDER if active else CARD, border_width=1,
             text_color=MUTED,
             font=ctk.CTkFont(size=size, weight="normal"),
             command=lambda v=val: _sel(v),
