@@ -4000,7 +4000,15 @@ class App(ctk.CTk):
             text=f"Σ {total / 60:.1f}h · {len(filtered)} sessions")
 
         filtered.sort(key=lambda x: x[0], reverse=True)
-        medals  = ["🥇", "🥈", "🥉"]
+        _medal_files = ["medal_gold.png", "medal_silver.png", "medal_copper.png"]
+        _medal_imgs  = []
+        for fn in _medal_files:
+            try:
+                p = os.path.join(os.path.dirname(__file__), "images", fn)
+                img = Image.open(p).resize((32, 32), Image.Resampling.LANCZOS)
+                _medal_imgs.append(ctk.CTkImage(img, size=(32, 32)))
+            except Exception:
+                _medal_imgs.append(None)
         mcolors = ["#92700a", "#7a5500", "#7a4500"]
         accent_cols = ["#c8960a", "#9e8060", "#b06030"]
 
@@ -4023,8 +4031,11 @@ class App(ctk.CTk):
             top = ctk.CTkFrame(inner, fg_color="transparent")
             top.pack(fill="x")
 
-            rank_s = medals[i] if is_top else f"#{i+1}"
-            mk_label(top, rank_s, size=13, color=rank_c).pack(side="left")
+            if is_top and _medal_imgs[i]:
+                ctk.CTkLabel(top, text="", image=_medal_imgs[i],
+                             fg_color="transparent").pack(side="left", padx=(0, 6))
+            else:
+                mk_label(top, f"#{i+1}", size=13, color=rank_c).pack(side="left")
             mk_label(top, f"  {dur:.0f} min", size=15, weight="bold",
                      color=rank_c if is_top else TEXT).pack(side="left")
 
