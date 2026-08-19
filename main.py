@@ -4002,11 +4002,15 @@ class App(ctk.CTk):
         filtered.sort(key=lambda x: x[0], reverse=True)
         _medal_files = ["medal_gold.png", "medal_silver.png", "medal_copper.png"]
         _medal_imgs  = []
+        _medal_h = 28
         for fn in _medal_files:
             try:
                 p = os.path.join(os.path.dirname(__file__), "images", fn)
-                img = Image.open(p).resize((32, 32), Image.Resampling.LANCZOS)
-                _medal_imgs.append(ctk.CTkImage(img, size=(32, 32)))
+                raw = Image.open(p)
+                w, h = raw.size
+                _medal_w = round(_medal_h * w / h)
+                img = raw.resize((_medal_w, _medal_h), Image.Resampling.LANCZOS)
+                _medal_imgs.append(ctk.CTkImage(img, size=(_medal_w, _medal_h)))
             except Exception:
                 _medal_imgs.append(None)
         mcolors = ["#92700a", "#7a5500", "#7a4500"]
