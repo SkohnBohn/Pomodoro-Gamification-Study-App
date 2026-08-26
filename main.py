@@ -1781,11 +1781,8 @@ class App(ctk.CTk):
         )
         self.stop_btn.pack(side="left", padx=8)
 
-        # ── Separator ─────────────────────────────────────────────────────────
-        ctk.CTkFrame(body, width=1, fg_color=BORDER).pack(side="left", fill="y", padx=(0, 0))
-
         # ── Right ─────────────────────────────────────────────────────────────
-        right = ctk.CTkFrame(body, fg_color="transparent", width=300)
+        right = ctk.CTkFrame(body, fg_color=PANEL, width=300)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
