@@ -1668,7 +1668,7 @@ class App(ctk.CTk):
         _mode_row.pack(pady=(16, 0))
         self._mode_btn_pomo = ctk.CTkButton(
             _mode_row, text="POMO", width=80, height=30, corner_radius=0,
-            fg_color="transparent", hover_color="transparent",
+            fg_color="transparent", hover_color=BG,
             border_width=1, border_color=DARK,
             text_color=DARK, font=ctk.CTkFont(size=11),
             command=lambda: _set_mode("Pomodoro"),
@@ -1676,7 +1676,7 @@ class App(ctk.CTk):
         self._mode_btn_pomo.pack(side="left")
         self._mode_btn_open = ctk.CTkButton(
             _mode_row, text="OPEN", width=80, height=30, corner_radius=0,
-            fg_color="transparent", hover_color="transparent",
+            fg_color="transparent", hover_color=BG,
             border_width=1, border_color=BORDER,
             text_color=MUTED, font=ctk.CTkFont(size=11),
             command=lambda: _set_mode("Open Timer"),
@@ -1893,7 +1893,7 @@ class App(ctk.CTk):
                 b = ctk.CTkButton(
                     self._sk_grid_frame,
                     text=name, width=82, height=28, corner_radius=0,
-                    fg_color="transparent", hover_color="transparent", text_color=MUTED,
+                    fg_color="transparent", hover_color=BG, text_color=MUTED,
                     border_width=1, border_color=BORDER, font=ctk.CTkFont(size=11),
                     command=lambda s=name: self._pick_skill(s),
                 )
