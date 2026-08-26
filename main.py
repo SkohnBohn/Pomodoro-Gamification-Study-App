@@ -295,24 +295,25 @@ class RingTimer(tk.Canvas):
         dot_color = dot_color or self.DOT_COLOR
         self.delete("all")
         cx = cy = self.SIZE // 2
-        pad, w = 14, 6
+        pad, w = 14, 2
         r = (self.SIZE - pad * 2) / 2
-        ir = r - w / 2
-        self.create_oval(cx - ir, cy - ir, cx + ir, cy + ir, fill=PANEL, outline="")
+        # Thin track ring (full circle in subtle border color)
         self._arc(pad, w, BORDER, 359.99)
+        # Depleting arc in dark ink
         if fraction > 0.001:
-            self._arc(pad, w, arc_color, fraction * 359.99)
+            self._arc(pad, int(w * 1.5), arc_color, fraction * 359.99)
+        # Small dot at current position
         angle = math.radians(90 - fraction * 360)
         dx = cx + r * math.cos(angle)
         dy = cy - r * math.sin(angle)
-        dot_r = 4
+        dot_r = 5
         self.create_oval(dx - dot_r, dy - dot_r, dx + dot_r, dy + dot_r,
-                         fill=MUTED, outline="")
-        self.create_text(cx, cy - (14 if sub else 0),
-                         text=time_str, fill=MUTED,
-                         font=("Helvetica", 44))
+                         fill=DARK2, outline="")
+        self.create_text(cx, cy - (16 if sub else 0),
+                         text=time_str, fill=DARK,
+                         font=("Helvetica Neue", 54))
         if sub:
-            self.create_text(cx, cy + 28, text=sub,
+            self.create_text(cx, cy + 32, text=sub,
                              fill=DIM, font=("Helvetica", 13))
 
     def _arc(self, pad, width, color, extent):
@@ -1646,16 +1647,41 @@ class App(ctk.CTk):
         left.pack(side="left", fill="both", expand=True, padx=(8, 10))
 
         self._mode_state = "Pomodoro"
-        _mode_row, _mode_btns = box_seg(
-            left,
-            [("POMO", "Pomodoro"), ("OPEN", "Open Timer")],
-            "Pomodoro",
-            lambda mode: (setattr(self, "_mode_state", mode), self._on_mode_change(mode)),
-            size=13,
-        )
+
+        def _set_mode(mode):
+            self._mode_state = mode
+            _refresh_mode_btns()
+            self._on_mode_change(mode)
+
+        def _refresh_mode_btns():
+            m = self._mode_state
+            self._mode_btn_pomo.configure(
+                border_color=DARK if m == "Pomodoro" else BORDER,
+                text_color=DARK if m == "Pomodoro" else MUTED,
+            )
+            self._mode_btn_open.configure(
+                border_color=DARK if m == "Open Timer" else BORDER,
+                text_color=DARK if m == "Open Timer" else MUTED,
+            )
+
+        _mode_row = ctk.CTkFrame(left, fg_color="transparent")
         _mode_row.pack(pady=(16, 0))
-        self._mode_btn_pomo = _mode_btns["Pomodoro"]
-        self._mode_btn_open = _mode_btns["Open Timer"]
+        self._mode_btn_pomo = ctk.CTkButton(
+            _mode_row, text="POMO", width=80, height=30, corner_radius=0,
+            fg_color="transparent", hover_color="transparent",
+            border_width=1, border_color=DARK,
+            text_color=DARK, font=ctk.CTkFont(size=11),
+            command=lambda: _set_mode("Pomodoro"),
+        )
+        self._mode_btn_pomo.pack(side="left")
+        self._mode_btn_open = ctk.CTkButton(
+            _mode_row, text="OPEN", width=80, height=30, corner_radius=0,
+            fg_color="transparent", hover_color="transparent",
+            border_width=1, border_color=BORDER,
+            text_color=MUTED, font=ctk.CTkFont(size=11),
+            command=lambda: _set_mode("Open Timer"),
+        )
+        self._mode_btn_open.pack(side="left")
 
         # keep a dummy .set() / .get() interface so _on_mode_change still works
         class _FakeSeg:
@@ -1726,39 +1752,49 @@ class App(ctk.CTk):
         self.ring.bind("<ButtonRelease-1>", _ring_release)
 
         self._brow = ctk.CTkFrame(left, fg_color="transparent")
-        self._brow.pack(pady=(16, 28))
+        self._brow.pack(pady=(20, 28))
 
         self.start_btn = ctk.CTkButton(
-            self._brow, text="▶", width=80, height=44, corner_radius=8,
-            fg_color=PANEL, hover_color=PANEL, text_color=MUTED,
-            border_width=1, border_color=BORDER,
-            font=ctk.CTkFont(size=22),
+            self._brow, text="▶", width=52, height=52, corner_radius=26,
+            fg_color="transparent", hover_color=PANEL, text_color=DARK,
+            border_width=1, border_color=DARK2,
+            font=ctk.CTkFont(size=18),
             command=self._on_start,
         )
-        self.start_btn.pack(side="left", padx=4)
+        self.start_btn.pack(side="left", padx=8)
 
         self.pause_btn = ctk.CTkButton(
-            self._brow, text="⏸", width=80, height=44, corner_radius=8,
-            fg_color=PANEL, hover_color=PANEL, text_color=MUTED,
-            border_width=1, border_color=BORDER,
-            font=ctk.CTkFont(size=20), state="disabled",
+            self._brow, text="⏸", width=52, height=52, corner_radius=26,
+            fg_color="transparent", hover_color=PANEL, text_color=DARK,
+            border_width=1, border_color=DARK2,
+            font=ctk.CTkFont(size=17), state="disabled",
             command=self._on_pause,
         )
-        self.pause_btn.pack(side="left", padx=4)
+        self.pause_btn.pack(side="left", padx=8)
 
         self.stop_btn = ctk.CTkButton(
-            self._brow, text="⏹", width=80, height=44, corner_radius=8,
-            fg_color=PANEL, hover_color=PANEL, text_color=MUTED,
-            border_width=1, border_color=BORDER,
-            font=ctk.CTkFont(size=20), state="disabled",
+            self._brow, text="⏹", width=52, height=52, corner_radius=26,
+            fg_color="transparent", hover_color=PANEL, text_color=DARK,
+            border_width=1, border_color=DARK2,
+            font=ctk.CTkFont(size=17), state="disabled",
             command=self._on_stop,
         )
-        self.stop_btn.pack(side="left", padx=4)
+        self.stop_btn.pack(side="left", padx=8)
+
+        # ── Separator ─────────────────────────────────────────────────────────
+        ctk.CTkFrame(body, width=1, fg_color=BORDER).pack(side="left", fill="y", padx=(0, 0))
 
         # ── Right ─────────────────────────────────────────────────────────────
-        right = ctk.CTkFrame(body, fg_color="transparent", width=290)
+        right = ctk.CTkFrame(body, fg_color="transparent", width=300)
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
+
+        # Inner pad for right panel (matches design's padding:40px 28px)
+        right_inner = ctk.CTkFrame(right, fg_color="transparent")
+        right_inner.pack(fill="both", expand=True, padx=20, pady=28)
+
+        # Redirect all children to right_inner
+        right = right_inner
 
         # Skill section
         self._sk_card = ctk.CTkFrame(right, fg_color="transparent")
@@ -1776,22 +1812,23 @@ class App(ctk.CTk):
 
         # Intention
         int_card = ctk.CTkFrame(right, fg_color="transparent")
-        int_card.pack(fill="x", pady=(0, 12))
+        int_card.pack(fill="x", pady=(0, 20))
         mk_label(int_card, "INTENTION", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.intention_entry = ctk.CTkEntry(
-            int_card, height=34, placeholder_text="",
-            corner_radius=6, fg_color=PANEL, border_color=BORDER,
+            int_card, height=30, placeholder_text="",
+            corner_radius=0, fg_color="transparent", border_width=0,
             text_color=TEXT, placeholder_text_color=DIM,
             font=ctk.CTkFont(size=13),
         )
-        self.intention_entry.pack(fill="x")
+        self.intention_entry.pack(fill="x", pady=(0, 0))
+        ctk.CTkFrame(int_card, height=1, fg_color=BORDER).pack(fill="x")
 
         # Notes
         notes_card = ctk.CTkFrame(right, fg_color="transparent")
         notes_card.pack(fill="both", expand=True)
         mk_label(notes_card, "NOTES", size=10, color=MUTED).pack(anchor="w", pady=(0, 6))
         self.notes_box = ctk.CTkTextbox(
-            notes_card, corner_radius=6, fg_color=PANEL,
+            notes_card, corner_radius=4, fg_color="transparent",
             text_color=TEXT, font=ctk.CTkFont(size=13),
             border_color=BORDER, border_width=1,
         )
@@ -1855,12 +1892,12 @@ class App(ctk.CTk):
             for i, (name, emoji) in enumerate(skills):
                 b = ctk.CTkButton(
                     self._sk_grid_frame,
-                    text=name, width=82, height=28, corner_radius=6,
-                    fg_color=PANEL, hover_color=PANEL, text_color=MUTED,
+                    text=name, width=82, height=28, corner_radius=0,
+                    fg_color="transparent", hover_color="transparent", text_color=MUTED,
                     border_width=1, border_color=BORDER, font=ctk.CTkFont(size=11),
                     command=lambda s=name: self._pick_skill(s),
                 )
-                b.grid(row=i // 3, column=i % 3, padx=3, pady=3, sticky="ew")
+                b.grid(row=i // 3, column=i % 3, padx=1, pady=1, sticky="ew")
                 self._sk_grid_frame.columnconfigure(i % 3, weight=1)
                 self._skill_btns[name] = b
 
@@ -1896,15 +1933,15 @@ class App(ctk.CTk):
             self.selected_skill = ""
             save_settings("selected_skill", "")
             for b in self._skill_btns.values():
-                b.configure(fg_color=PANEL, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color="transparent", text_color=MUTED, border_color=BORDER)
             return
         self.selected_skill = skill
         save_settings("selected_skill", skill)
         for sk, b in self._skill_btns.items():
             if sk == skill:
-                b.configure(fg_color=PANEL, text_color=DARK2, border_color=MUTED)
+                b.configure(fg_color="transparent", text_color=DARK, border_color=DARK)
             else:
-                b.configure(fg_color=PANEL, text_color=MUTED, border_color=BORDER)
+                b.configure(fg_color="transparent", text_color=MUTED, border_color=BORDER)
 
     def _on_mode_change(self, mode: str):
         self.timer_mode = mode
@@ -2197,18 +2234,18 @@ class App(ctk.CTk):
         self.after(50, self._tick_open)
 
     def _btns_running(self):
-        self.start_btn.configure(state="disabled", fg_color=PANEL, text_color=BORDER,
-                                  border_color=BORDER, border_width=1)
-        self.pause_btn.configure(state="normal", text_color=MUTED, border_color=BORDER, text="⏸")
-        self.stop_btn.configure(state="normal", fg_color=PANEL, text_color=MUTED,
-                                border_color=BORDER, border_width=1)
+        self.start_btn.configure(state="disabled", fg_color="transparent", text_color=BORDER,
+                                  border_color=BORDER)
+        self.pause_btn.configure(state="normal", text_color=DARK, border_color=DARK2, text="⏸")
+        self.stop_btn.configure(state="normal", fg_color="transparent", text_color=DARK,
+                                border_color=DARK2)
 
     def _btns_idle(self):
-        self.start_btn.configure(state="normal", fg_color=PANEL, text_color=MUTED,
-                                  border_color=BORDER, border_width=1)
-        self.pause_btn.configure(state="disabled", text_color=MUTED, border_color=BORDER, text="⏸")
-        self.stop_btn.configure(state="disabled", fg_color=PANEL, text_color=MUTED,
-                                border_color=BORDER, border_width=1)
+        self.start_btn.configure(state="normal", fg_color="transparent", text_color=DARK,
+                                  border_color=DARK2)
+        self.pause_btn.configure(state="disabled", text_color=BORDER, border_color=BORDER, text="⏸")
+        self.stop_btn.configure(state="disabled", fg_color="transparent", text_color=BORDER,
+                                border_color=BORDER)
 
     def _reset_timer(self):
         self.running = False
