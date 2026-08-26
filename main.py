@@ -1795,10 +1795,10 @@ class App(ctk.CTk):
             text_color=TEXT, font=ctk.CTkFont(size=13),
             border_color=BORDER, border_width=1,
         )
-        self.notes_box.pack(fill="both", expand=True)
+        self.notes_box.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
         note_btns = ctk.CTkFrame(notes_card, fg_color="transparent")
-        note_btns.pack(fill="x", pady=(4, 0))
+        note_btns.pack(fill="x", padx=12, pady=(0, 12))
         _arrow_btn(note_btns, "up",   self._load_notes_dialog, bg=BG).pack(side="left")
         _arrow_btn(note_btns, "down", self._save_note,         bg=BG).pack(side="right")
 
