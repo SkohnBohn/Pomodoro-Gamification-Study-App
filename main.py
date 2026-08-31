@@ -3108,7 +3108,8 @@ class App(ctk.CTk):
         skill_names = [name for name, _ in get_user_skills()]
         selected: set = set()  # empty = All
 
-        _popup = [None]
+        _popup_frame = [None]
+        _root_bind_id = [None]
 
         # Button that opens/closes the popup
         _btn_var = ctk.StringVar(value="All")
@@ -3138,13 +3139,23 @@ class App(ctk.CTk):
         def _update_label():
             _btn_var.set(", ".join(sorted(selected)) if selected else "All")
 
-        def _close_popup(*_):
-            if _popup[0]:
+        def _unbind_root():
+            if _root_bind_id[0] is not None:
                 try:
-                    _popup[0].destroy()
+                    parent.winfo_toplevel().unbind("<Button-1>", _root_bind_id[0])
                 except Exception:
                     pass
-                _popup[0] = None
+                _root_bind_id[0] = None
+
+        def _close_popup(*_):
+            _unbind_root()
+            if _popup_frame[0]:
+                try:
+                    _popup_frame[0].place_forget()
+                    _popup_frame[0].destroy()
+                except Exception:
+                    pass
+                _popup_frame[0] = None
 
         def _toggle_skill(name, btn):
             if name in selected:
@@ -3157,34 +3168,35 @@ class App(ctk.CTk):
             _redraw()
 
         def _open_popup():
-            if _popup[0]:
+            if _popup_frame[0]:
                 _close_popup()
                 return
-            popup = tk.Toplevel(parent)
-            popup.overrideredirect(True)
-            popup.configure(bg=CARD)
-            _popup[0] = popup
 
-            # Position below the toggle button
+            # Float a plain frame over the parent — no Toplevel, no focus stealing
+            popup = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=8,
+                                 border_width=1, border_color=BORDER)
+            _popup_frame[0] = popup
+
+            # Position below toggle button, right-aligned
+            ctrl.update_idletasks()
             toggle_btn.update_idletasks()
-            bx = toggle_btn.winfo_rootx()
-            by = toggle_btn.winfo_rooty() + toggle_btn.winfo_height() + 2
-            popup.geometry(f"+{bx}+{by}")
-
-            frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8, border_width=1, border_color=BORDER)
-            frame.pack(padx=0, pady=0)
+            tx = ctrl.winfo_x() + toggle_btn.winfo_x()
+            ty = ctrl.winfo_y() + ctrl.winfo_height() + 2
+            popup_w = 136
+            popup.place(x=tx + toggle_btn.winfo_width() - popup_w, y=ty)
+            popup.lift()
 
             skill_btns = {}
             for name in skill_names:
                 active = name in selected
                 b = ctk.CTkButton(
-                    frame, text=name, width=128, height=26, corner_radius=0,
+                    popup, text=name, width=128, height=26, corner_radius=0,
                     fg_color="transparent", hover_color=BG,
                     border_width=1,
                     border_color=DARK if active else BORDER,
                     text_color=DARK if active else MUTED,
                     font=ctk.CTkFont(size=11),
-                    command=lambda n=name: None,  # set below
+                    command=lambda n=name, btn=None: None,
                 )
                 b.pack(padx=4, pady=(4 if name == skill_names[0] else 0, 4 if name == skill_names[-1] else 0))
                 skill_btns[name] = b
@@ -3192,9 +3204,26 @@ class App(ctk.CTk):
             for name, b in skill_btns.items():
                 b.configure(command=lambda n=name, btn=b: _toggle_skill(n, btn))
 
-            # Close when clicking outside
-            popup.bind("<FocusOut>", lambda e: canvas.after(100, _close_popup))
-            popup.focus_set()
+            # Close when clicking outside popup or toggle button
+            def _maybe_close(event):
+                if not _popup_frame[0]:
+                    return
+                try:
+                    px, py = popup.winfo_rootx(), popup.winfo_rooty()
+                    pw, ph = popup.winfo_width(), popup.winfo_height()
+                    inside_popup = (px <= event.x_root <= px + pw and py <= event.y_root <= py + ph)
+                    tbx, tby = toggle_btn.winfo_rootx(), toggle_btn.winfo_rooty()
+                    tbw, tbh = toggle_btn.winfo_width(), toggle_btn.winfo_height()
+                    inside_toggle = (tbx <= event.x_root <= tbx + tbw and tby <= event.y_root <= tby + tbh)
+                    if not inside_popup and not inside_toggle:
+                        _close_popup()
+                except Exception:
+                    _close_popup()
+
+            # Delay by one tick so the current click doesn't immediately close it
+            def _bind_root():
+                _root_bind_id[0] = parent.winfo_toplevel().bind("<Button-1>", _maybe_close, add="+")
+            parent.after(1, _bind_root)
 
         toggle_btn.configure(command=_open_popup)
         canvas.bind("<Destroy>", lambda e: _close_popup())
