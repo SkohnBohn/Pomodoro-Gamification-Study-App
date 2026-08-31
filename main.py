@@ -3104,17 +3104,20 @@ class App(ctk.CTk):
     def _draw_line_graph(self, parent):
         ctrl = ctk.CTkFrame(parent, fg_color="transparent")
         ctrl.pack(fill="x", padx=16, pady=(14, 6))
-        skills_list = ["All"] + [name for name, _ in get_user_skills()]
-        line_skill = ctk.StringVar(value="All")
-        opt = ctk.CTkOptionMenu(
-            ctrl, values=skills_list, variable=line_skill,
-            width=130, height=28, corner_radius=8,
-            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
-            text_color=TEXT, dropdown_fg_color=CARD,
-            dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
+
+        skill_names = [name for name, _ in get_user_skills()]
+        selected: set = set()  # empty = All
+
+        _popup = [None]
+
+        # Button that opens/closes the popup
+        _btn_var = ctk.StringVar(value="All")
+        toggle_btn = ctk.CTkButton(
+            ctrl, textvariable=_btn_var, width=130, height=28, corner_radius=8,
+            fg_color=CARD, hover_color=BORDER, text_color=TEXT,
             font=ctk.CTkFont(size=12),
         )
-        opt.pack(side="right")
+        toggle_btn.pack(side="right")
 
         canvas = tk.Canvas(parent, height=165, bg=PANEL, highlightthickness=0)
         canvas.pack(fill="x", padx=16, pady=(0, 14))
@@ -3123,17 +3126,81 @@ class App(ctk.CTk):
             w = canvas.winfo_width()
             if w < 50:
                 return
-            self._draw_lines(canvas, line_skill.get(), w, None)
+            self._draw_lines(canvas, list(selected), w)
 
         _line_pending = [None]
-        def _redraw_debounced_line(*_):
+        def _debounce(*_):
             if _line_pending[0]:
                 canvas.after_cancel(_line_pending[0])
             _line_pending[0] = canvas.after(80, _redraw)
-        canvas.bind("<Configure>", _redraw_debounced_line)
-        line_skill.trace_add("write", lambda *_: _redraw())
+        canvas.bind("<Configure>", _debounce)
 
-    def _draw_lines(self, canvas, skill: str, canvas_w: int, tip_lbl):
+        def _update_label():
+            _btn_var.set(", ".join(sorted(selected)) if selected else "All")
+
+        def _close_popup(*_):
+            if _popup[0]:
+                try:
+                    _popup[0].destroy()
+                except Exception:
+                    pass
+                _popup[0] = None
+
+        def _toggle_skill(name, btn):
+            if name in selected:
+                selected.discard(name)
+                btn.configure(border_color=BORDER, text_color=MUTED)
+            else:
+                selected.add(name)
+                btn.configure(border_color=DARK, text_color=DARK)
+            _update_label()
+            _redraw()
+
+        def _open_popup():
+            if _popup[0]:
+                _close_popup()
+                return
+            popup = tk.Toplevel(parent)
+            popup.overrideredirect(True)
+            popup.configure(bg=CARD)
+            _popup[0] = popup
+
+            # Position below the toggle button
+            toggle_btn.update_idletasks()
+            bx = toggle_btn.winfo_rootx()
+            by = toggle_btn.winfo_rooty() + toggle_btn.winfo_height() + 2
+            popup.geometry(f"+{bx}+{by}")
+
+            frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=8, border_width=1, border_color=BORDER)
+            frame.pack(padx=0, pady=0)
+
+            skill_btns = {}
+            for name in skill_names:
+                active = name in selected
+                b = ctk.CTkButton(
+                    frame, text=name, width=128, height=26, corner_radius=0,
+                    fg_color="transparent", hover_color=BG,
+                    border_width=1,
+                    border_color=DARK if active else BORDER,
+                    text_color=DARK if active else MUTED,
+                    font=ctk.CTkFont(size=11),
+                    command=lambda n=name: None,  # set below
+                )
+                b.pack(padx=4, pady=(4 if name == skill_names[0] else 0, 4 if name == skill_names[-1] else 0))
+                skill_btns[name] = b
+
+            for name, b in skill_btns.items():
+                b.configure(command=lambda n=name, btn=b: _toggle_skill(n, btn))
+
+            # Close when clicking outside
+            popup.bind("<FocusOut>", lambda e: canvas.after(100, _close_popup))
+            popup.focus_set()
+
+        toggle_btn.configure(command=_open_popup)
+        canvas.bind("<Destroy>", lambda e: _close_popup())
+
+    def _draw_lines(self, canvas, skills: list, canvas_w: int):
+        GREY_PALETTE = ["#1a1200", "#555555", "#888888", "#aaaaaa"]
         canvas.delete("all")
         canvas_h = 165
         LM, BM, TM, RM = 44, 32, 10, 10
@@ -3147,47 +3214,58 @@ class App(ctk.CTk):
                                font=("Helvetica", 13))
             return
 
-        data = get_chart_data(skill if skill != "All" else None)
-
         start_d = datetime.strptime(first, "%Y-%m-%d").date()
         today_d = study_date()
         num_days = (today_d - start_d).days + 1
         if num_days < 1:
             num_days = 1
-
         days = [start_d + timedelta(days=i) for i in range(num_days)]
 
-        # Build cumulative hours
-        cumulative = []
-        running = 0.0
-        for d in days:
-            running += data.get(d.strftime("%Y-%m-%d"), 0.0)
-            cumulative.append(running)
+        # Build series: list of (label, cumulative_list, color)
+        if not skills:
+            # All combined
+            data = get_chart_data(None)
+            cum = []
+            running = 0.0
+            for d in days:
+                running += data.get(d.strftime("%Y-%m-%d"), 0.0)
+                cum.append(running)
+            series = [("All", cum, DARK2)]
+        else:
+            series = []
+            for i, sk in enumerate(skills):
+                data = get_chart_data(sk)
+                cum = []
+                running = 0.0
+                for d in days:
+                    running += data.get(d.strftime("%Y-%m-%d"), 0.0)
+                    cum.append(running)
+                color = GREY_PALETTE[i % len(GREY_PALETTE)]
+                series.append((sk, cum, color))
 
-        total_h = cumulative[-1]
-        if total_h == 0:
+        all_totals = [s[1][-1] for s in series]
+        global_max = max(all_totals) if any(t > 0 for t in all_totals) else 0
+        if global_max == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
                                text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
-        if total_h <= 10:    nice_max = math.ceil(total_h)
-        elif total_h <= 50:  nice_max = math.ceil(total_h / 5) * 5
-        elif total_h <= 200: nice_max = math.ceil(total_h / 10) * 10
-        elif total_h <= 500: nice_max = math.ceil(total_h / 50) * 50
-        else:                nice_max = math.ceil(total_h / 100) * 100
+        if global_max <= 10:    nice_max = math.ceil(global_max)
+        elif global_max <= 50:  nice_max = math.ceil(global_max / 5) * 5
+        elif global_max <= 200: nice_max = math.ceil(global_max / 10) * 10
+        elif global_max <= 500: nice_max = math.ceil(global_max / 50) * 50
+        else:                   nice_max = math.ceil(global_max / 100) * 100
 
         # Axes
         canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
-        canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h,
-                           fill=BORDER, width=1)
+        canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h, fill=BORDER, width=1)
 
         # Y-axis ticks
         for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
             y = TM + draw_h - frac * draw_h
             canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
-            label = f"{nice_max * frac:.0f}h"
-            canvas.create_text(LM - 5, y, text=label,
+            canvas.create_text(LM - 5, y, text=f"{nice_max * frac:.0f}h",
                                anchor="e", fill=MUTED, font=("Helvetica", 8))
 
         def _x(i):
@@ -3198,13 +3276,19 @@ class App(ctk.CTk):
         def _y(val):
             return TM + draw_h - (val / nice_max) * draw_h
 
-        # Continuous line across all days
-        coords = []
-        for i, v in enumerate(cumulative):
-            coords.append(_x(i))
-            coords.append(_y(v))
-        if len(coords) >= 4:
-            canvas.create_line(*coords, fill=DARK2, width=1.5, smooth=False)
+        # Draw each series
+        for label, cum, color in series:
+            coords = []
+            for i, v in enumerate(cum):
+                coords.extend([_x(i), _y(v)])
+            if len(coords) >= 4:
+                canvas.create_line(*coords, fill=color, width=1.5, smooth=False)
+            # Inline label at rightmost point (multi-series only)
+            if len(series) > 1 and cum:
+                rx = _x(num_days - 1) - 2
+                ry = _y(cum[-1])
+                canvas.create_text(rx, ry, text=label, fill=color,
+                                   font=("Helvetica", 7), anchor="e")
 
         # X-axis month labels
         prev_month = None
@@ -3219,16 +3303,20 @@ class App(ctk.CTk):
                     )
                     prev_month = m
 
-        # Hover: tip drawn inside canvas at bottom margin, centered on pointer X
+        # Hover tooltip — same position logic, multi-line when multiple series
         def _hover(event):
             canvas.delete("tip")
             if num_days < 2:
                 return
             frac = (event.x - LM) / draw_w
-            idx  = max(0, min(num_days - 1, round(frac * (num_days - 1))))
-            d    = days[idx]
-            val  = cumulative[idx]
-            txt  = f"{d.strftime('%d-%m-%y')}  ·  {val:.1f}h"
+            idx = max(0, min(num_days - 1, round(frac * (num_days - 1))))
+            d = days[idx]
+            date_str = d.strftime("%d-%m-%y")
+            if len(series) == 1:
+                txt = f"{date_str}  ·  {series[0][1][idx]:.1f}h"
+            else:
+                lines = [date_str] + [f"{lbl}  {cum[idx]:.1f}h" for lbl, cum, _ in series]
+                txt = "\n".join(lines)
             tip_x = max(50, min(event.x, canvas_w - 50))
             canvas.create_text(tip_x, canvas_h - 1, text=txt, fill=TEXT,
                                font=("Helvetica", 10), anchor="s", tags="tip")
