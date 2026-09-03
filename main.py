@@ -578,7 +578,7 @@ class App(ctk.CTk):
 
         # Badge + level row
         mid = ctk.CTkFrame(footer, fg_color="transparent")
-        mid.pack(fill="x", pady=(10, 4))
+        mid.pack(fill="x", pady=(10, 2))
         self._badge_lbl = ctk.CTkLabel(mid, text="")
         self._badge_lbl.pack(side="left")
         lvl_col = ctk.CTkFrame(mid, fg_color="transparent")
@@ -589,11 +589,11 @@ class App(ctk.CTk):
         self._next_lbl.pack(anchor="w")
 
         self._lvl_bar = progress_bar(footer)
-        self._lvl_bar.pack(fill="x", pady=(4, 0))
+        self._lvl_bar.pack(fill="x", pady=(2, 0))
         self._lvl_bar.set(0)
 
         streak_row = ctk.CTkFrame(footer, fg_color="transparent")
-        streak_row.pack(anchor="center", pady=(4, 0))
+        streak_row.pack(anchor="center", pady=(6, 0))
         _flame_path = os.path.join(os.path.dirname(__file__), "images", "flame.png")
         self._streak_flame_lbl = ctk.CTkLabel(streak_row, text="")
         if os.path.exists(_flame_path):
@@ -1387,7 +1387,7 @@ class App(ctk.CTk):
             frac  = max(0.0, min((total - lower) / (upper - lower), 1.0))
             self._lvl_bar.set(frac)
             self._next_lbl.configure(
-                text=f"{format_hours(upper - total)} to LVL {level + 1}")
+                text=f"{format_hours(upper - total)}")
 
         badge_path = os.path.join(BADGE_DIR, f"p{level}.png")
         if os.path.exists(badge_path):
