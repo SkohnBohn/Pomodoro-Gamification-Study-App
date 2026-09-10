@@ -3101,43 +3101,23 @@ class App(ctk.CTk):
         self._draw_line_graph(line_card)
 
     # ── Line graph ────────────────────────────────────────────────────────────
-    def _draw_line_graph(self, parent):
-        ctrl = ctk.CTkFrame(parent, fg_color="transparent")
-        ctrl.pack(fill="x", padx=16, pady=(14, 6))
-
-        skill_names = [name for name, _ in get_user_skills()]
-        selected: set = set()  # empty = All
-
+    def _make_flat_dropdown(self, parent, ctrl, canvas, btn_width, options,
+                             is_selected, on_pick, label_getter, close_on_pick=True):
+        """Shared flat-button dropdown: a toggle CTkButton that opens a
+        floating CTkFrame of flat option buttons positioned below it.
+        Returns the toggle button (caller packs it)."""
         _popup_frame = [None]
         _root_bind_id = [None]
 
-        # Button that opens/closes the popup
-        _btn_var = ctk.StringVar(value="All")
+        _btn_var = ctk.StringVar(value=label_getter())
         toggle_btn = ctk.CTkButton(
-            ctrl, textvariable=_btn_var, width=130, height=28, corner_radius=8,
+            ctrl, textvariable=_btn_var, width=btn_width, height=28, corner_radius=8,
             fg_color=CARD, hover_color=BORDER, text_color=TEXT,
             font=ctk.CTkFont(size=12),
         )
-        toggle_btn.pack(side="right")
-
-        canvas = tk.Canvas(parent, height=165, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 14))
-
-        def _redraw(*_):
-            w = canvas.winfo_width()
-            if w < 50:
-                return
-            self._draw_lines(canvas, list(selected), w)
-
-        _line_pending = [None]
-        def _debounce(*_):
-            if _line_pending[0]:
-                canvas.after_cancel(_line_pending[0])
-            _line_pending[0] = canvas.after(80, _redraw)
-        canvas.bind("<Configure>", _debounce)
 
         def _update_label():
-            _btn_var.set(", ".join(sorted(selected)) if selected else "All")
+            _btn_var.set(label_getter())
 
         def _unbind_root():
             if _root_bind_id[0] is not None:
@@ -3157,15 +3137,10 @@ class App(ctk.CTk):
                     pass
                 _popup_frame[0] = None
 
-        def _toggle_skill(name, btn):
-            if name in selected:
-                selected.discard(name)
-                btn.configure(border_color=BORDER, text_color=MUTED)
-            else:
-                selected.add(name)
-                btn.configure(border_color=DARK, text_color=DARK)
+        def _pick(name, btn):
+            on_pick(name)
             _update_label()
-            _redraw()
+            self._draw_line_graph_redraw()
 
         def _open_popup():
             if _popup_frame[0]:
@@ -3182,27 +3157,37 @@ class App(ctk.CTk):
             toggle_btn.update_idletasks()
             tx = ctrl.winfo_x() + toggle_btn.winfo_x()
             ty = ctrl.winfo_y() + ctrl.winfo_height() + 2
-            popup_w = 136
+            popup_w = btn_width + 6
             popup.place(x=tx + toggle_btn.winfo_width() - popup_w, y=ty)
             popup.lift()
 
-            skill_btns = {}
-            for name in skill_names:
-                active = name in selected
+            opt_btns = {}
+            for name in options:
+                active = is_selected(name)
                 b = ctk.CTkButton(
-                    popup, text=name, width=128, height=26, corner_radius=0,
+                    popup, text=name, width=popup_w - 8, height=26, corner_radius=0,
                     fg_color="transparent", hover_color=BG,
                     border_width=1,
                     border_color=DARK if active else BORDER,
                     text_color=DARK if active else MUTED,
                     font=ctk.CTkFont(size=11),
-                    command=lambda n=name, btn=None: None,
+                    command=lambda n=name: None,
                 )
-                b.pack(padx=4, pady=(4 if name == skill_names[0] else 0, 4 if name == skill_names[-1] else 0))
-                skill_btns[name] = b
+                b.pack(padx=4, pady=(4 if name == options[0] else 0, 4 if name == options[-1] else 0))
+                opt_btns[name] = b
 
-            for name, b in skill_btns.items():
-                b.configure(command=lambda n=name, btn=b: _toggle_skill(n, btn))
+            def _handle_pick(n, btn):
+                _pick(n, btn)
+                if close_on_pick:
+                    _close_popup()
+                else:
+                    for nm, bb in opt_btns.items():
+                        act = is_selected(nm)
+                        bb.configure(border_color=DARK if act else BORDER,
+                                     text_color=DARK if act else MUTED)
+
+            for name, b in opt_btns.items():
+                b.configure(command=lambda n=name, btn=b: _handle_pick(n, btn))
 
             # Close when clicking outside popup or toggle button
             def _maybe_close(event):
@@ -3227,8 +3212,66 @@ class App(ctk.CTk):
 
         toggle_btn.configure(command=_open_popup)
         canvas.bind("<Destroy>", lambda e: _close_popup())
+        return toggle_btn
 
-    def _draw_lines(self, canvas, skills: list, canvas_w: int):
+    def _draw_line_graph(self, parent):
+        ctrl = ctk.CTkFrame(parent, fg_color="transparent")
+        ctrl.pack(fill="x", padx=16, pady=(14, 6))
+
+        skill_names = [name for name, _ in get_user_skills()]
+        selected: set = set()  # empty = All
+
+        range_options = ["Total", "1Y", "90D", "30D"]
+        selected_range = ["Total"]
+
+        canvas = tk.Canvas(parent, height=165, bg=PANEL, highlightthickness=0)
+
+        def _redraw(*_):
+            w = canvas.winfo_width()
+            if w < 50:
+                return
+            self._draw_lines(canvas, list(selected), w, selected_range[0])
+
+        self._draw_line_graph_redraw = _redraw
+
+        _line_pending = [None]
+        def _debounce(*_):
+            if _line_pending[0]:
+                canvas.after_cancel(_line_pending[0])
+            _line_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _debounce)
+
+        # Skill multi-select dropdown (rightmost)
+        def _skill_toggle_pick(name):
+            if name in selected:
+                selected.discard(name)
+            else:
+                selected.add(name)
+
+        skill_btn = self._make_flat_dropdown(
+            parent, ctrl, canvas, 130, skill_names,
+            is_selected=lambda n: n in selected,
+            on_pick=_skill_toggle_pick,
+            label_getter=lambda: (", ".join(sorted(selected)) if selected else "All"),
+            close_on_pick=False,
+        )
+        skill_btn.pack(side="right")
+
+        # Range single-select dropdown (left of skill dropdown)
+        def _range_pick(name):
+            selected_range[0] = name
+
+        range_btn = self._make_flat_dropdown(
+            parent, ctrl, canvas, 80, range_options,
+            is_selected=lambda n: n == selected_range[0],
+            on_pick=_range_pick,
+            label_getter=lambda: selected_range[0],
+        )
+        range_btn.pack(side="right", padx=(0, 8))
+
+        canvas.pack(fill="x", padx=16, pady=(0, 14))
+
+    def _draw_lines(self, canvas, skills: list, canvas_w: int, range_key: str = "Total"):
         GREY_PALETTE = ["#1a1200", "#555555", "#888888", "#aaaaaa"]
         canvas.delete("all")
         canvas_h = 165
@@ -3245,35 +3288,46 @@ class App(ctk.CTk):
 
         start_d = datetime.strptime(first, "%Y-%m-%d").date()
         today_d = study_date()
-        num_days = (today_d - start_d).days + 1
-        if num_days < 1:
-            num_days = 1
-        days = [start_d + timedelta(days=i) for i in range(num_days)]
+        full_num_days = (today_d - start_d).days + 1
+        if full_num_days < 1:
+            full_num_days = 1
+        full_days = [start_d + timedelta(days=i) for i in range(full_num_days)]
 
-        # Build series: list of (label, cumulative_list, color)
+        # Build full-history series first, so cumulative totals stay correct
+        # regardless of the visible window.
         if not skills:
-            # All combined
             data = get_chart_data(None)
             cum = []
             running = 0.0
-            for d in days:
+            for d in full_days:
                 running += data.get(d.strftime("%Y-%m-%d"), 0.0)
                 cum.append(running)
-            series = [("All", cum, DARK2)]
+            full_series = [("All", cum, DARK2)]
         else:
-            series = []
+            full_series = []
             for i, sk in enumerate(skills):
                 data = get_chart_data(sk)
                 cum = []
                 running = 0.0
-                for d in days:
+                for d in full_days:
                     running += data.get(d.strftime("%Y-%m-%d"), 0.0)
                     cum.append(running)
                 color = GREY_PALETTE[i % len(GREY_PALETTE)]
-                series.append((sk, cum, color))
+                full_series.append((sk, cum, color))
 
-        all_totals = [s[1][-1] for s in series]
-        global_max = max(all_totals) if any(t > 0 for t in all_totals) else 0
+        # Slice to the requested window (values stay cumulative-from-start)
+        RANGE_DAYS = {"1Y": 365, "90D": 90, "30D": 30}
+        if range_key in RANGE_DAYS:
+            window = RANGE_DAYS[range_key]
+            start_idx = max(0, full_num_days - window)
+        else:
+            start_idx = 0
+        days = full_days[start_idx:]
+        num_days = len(days)
+        series = [(label, cum[start_idx:], color) for label, cum, color in full_series]
+
+        all_totals = [s[1][-1] for s in series if s[1]]
+        global_max = max(all_totals) if all_totals and any(t > 0 for t in all_totals) else 0
         if global_max == 0:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
                                text="no data", fill=MUTED,
@@ -3321,6 +3375,7 @@ class App(ctk.CTk):
 
         # X-axis month labels
         prev_month = None
+        any_month_label = False
         for i, d in enumerate(days):
             if d.day == 1:
                 m = d.strftime("%b %y")
@@ -3331,6 +3386,14 @@ class App(ctk.CTk):
                         fill=MUTED, font=("Helvetica", 8), anchor="n",
                     )
                     prev_month = m
+                    any_month_label = True
+
+        # For short windows with no month-start in range, show start/end dates
+        if range_key in ("30D", "90D") and not any_month_label and num_days >= 2:
+            canvas.create_text(_x(0), TM + draw_h + 6, text=days[0].strftime("%d %b"),
+                               fill=MUTED, font=("Helvetica", 8), anchor="n")
+            canvas.create_text(_x(num_days - 1), TM + draw_h + 6, text=days[-1].strftime("%d %b"),
+                               fill=MUTED, font=("Helvetica", 8), anchor="n")
 
         # Hover tooltip — same position logic, multi-line when multiple series
         def _hover(event):
