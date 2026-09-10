@@ -2933,36 +2933,17 @@ class App(ctk.CTk):
         ctrl = ctk.CTkFrame(parent, fg_color="transparent")
         ctrl.pack(fill="x", padx=16, pady=(14, 6))
 
-
         skills_list = ["All"] + [name for name, _ in get_user_skills()]
-        chart_skill  = ctk.StringVar(value="All")
-        chart_period = ctk.StringVar(value="30d")
-
-        _opt_kw = dict(
-            height=28, corner_radius=8,
-            fg_color=CARD, button_color=BORDER, button_hover_color=DARK,
-            text_color=TEXT, dropdown_fg_color=CARD,
-            dropdown_text_color=TEXT, dropdown_hover_color=BORDER,
-            font=ctk.CTkFont(size=12),
-        )
-        ctk.CTkOptionMenu(
-            ctrl, values=skills_list, variable=chart_skill,
-            width=130, **_opt_kw,
-        ).pack(side="right", padx=(6, 0))
-
-        ctk.CTkOptionMenu(
-            ctrl, values=["30d", "90d", "1y"],
-            variable=chart_period, width=90, **_opt_kw,
-        ).pack(side="right")
+        chart_skill  = [ "All"]
+        chart_period = ["30d"]
 
         canvas = tk.Canvas(parent, height=155, bg=PANEL, highlightthickness=0)
-        canvas.pack(fill="x", padx=16, pady=(0, 14))
 
         def _redraw(*_):
             w = canvas.winfo_width()
             if w < 50:
                 return
-            self._draw_bars(canvas, chart_skill.get(), chart_period.get(), w, None)
+            self._draw_bars(canvas, chart_skill[0], chart_period[0], w, None)
 
         _bar_pending = [None]
         def _redraw_debounced_bar(*_):
@@ -2970,8 +2951,32 @@ class App(ctk.CTk):
                 canvas.after_cancel(_bar_pending[0])
             _bar_pending[0] = canvas.after(80, _redraw)
         canvas.bind("<Configure>", _redraw_debounced_bar)
-        chart_skill.trace_add("write", lambda *_: _redraw())
-        chart_period.trace_add("write", lambda *_: _redraw())
+
+        def _skill_pick(name):
+            chart_skill[0] = name
+
+        skill_btn = self._make_flat_dropdown(
+            parent, ctrl, canvas, 130, skills_list,
+            is_selected=lambda n: n == chart_skill[0],
+            on_pick=_skill_pick,
+            label_getter=lambda: chart_skill[0],
+            on_change=_redraw,
+        )
+        skill_btn.pack(side="right", padx=(6, 0))
+
+        def _period_pick(name):
+            chart_period[0] = name
+
+        period_btn = self._make_flat_dropdown(
+            parent, ctrl, canvas, 90, ["30d", "90d", "1y"],
+            is_selected=lambda n: n == chart_period[0],
+            on_pick=_period_pick,
+            label_getter=lambda: chart_period[0],
+            on_change=_redraw,
+        )
+        period_btn.pack(side="right")
+
+        canvas.pack(fill="x", padx=16, pady=(0, 14))
 
     def _draw_bars(self, canvas, skill: str, period: str, canvas_w: int, tip_lbl):
         canvas.delete("all")
@@ -3102,7 +3107,8 @@ class App(ctk.CTk):
 
     # ── Line graph ────────────────────────────────────────────────────────────
     def _make_flat_dropdown(self, parent, ctrl, canvas, btn_width, options,
-                             is_selected, on_pick, label_getter, close_on_pick=True):
+                             is_selected, on_pick, label_getter, on_change,
+                             close_on_pick=True):
         """Shared flat-button dropdown: a toggle CTkButton that opens a
         floating CTkFrame of flat option buttons positioned below it.
         Returns the toggle button (caller packs it)."""
@@ -3140,7 +3146,7 @@ class App(ctk.CTk):
         def _pick(name, btn):
             on_pick(name)
             _update_label()
-            self._draw_line_graph_redraw()
+            on_change()
 
         def _open_popup():
             if _popup_frame[0]:
@@ -3232,8 +3238,6 @@ class App(ctk.CTk):
                 return
             self._draw_lines(canvas, list(selected), w, selected_range[0])
 
-        self._draw_line_graph_redraw = _redraw
-
         _line_pending = [None]
         def _debounce(*_):
             if _line_pending[0]:
@@ -3253,6 +3257,7 @@ class App(ctk.CTk):
             is_selected=lambda n: n in selected,
             on_pick=_skill_toggle_pick,
             label_getter=lambda: (", ".join(sorted(selected)) if selected else "All"),
+            on_change=_redraw,
             close_on_pick=False,
         )
         skill_btn.pack(side="right")
@@ -3266,6 +3271,7 @@ class App(ctk.CTk):
             is_selected=lambda n: n == selected_range[0],
             on_pick=_range_pick,
             label_getter=lambda: selected_range[0],
+            on_change=_redraw,
         )
         range_btn.pack(side="right", padx=(0, 8))
 
