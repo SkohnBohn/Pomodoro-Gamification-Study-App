@@ -3334,11 +3334,27 @@ class App(ctk.CTk):
                                font=("Helvetica", 13))
             return
 
-        if global_max <= 10:    nice_max = math.ceil(global_max)
-        elif global_max <= 50:  nice_max = math.ceil(global_max / 5) * 5
-        elif global_max <= 200: nice_max = math.ceil(global_max / 10) * 10
-        elif global_max <= 500: nice_max = math.ceil(global_max / 50) * 50
-        else:                   nice_max = math.ceil(global_max / 100) * 100
+        # Zoom the Y-axis to the visible window: bound it by the lowest and
+        # highest cumulative values actually shown, not by 0..max, so short
+        # windows (30D/90D) reveal the slope instead of looking flat against
+        # the account's all-time total.
+        visible_lows = [s[1][0] for s in series if s[1]]
+        visible_highs = [s[1][-1] for s in series if s[1]]
+        window_min = min(visible_lows)
+        window_max = max(visible_highs)
+        span = max(window_max - window_min, 1e-9)
+
+        if span <= 10:    step = 1
+        elif span <= 50:  step = 5
+        elif span <= 200: step = 10
+        elif span <= 500: step = 50
+        else:             step = math.ceil(span / 500) * 100
+
+        nice_min = math.floor(window_min / step) * step
+        nice_max = math.ceil(window_max / step) * step
+        if nice_max == nice_min:
+            nice_max = nice_min + step
+        nice_span = nice_max - nice_min
 
         # Axes
         canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
@@ -3348,7 +3364,7 @@ class App(ctk.CTk):
         for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
             y = TM + draw_h - frac * draw_h
             canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
-            canvas.create_text(LM - 5, y, text=f"{nice_max * frac:.0f}h",
+            canvas.create_text(LM - 5, y, text=f"{nice_min + nice_span * frac:.0f}h",
                                anchor="e", fill=MUTED, font=("Helvetica", 8))
 
         def _x(i):
@@ -3357,7 +3373,7 @@ class App(ctk.CTk):
             return LM + i * draw_w / (num_days - 1)
 
         def _y(val):
-            return TM + draw_h - (val / nice_max) * draw_h
+            return TM + draw_h - ((val - nice_min) / nice_span) * draw_h
 
         # Draw each series
         for label, cum, color in series:
