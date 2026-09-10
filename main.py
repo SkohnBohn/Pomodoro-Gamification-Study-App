@@ -2832,7 +2832,8 @@ class App(ctk.CTk):
             num_cols += 1
 
         canvas_w = LM + num_cols * STEP + CELL + 4
-        canvas_h = TM + 7 * STEP + 4
+        BM = 16
+        canvas_h = TM + 7 * STEP + 4 + BM
 
         canvas = tk.Canvas(parent, width=canvas_w, height=canvas_h,
                            bg=PANEL, highlightthickness=0)
@@ -2878,39 +2879,37 @@ class App(ctk.CTk):
             d   += timedelta(weeks=1)
             col += 1
 
-        # Tooltip label below canvas
-        tip = mk_label(parent, "", size=11, color=MUTED)
-        tip.pack(anchor="w", padx=14, pady=(0, 10))
-
+        # Hover — tip drawn inside canvas at bottom margin, centered on cursor X
         def _hover(event):
+            canvas.delete("tip")
             c = (event.x - LM) // STEP
             r = (event.y - TM) // STEP
             info = cell_map.get((c, r))
             if info:
                 ds, mins = info
                 dd = datetime.strptime(ds, "%Y-%m-%d").strftime("%d-%m-%y")
-                if mins:
-                    tip.configure(text=f"{dd}  ·  {mins / 60:.1f}h")
-                else:
-                    tip.configure(text=f"{dd}  ·  —")
-            else:
-                tip.configure(text="")
+                txt = f"{dd}  ·  {mins / 60:.1f}h" if mins else f"{dd}  ·  —"
+                tip_x = max(50, min(event.x, canvas_w - 50))
+                canvas.create_text(tip_x, canvas_h - 2, text=txt, fill=TEXT,
+                                   font=("Helvetica", 10), anchor="s", tags="tip")
 
         canvas.bind("<Motion>", _hover)
-        canvas.bind("<Leave>", lambda _: tip.configure(text=""))
+        canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
 
         # Legend
         leg = ctk.CTkFrame(parent, fg_color="transparent")
         leg.pack(anchor="w", padx=14, pady=(0, 14))
         mk_label(leg, "Less", size=10, color=MUTED).pack(side="left", padx=(0, 4))
         _legend_ranges = ["0", "<30", "<90", "<240", ">240"]
+        leg_tip = mk_label(leg, "", size=10, color=MUTED)
         for col_val, rng in zip([CARD, "#fbbf24", "#d97706", "#92400e", DARK], _legend_ranges):
             c = tk.Canvas(leg, width=CELL, height=CELL, bg=col_val,
                           highlightthickness=0)
             c.pack(side="left", padx=1)
-            c.bind("<Enter>", lambda _, r=rng: tip.configure(text=r))
-            c.bind("<Leave>", lambda _: tip.configure(text=""))
-        mk_label(leg, "More", size=10, color=MUTED).pack(side="left", padx=(4, 0))
+            c.bind("<Enter>", lambda _, r=rng: leg_tip.configure(text=r))
+            c.bind("<Leave>", lambda _: leg_tip.configure(text=""))
+        mk_label(leg, "More", size=10, color=MUTED).pack(side="left", padx=(4, 8))
+        leg_tip.pack(side="left")
 
     # ── Stat level-up dialog ─────────────────────────────────────────────────
     def _stat_levelup_dialog(self, stat_name: str, level: int):
