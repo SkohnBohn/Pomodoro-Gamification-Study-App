@@ -38,6 +38,37 @@ def play_click():
     threading.Thread(target=_go, daemon=True).start()
 
 
+# ── Background ambience (looping, user-picked file) ────────────────────────────
+# Uses a reserved channel so it never collides with the finish alarm
+# (pygame.mixer.music) or the click/reward one-shots (auto-allocated channels).
+_BG_CHANNEL_ID = 7
+_bg_sound = None
+
+
+def play_bg_sound(path: str) -> bool:
+    global _bg_sound
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+        stop_bg_sound()
+        _bg_sound = pygame.mixer.Sound(path)
+        ch = pygame.mixer.Channel(_BG_CHANNEL_ID)
+        ch.play(_bg_sound, loops=-1)
+        return True
+    except Exception as e:
+        print("Background sound error:", e)
+        _bg_sound = None
+        return False
+
+
+def stop_bg_sound():
+    try:
+        if pygame.mixer.get_init():
+            pygame.mixer.Channel(_BG_CHANNEL_ID).stop()
+    except Exception as e:
+        print("Background sound stop error:", e)
+
+
 # ── Reward sound synthesis ─────────────────────────────────────────────────────
 
 _SR = 44100  # sample rate

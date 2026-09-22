@@ -3,6 +3,7 @@
 
 import customtkinter as ctk
 import tkinter as tk
+from tkinter import filedialog
 import sqlite3
 import threading
 import math
@@ -509,6 +510,7 @@ class App(ctk.CTk):
             ("Records",       "records"),
             ("Skill Log",     "skilllog"),
             ("Leaderboard",   "leaderboard"),
+            ("Ambience",      "ambience"),
             ("Settings",      "settings"),
         ]
 
@@ -677,6 +679,7 @@ class App(ctk.CTk):
                 "records":      self._build_records_view,
                 "leaderboard":  self._build_leaderboard_view,
                 "skilllog":     self._build_skilllog_view,
+                "ambience":     self._build_ambience_view,
                 "settings":     self._build_settings_view,
             }
             self._views[key] = builders[key]()
@@ -1307,6 +1310,7 @@ class App(ctk.CTk):
                 ("Today","today"),("Stats","stats"),("Skilltree","skills"),
                 ("Achievements","achievements"),("Records","records"),
                 ("Skill Log","skilllog"),("Leaderboard","leaderboard"),
+                ("Ambience","ambience"),
             ]
 
             def _redraw_sq(c, key):
@@ -4299,6 +4303,123 @@ class App(ctk.CTk):
                 command=lambda: self._refresh_leaderboard(shown + 10),
                 width=220, height=36,
             ).pack(pady=14)
+
+    # ── Ambience tab (looping background sound) ─────────────────────────────────
+    def _build_ambience_view(self) -> ctk.CTkFrame:
+        view = ctk.CTkFrame(self.content, fg_color=BG)
+
+        center = ctk.CTkFrame(view, fg_color="transparent")
+        center.place(relx=0.5, rely=0.5, anchor="center")
+
+        state = {"playing": False}
+
+        def _current_label():
+            lbl = load_settings().get("bg_sound_label", "").strip()
+            if lbl:
+                return lbl
+            path = load_settings().get("bg_sound_path", "")
+            return os.path.basename(path) if path else "No sound selected"
+
+        play_btn = ctk.CTkButton(
+            center, text="▶", width=64, height=64, corner_radius=32,
+            fg_color="transparent", hover_color=PANEL, text_color=DARK,
+            border_width=1, border_color=DARK2,
+            font=ctk.CTkFont(size=20),
+        )
+        play_btn.pack(pady=(0, 14))
+
+        name_lbl = mk_label(center, _current_label(), size=12, color=MUTED)
+        name_lbl.pack()
+
+        error_lbl = mk_label(center, "", size=10, color="#c0392b")
+        error_lbl.pack(pady=(2, 0))
+
+        def _refresh_play_state():
+            path = load_settings().get("bg_sound_path", "")
+            if path:
+                play_btn.configure(state="normal", border_color=DARK2, text_color=DARK)
+            else:
+                play_btn.configure(state="disabled", border_color=BORDER, text_color=BORDER)
+            name_lbl.configure(text=_current_label())
+
+        def _toggle_play():
+            path = load_settings().get("bg_sound_path", "")
+            if not path:
+                return
+            if state["playing"]:
+                _audio.stop_bg_sound()
+                state["playing"] = False
+                play_btn.configure(text="▶")
+            else:
+                ok = _audio.play_bg_sound(path)
+                if ok:
+                    state["playing"] = True
+                    play_btn.configure(text="⏹")
+                    error_lbl.configure(text="")
+                else:
+                    error_lbl.configure(text="couldn't play this file")
+
+        play_btn.configure(command=_toggle_play)
+
+        # ── Hidden path controls, revealed via small toggle ─────────────────────
+        toggle_row = ctk.CTkFrame(center, fg_color="transparent")
+        toggle_row.pack(pady=(18, 0))
+        reveal_btn = icon_btn(toggle_row, "⚙", lambda: _toggle_reveal(), size=13)
+        reveal_btn.pack()
+
+        controls = ctk.CTkFrame(center, fg_color="transparent")
+
+        def _browse():
+            path = filedialog.askopenfilename(
+                title="Choose background sound",
+                filetypes=[("Audio files", "*.mp3 *.wav *.ogg *.flac"), ("All files", "*.*")],
+            )
+            if not path:
+                return
+            save_settings("bg_sound_path", path)
+            if not load_settings().get("bg_sound_label", "").strip():
+                save_settings("bg_sound_label", os.path.splitext(os.path.basename(path))[0])
+            if state["playing"]:
+                _audio.stop_bg_sound()
+                state["playing"] = False
+                play_btn.configure(text="▶")
+            error_lbl.configure(text="")
+            _refresh_play_state()
+
+        def _rename():
+            rd = ctk.CTkToplevel(view)
+            rd.title("Rename")
+            rd.geometry("300x128")
+            rd.configure(fg_color=PANEL)
+            rd.grab_set()
+            rd.lift()
+            rd.resizable(False, False)
+            e = ctk.CTkEntry(rd, height=38, fg_color=CARD, border_color=BORDER,
+                             text_color=TEXT, font=ctk.CTkFont(size=13))
+            e.insert(0, _current_label())
+            e.pack(fill="x", padx=20, pady=(20, 12))
+            e.focus_set()
+            e.select_range(0, "end")
+            def _ok():
+                t = e.get().strip()
+                save_settings("bg_sound_label", t)
+                _refresh_play_state()
+                rd.destroy()
+            e.bind("<Return>", lambda _: _ok())
+            e.bind("<Escape>", lambda _: rd.destroy())
+            mk_btn(rd, "OK", _ok, primary=True, height=34).pack(fill="x", padx=20)
+
+        mk_btn(controls, "Browse…", _browse, width=140, height=30).pack(pady=(4, 6))
+        mk_btn(controls, "Rename", _rename, width=140, height=30).pack()
+
+        def _toggle_reveal():
+            if controls.winfo_ismapped():
+                controls.pack_forget()
+            else:
+                controls.pack(pady=(10, 0))
+
+        _refresh_play_state()
+        return view
 
     # ── Skill Log tab ─────────────────────────────────────────────────────────
     def _build_skilllog_view(self) -> ctk.CTkFrame:
