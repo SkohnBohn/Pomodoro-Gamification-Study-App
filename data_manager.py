@@ -17,8 +17,7 @@ _SETTINGS_DEFAULTS = {
     "day_end_hour":   3,
     "hidden_tabs":    [],
     "known_tabs":     [],
-    "bg_sound_path":  "",
-    "bg_sound_label": "",
+    "ambience_slots": [None] * 9,
 }
 
 def load_settings() -> dict:

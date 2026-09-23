@@ -12,6 +12,12 @@ import json
 import platform
 import time as _time
 import subprocess
+
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+except Exception:
+    TkinterDnD = None
+    DND_FILES = None
 from datetime import datetime, date, timedelta
 from PIL import Image
 
@@ -450,6 +456,14 @@ class App(ctk.CTk):
         self.minsize(920, 660)
         self.configure(fg_color=BG)
         self.bind("<Control-q>", lambda _: self.destroy())
+
+        self._dnd_ready = False
+        if TkinterDnD is not None:
+            try:
+                TkinterDnD.require(self)
+                self._dnd_ready = True
+            except Exception:
+                self._dnd_ready = False
 
         _s = load_settings()
         if _s["db"] == "newui":
@@ -4308,110 +4322,141 @@ class App(ctk.CTk):
     def _build_ambience_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
-        # Anchored to a fixed top point (not "center") so revealing the
-        # controls below never shifts the play button/name upward.
-        center = ctk.CTkFrame(view, fg_color="transparent")
-        center.place(relx=0.5, rely=0.38, anchor="n")
+        SLOT = 130
+        GAP = 10
 
-        state = {"playing": False, "busy": False}
+        def _load_slots():
+            raw = list(load_settings().get("ambience_slots") or [])
+            raw = (raw + [None] * 9)[:9]
+            return raw
 
-        def _current_label():
-            lbl = load_settings().get("bg_sound_label", "").strip()
+        def _save_slots(sl):
+            save_settings("ambience_slots", sl)
+
+        slots = _load_slots()
+        face_state = ["front"] * 9
+        amb_state = {"playing_idx": None, "start_ts": None, "busy": False}
+
+        grid_frame = ctk.CTkFrame(view, fg_color="transparent")
+        grid_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        tiles = []
+        for i in range(9):
+            t = ctk.CTkFrame(grid_frame, width=SLOT, height=SLOT, corner_radius=0,
+                             fg_color="transparent", border_width=1, border_color=BORDER)
+            t.grid(row=i // 3, column=i % 3, padx=GAP // 2, pady=GAP // 2)
+            t.grid_propagate(False)
+            tiles.append(t)
+
+        def _row_filled(row):
+            return all(slots[row * 3 + c] is not None for c in range(3))
+
+        def _row_has_any(row):
+            return any(slots[row * 3 + c] is not None for c in range(3))
+
+        def _refresh_rows_visibility():
+            show2 = _row_filled(0) or _row_has_any(1)
+            show3 = (show2 and _row_filled(1)) or _row_has_any(2)
+            for c in range(3):
+                (tiles[3 + c].grid() if show2 else tiles[3 + c].grid_remove())
+            for c in range(3):
+                (tiles[6 + c].grid() if show3 else tiles[6 + c].grid_remove())
+
+        def _pointer_inside(tile):
+            try:
+                px, py = tile.winfo_pointerxy()
+            except Exception:
+                return False
+            x0, y0 = tile.winfo_rootx(), tile.winfo_rooty()
+            x1, y1 = x0 + tile.winfo_width(), y0 + tile.winfo_height()
+            return x0 <= px <= x1 and y0 <= py <= y1
+
+        def _slot_display_name(slot):
+            lbl = (slot.get("label") or "").strip()
             if lbl:
                 return lbl
-            path = load_settings().get("bg_sound_path", "")
-            return os.path.basename(path) if path else "No sound selected"
+            return os.path.splitext(os.path.basename(slot.get("path", "")))[0]
 
-        play_btn = ctk.CTkButton(
-            center, text="▶", width=64, height=64, corner_radius=32,
-            fg_color="transparent", hover_color=PANEL, text_color=DARK,
-            border_width=1, border_color=DARK2,
-            font=ctk.CTkFont(size=20),
-        )
-        play_btn.pack(pady=(0, 14))
+        def _assign_file(idx, path):
+            slots[idx] = {"path": path, "label": os.path.splitext(os.path.basename(path))[0],
+                          "total_seconds": 0.0, "play_count": 0}
+            face_state[idx] = "front"
+            _save_slots(slots)
+            _refresh_rows_visibility()
+            _render_tile(idx)
 
-        name_lbl = mk_label(center, _current_label(), size=12, color=MUTED)
-        name_lbl.pack()
-
-        error_lbl = mk_label(center, "", size=10, color="#c0392b")
-        error_lbl.pack(pady=(2, 0))
-
-        def _refresh_play_state():
-            path = load_settings().get("bg_sound_path", "")
+        def _handle_drop(event, idx):
+            try:
+                paths = view.tk.splitlist(event.data)
+            except Exception:
+                paths = [event.data] if event.data else []
+            if not paths:
+                return
+            path = paths[0].strip("{}")
             if path:
-                play_btn.configure(state="normal", border_color=DARK2, text_color=DARK)
-            else:
-                play_btn.configure(state="disabled", border_color=BORDER, text_color=BORDER)
-            name_lbl.configure(text=_current_label())
+                _assign_file(idx, path)
 
-        def _toggle_play():
-            if state["busy"]:
+        def _register_drop(widget, idx):
+            if not self._dnd_ready:
                 return
-            path = load_settings().get("bg_sound_path", "")
-            if not path:
-                return
-            state["busy"] = True
-            play_btn.configure(text="…")
+            try:
+                widget.drop_target_register(DND_FILES)
+                widget.dnd_bind("<<Drop>>", lambda e, i=idx: _handle_drop(e, i))
+            except Exception:
+                pass
 
-            if state["playing"]:
+        def _flush_playing_time(idx):
+            if amb_state["start_ts"] is not None and slots[idx] is not None:
+                elapsed = max(0.0, _time.time() - amb_state["start_ts"])
+                slots[idx]["total_seconds"] = slots[idx].get("total_seconds", 0.0) + elapsed
+            amb_state["start_ts"] = None
+
+        def _toggle_slot_play(idx):
+            if amb_state["busy"]:
+                return
+            slot = slots[idx]
+            if not slot or not slot.get("path"):
+                return
+            amb_state["busy"] = True
+
+            if amb_state["playing_idx"] == idx:
                 def _go_stop():
                     _audio.stop_bg_sound()
                     def _done():
-                        state["playing"] = False
-                        state["busy"] = False
-                        play_btn.configure(text="▶")
+                        _flush_playing_time(idx)
+                        amb_state["playing_idx"] = None
+                        amb_state["busy"] = False
+                        _save_slots(slots)
+                        _render_tile(idx)
                     self.after(0, _done)
                 threading.Thread(target=_go_stop, daemon=True).start()
             else:
+                prev_idx = amb_state["playing_idx"]
                 def _go_play():
-                    ok = _audio.play_bg_sound(path)
+                    if prev_idx is not None:
+                        _audio.stop_bg_sound()
+                    ok = _audio.play_bg_sound(slot["path"])
                     def _done():
-                        state["busy"] = False
+                        if prev_idx is not None:
+                            _flush_playing_time(prev_idx)
+                        amb_state["busy"] = False
                         if ok:
-                            state["playing"] = True
-                            play_btn.configure(text="⏹")
-                            error_lbl.configure(text="")
+                            slot["play_count"] = slot.get("play_count", 0) + 1
+                            amb_state["playing_idx"] = idx
+                            amb_state["start_ts"] = _time.time()
                         else:
-                            state["playing"] = False
-                            play_btn.configure(text="▶")
-                            error_lbl.configure(text="couldn't play this file")
+                            amb_state["playing_idx"] = None
+                        _save_slots(slots)
+                        if prev_idx is not None:
+                            _render_tile(prev_idx)
+                        _render_tile(idx)
                     self.after(0, _done)
                 threading.Thread(target=_go_play, daemon=True).start()
 
-        play_btn.configure(command=_toggle_play)
-
-        # ── Hidden path controls, revealed via small toggle ─────────────────────
-        toggle_row = ctk.CTkFrame(center, fg_color="transparent")
-        toggle_row.pack(pady=(18, 0))
-        reveal_btn = icon_btn(toggle_row, "⚙", lambda: _toggle_reveal(), size=13)
-        reveal_btn.pack()
-
-        # Reserved, fixed-size slot for the controls — always occupies the
-        # same space so nothing above it ever moves when toggled.
-        controls_slot = ctk.CTkFrame(center, fg_color="transparent", height=76, width=140)
-        controls_slot.pack(pady=(10, 0))
-        controls_slot.pack_propagate(False)
-
-        controls = ctk.CTkFrame(controls_slot, fg_color="transparent")
-
-        def _browse():
-            path = filedialog.askopenfilename(
-                title="Choose background sound",
-                filetypes=[("Audio files", "*.mp3 *.wav *.ogg *.flac"), ("All files", "*.*")],
-            )
-            if not path:
+        def _rename_slot(idx):
+            slot = slots[idx]
+            if not slot:
                 return
-            save_settings("bg_sound_path", path)
-            if not load_settings().get("bg_sound_label", "").strip():
-                save_settings("bg_sound_label", os.path.splitext(os.path.basename(path))[0])
-            if state["playing"]:
-                _audio.stop_bg_sound()
-                state["playing"] = False
-                play_btn.configure(text="▶")
-            error_lbl.configure(text="")
-            _refresh_play_state()
-
-        def _rename():
             rd = ctk.CTkToplevel(view)
             rd.title("Rename")
             rd.geometry("300x128")
@@ -4421,35 +4466,114 @@ class App(ctk.CTk):
             rd.resizable(False, False)
             e = ctk.CTkEntry(rd, height=38, fg_color=CARD, border_color=BORDER,
                              text_color=TEXT, font=ctk.CTkFont(size=13))
-            e.insert(0, _current_label())
+            e.insert(0, _slot_display_name(slot))
             e.pack(fill="x", padx=20, pady=(20, 12))
             e.focus_set()
             e.select_range(0, "end")
             def _ok():
                 t = e.get().strip()
-                save_settings("bg_sound_label", t)
-                _refresh_play_state()
+                slot["label"] = t
+                _save_slots(slots)
+                _render_tile(idx)
                 rd.destroy()
             e.bind("<Return>", lambda _: _ok())
             e.bind("<Escape>", lambda _: rd.destroy())
             mk_btn(rd, "OK", _ok, primary=True, height=34).pack(fill="x", padx=20)
 
-        _flat_kw = dict(
-            width=140, height=30, corner_radius=0,
-            fg_color="transparent", hover_color=BG,
-            border_width=1, border_color=BORDER,
-            text_color=MUTED, font=ctk.CTkFont(size=11),
-        )
-        ctk.CTkButton(controls, text="BROWSE", command=_browse, **_flat_kw).pack(pady=(0, 6))
-        ctk.CTkButton(controls, text="RENAME", command=_rename, **_flat_kw).pack()
+        def _delete_slot(idx):
+            if amb_state["playing_idx"] == idx:
+                _audio.stop_bg_sound()
+                amb_state["playing_idx"] = None
+                amb_state["start_ts"] = None
+            slots[idx] = None
+            face_state[idx] = "front"
+            _save_slots(slots)
+            _refresh_rows_visibility()
+            _render_tile(idx)
 
-        def _toggle_reveal():
-            if controls.winfo_ismapped():
-                controls.pack_forget()
+        def _flip_face(idx):
+            face_state[idx] = "stats" if face_state[idx] == "front" else "front"
+            _render_tile(idx)
+
+        def _attach_hover_overlay(tile, idx):
+            overlay = ctk.CTkFrame(tile, fg_color="transparent")
+            btn_kw = dict(
+                width=20, height=18, corner_radius=0,
+                fg_color="transparent", hover_color=BG,
+                border_width=1, border_color=BORDER,
+                text_color=MUTED, font=ctk.CTkFont(size=9),
+            )
+            ctk.CTkButton(overlay, text="o", command=lambda i=idx: _rename_slot(i),
+                          **btn_kw).pack(side="left", padx=1)
+            ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
+                          **btn_kw).pack(side="left", padx=1)
+            ctk.CTkButton(overlay, text="-", command=lambda i=idx: _flip_face(i),
+                          **btn_kw).pack(side="left", padx=1)
+
+            def _show(_e=None):
+                overlay.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+
+            def _maybe_hide():
+                if not _pointer_inside(tile):
+                    overlay.place_forget()
+
+            def _hide(_e=None):
+                tile.after(60, _maybe_hide)
+
+            tile.bind("<Enter>", _show)
+            tile.bind("<Leave>", _hide)
+
+        def _render_tile(idx):
+            tile = tiles[idx]
+            for w in tile.winfo_children():
+                w.destroy()
+            slot = slots[idx]
+
+            if slot is None:
+                plus = mk_label(tile, "+", size=30, color=MUTED)
+                plus.place(relx=0.5, rely=0.5, anchor="center")
+
+                def _pick(_e=None, i=idx):
+                    path = filedialog.askopenfilename(
+                        title="Choose background sound",
+                        filetypes=[("Audio files", "*.mp3 *.wav *.ogg *.flac"), ("All files", "*.*")],
+                    )
+                    if path:
+                        _assign_file(i, path)
+
+                tile.bind("<Button-1>", _pick)
+                plus.bind("<Button-1>", _pick)
+                _register_drop(tile, idx)
+                _register_drop(plus, idx)
+                return
+
+            if face_state[idx] == "stats":
+                total_h = slot.get("total_seconds", 0.0) / 3600
+                plays = slot.get("play_count", 0)
+                mk_label(tile, f"{total_h:.1f}h played", size=10, color=MUTED).place(
+                    relx=0.5, rely=0.42, anchor="center")
+                mk_label(tile, f"{plays}x listened", size=10, color=MUTED).place(
+                    relx=0.5, rely=0.58, anchor="center")
             else:
-                controls.pack()
+                is_playing = amb_state["playing_idx"] == idx
+                play_btn = ctk.CTkButton(
+                    tile, text=("⏹" if is_playing else "▶"),
+                    width=56, height=56, corner_radius=0,
+                    fg_color="transparent", hover_color=PANEL, text_color=DARK,
+                    border_width=1, border_color=DARK2,
+                    font=ctk.CTkFont(size=18),
+                    command=lambda i=idx: _toggle_slot_play(i),
+                )
+                play_btn.place(relx=0.5, rely=0.4, anchor="center")
+                mk_label(tile, _slot_display_name(slot), size=10, color=MUTED).place(
+                    relx=0.5, rely=0.82, anchor="center")
 
-        _refresh_play_state()
+            _attach_hover_overlay(tile, idx)
+
+        _refresh_rows_visibility()
+        for i in range(9):
+            _render_tile(i)
+
         return view
 
     # ── Skill Log tab ─────────────────────────────────────────────────────────
