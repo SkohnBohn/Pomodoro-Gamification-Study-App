@@ -4322,8 +4322,8 @@ class App(ctk.CTk):
     def _build_ambience_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
-        SLOT_W = 200
-        SLOT_H = 120
+        SLOT_W = 220
+        SLOT_H = 150
         GAP = 14
 
         def _load_slots():
@@ -4497,26 +4497,36 @@ class App(ctk.CTk):
             _render_tile(idx)
 
         def _attach_hover_overlay(tile, idx):
-            overlay = ctk.CTkFrame(tile, fg_color="transparent")
-            btn_kw = dict(
-                width=20, height=18, corner_radius=0,
-                fg_color="transparent", hover_color=CARD,
-                border_width=0,
-                text_color=MUTED, font=ctk.CTkFont(size=9),
-            )
-            ctk.CTkButton(overlay, text="o", command=lambda i=idx: _rename_slot(i),
-                          **btn_kw).pack(side="left", padx=4)
-            ctk.CTkButton(overlay, text="-", command=lambda i=idx: _flip_face(i),
-                          **btn_kw).pack(side="left", padx=4)
-            ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
-                          **btn_kw).pack(side="left", padx=4)
+            # Built lazily on first hover — creating a "transparent" CTkFrame
+            # eagerly for every tile at render time can paint one opaque
+            # white frame before customtkinter resolves its real background,
+            # which flashes visible until something else forces a redraw.
+            box = {"overlay": None}
+
+            def _build():
+                overlay = ctk.CTkFrame(tile, fg_color="transparent")
+                btn_kw = dict(
+                    width=22, height=20, corner_radius=0,
+                    fg_color="transparent", hover_color=CARD,
+                    border_width=0,
+                    text_color=MUTED, font=ctk.CTkFont(size=10),
+                )
+                ctk.CTkButton(overlay, text="o", command=lambda i=idx: _rename_slot(i),
+                              **btn_kw).pack(side="left", padx=5)
+                ctk.CTkButton(overlay, text="-", command=lambda i=idx: _flip_face(i),
+                              **btn_kw).pack(side="left", padx=5)
+                ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
+                              **btn_kw).pack(side="left", padx=5)
+                return overlay
 
             def _show(_e=None):
-                overlay.place(relx=0.5, rely=1.0, anchor="s", y=-6)
+                if box["overlay"] is None:
+                    box["overlay"] = _build()
+                box["overlay"].place(relx=0.5, rely=1.0, anchor="s", y=-8)
 
             def _maybe_hide():
-                if not _pointer_inside(tile):
-                    overlay.place_forget()
+                if box["overlay"] is not None and not _pointer_inside(tile):
+                    box["overlay"].place_forget()
 
             def _hide(_e=None):
                 tile.after(60, _maybe_hide)
@@ -4531,7 +4541,7 @@ class App(ctk.CTk):
             slot = slots[idx]
 
             if slot is None:
-                plus = mk_label(tile, "+", size=30, color=MUTED)
+                plus = mk_label(tile, "+", size=36, color=MUTED)
                 plus.place(relx=0.5, rely=0.5, anchor="center")
 
                 def _pick(_e=None, i=idx):
@@ -4551,23 +4561,23 @@ class App(ctk.CTk):
             if face_state[idx] == "stats":
                 total_h = slot.get("total_seconds", 0.0) / 3600
                 plays = slot.get("play_count", 0)
-                mk_label(tile, f"{total_h:.1f}h played", size=10, color=MUTED).place(
-                    relx=0.5, rely=0.38, anchor="center")
-                mk_label(tile, f"{plays}x listened", size=10, color=MUTED).place(
+                mk_label(tile, f"{total_h:.1f}h played", size=11, color=MUTED).place(
+                    relx=0.5, rely=0.4, anchor="center")
+                mk_label(tile, f"{plays}x listened", size=11, color=MUTED).place(
                     relx=0.5, rely=0.56, anchor="center")
             else:
                 is_playing = amb_state["playing_idx"] == idx
                 play_btn = ctk.CTkButton(
                     tile, text=("⏹" if is_playing else "▶"),
-                    width=48, height=48, corner_radius=0,
+                    width=56, height=56, corner_radius=0,
                     fg_color="transparent", hover_color=PANEL, text_color=DARK,
                     border_width=1, border_color=DARK2,
-                    font=ctk.CTkFont(size=16),
+                    font=ctk.CTkFont(size=18),
                     command=lambda i=idx: _toggle_slot_play(i),
                 )
-                play_btn.place(relx=0.5, rely=0.36, anchor="center")
-                mk_label(tile, _slot_display_name(slot), size=10, color=MUTED).place(
-                    relx=0.5, rely=0.66, anchor="center")
+                play_btn.place(relx=0.5, rely=0.38, anchor="center")
+                mk_label(tile, _slot_display_name(slot), size=11, color=MUTED).place(
+                    relx=0.5, rely=0.68, anchor="center")
 
             _attach_hover_overlay(tile, idx)
 
