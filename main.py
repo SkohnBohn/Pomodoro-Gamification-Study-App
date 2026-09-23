@@ -4342,12 +4342,34 @@ class App(ctk.CTk):
         grid_frame.place(relx=0.5, rely=0.08, anchor="n")
 
         tiles = []
+        overlays = []
         for i in range(9):
             t = ctk.CTkFrame(grid_frame, width=SLOT_W, height=SLOT_H, corner_radius=0,
                              fg_color=CARD, border_width=1, border_color=BORDER)
             t.grid(row=i // 3, column=i % 3, padx=GAP // 2, pady=GAP // 2)
             t.grid_propagate(False)
             tiles.append(t)
+
+            # Hover-icon row is built once, eagerly, right here — never
+            # destroyed/recreated later. A CTkFrame/CTkButton created and
+            # shown on demand during live interaction (e.g. inside a hover
+            # handler) can paint one incorrect (white) frame before
+            # customtkinter resolves its real color; building it now, during
+            # the tab's initial synchronous construction, means it's already
+            # fully drawn long before the user can ever hover it.
+            overlay = ctk.CTkFrame(t, fg_color=CARD, corner_radius=0, border_width=0)
+            btn_kw = dict(
+                width=22, height=20, corner_radius=0,
+                fg_color=CARD, hover_color=BG,
+                border_width=0, text_color=MUTED, font=ctk.CTkFont(size=10),
+            )
+            o_btn = ctk.CTkButton(overlay, text="o", command=lambda idx=i: _rename_slot(idx), **btn_kw)
+            m_btn = ctk.CTkButton(overlay, text="-", command=lambda idx=i: _flip_face(idx), **btn_kw)
+            x_btn = ctk.CTkButton(overlay, text="x", command=lambda idx=i: _delete_slot(idx), **btn_kw)
+            o_btn.pack(side="left", padx=5)
+            m_btn.pack(side="left", padx=5)
+            x_btn.pack(side="left", padx=5)
+            overlays.append({"frame": overlay, "o": o_btn, "m": m_btn, "x": x_btn})
 
         def _row_filled(row):
             return all(slots[row * 3 + c] is not None for c in range(3))
@@ -4496,42 +4518,39 @@ class App(ctk.CTk):
             face_state[idx] = "stats" if face_state[idx] == "front" else "front"
             _render_tile(idx)
 
-        def _attach_hover_overlay(tile, idx, include_flip=True):
-            # Built lazily on first hover. Also: fg_color is set to the
-            # tile's own concrete color (CARD) rather than "transparent" —
-            # a freshly-created "transparent" CTkFrame/CTkButton paints one
-            # opaque white frame before customtkinter resolves it against
-            # its parent, which is visible as a flash on the very first
-            # paint (whether that happens at load or on first hover). A
-            # concrete color matching the tile draws correctly immediately
-            # and is visually indistinguishable from true transparency here.
-            box = {"overlay": None}
+        def _overlay_resting(idx):
+            """Baseline (non-hover) visibility: hidden entirely for an empty
+            tile or the front face; on the stats face, only '-' shows."""
+            ov = overlays[idx]
+            slot = slots[idx]
+            if slot is None:
+                ov["frame"].place_forget()
+                return
+            if face_state[idx] == "stats":
+                ov["o"].pack_forget()
+                ov["x"].pack_forget()
+                ov["frame"].place(relx=0.5, rely=1.0, anchor="s", y=-8)
+            else:
+                ov["frame"].place_forget()
 
-            def _build():
-                overlay = ctk.CTkFrame(tile, fg_color=CARD, corner_radius=0, border_width=0)
-                btn_kw = dict(
-                    width=22, height=20, corner_radius=0,
-                    fg_color=CARD, hover_color=BG,
-                    border_width=0,
-                    text_color=MUTED, font=ctk.CTkFont(size=10),
-                )
-                ctk.CTkButton(overlay, text="o", command=lambda i=idx: _rename_slot(i),
-                              **btn_kw).pack(side="left", padx=5)
-                if include_flip:
-                    ctk.CTkButton(overlay, text="-", command=lambda i=idx: _flip_face(i),
-                                  **btn_kw).pack(side="left", padx=5)
-                ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
-                              **btn_kw).pack(side="left", padx=5)
-                return overlay
+        def _overlay_hover_show(idx):
+            if slots[idx] is None:
+                return
+            ov = overlays[idx]
+            for b in (ov["o"], ov["m"], ov["x"]):
+                b.pack_forget()
+            ov["o"].pack(side="left", padx=5)
+            ov["m"].pack(side="left", padx=5)
+            ov["x"].pack(side="left", padx=5)
+            ov["frame"].place(relx=0.5, rely=1.0, anchor="s", y=-8)
 
+        def _bind_tile_hover(tile, idx):
             def _show(_e=None):
-                if box["overlay"] is None:
-                    box["overlay"] = _build()
-                box["overlay"].place(relx=0.5, rely=1.0, anchor="s", y=-8)
+                _overlay_hover_show(idx)
 
             def _maybe_hide():
-                if box["overlay"] is not None and not _pointer_inside(tile):
-                    box["overlay"].place_forget()
+                if not _pointer_inside(tile):
+                    _overlay_resting(idx)
 
             def _hide(_e=None):
                 tile.after(60, _maybe_hide)
@@ -4539,10 +4558,15 @@ class App(ctk.CTk):
             tile.bind("<Enter>", _show)
             tile.bind("<Leave>", _hide)
 
+        for i in range(9):
+            _bind_tile_hover(tiles[i], i)
+
         def _render_tile(idx):
             tile = tiles[idx]
+            overlay_frame = overlays[idx]["frame"]
             for w in tile.winfo_children():
-                w.destroy()
+                if w is not overlay_frame:
+                    w.destroy()
             # Bindings/drop-registration are on the tile frame itself, which
             # survives across re-renders (only its children get destroyed
             # above) — clear them each time so a loaded slot can't still
@@ -4571,6 +4595,7 @@ class App(ctk.CTk):
                 plus.bind("<Button-1>", _pick)
                 _register_drop(tile, idx)
                 _register_drop(plus, idx)
+                _overlay_resting(idx)
                 return
 
             if face_state[idx] == "stats":
@@ -4580,15 +4605,6 @@ class App(ctk.CTk):
                     relx=0.5, rely=0.4, anchor="center")
                 mk_label(tile, f"{plays}x listened", size=11, color=MUTED).place(
                     relx=0.5, rely=0.56, anchor="center")
-                # "-" (back to front face) stays permanently visible here;
-                # rename/delete remain hover-only via the overlay.
-                ctk.CTkButton(
-                    tile, text="-", command=lambda i=idx: _flip_face(i),
-                    width=22, height=20, corner_radius=0,
-                    fg_color=CARD, hover_color=BG,
-                    border_width=0, text_color=MUTED, font=ctk.CTkFont(size=10),
-                ).place(relx=0.5, rely=1.0, anchor="s", y=-8)
-                _attach_hover_overlay(tile, idx, include_flip=False)
             else:
                 is_playing = amb_state["playing_idx"] == idx
                 play_btn = ctk.CTkButton(
@@ -4602,7 +4618,9 @@ class App(ctk.CTk):
                 play_btn.place(relx=0.5, rely=0.38, anchor="center")
                 mk_label(tile, _slot_display_name(slot), size=11, color=MUTED).place(
                     relx=0.5, rely=0.68, anchor="center")
-                _attach_hover_overlay(tile, idx, include_flip=True)
+
+            overlay_frame.lift()
+            _overlay_resting(idx)
 
         _refresh_rows_visibility()
         for i in range(9):
