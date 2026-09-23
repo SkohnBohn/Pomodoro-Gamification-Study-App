@@ -4322,8 +4322,9 @@ class App(ctk.CTk):
     def _build_ambience_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
-        SLOT = 130
-        GAP = 10
+        SLOT_W = 200
+        SLOT_H = 120
+        GAP = 14
 
         def _load_slots():
             raw = list(load_settings().get("ambience_slots") or [])
@@ -4338,12 +4339,12 @@ class App(ctk.CTk):
         amb_state = {"playing_idx": None, "start_ts": None, "busy": False}
 
         grid_frame = ctk.CTkFrame(view, fg_color="transparent")
-        grid_frame.place(relx=0.5, rely=0.5, anchor="center")
+        grid_frame.place(relx=0.5, rely=0.08, anchor="n")
 
         tiles = []
         for i in range(9):
-            t = ctk.CTkFrame(grid_frame, width=SLOT, height=SLOT, corner_radius=0,
-                             fg_color="transparent", border_width=1, border_color=BORDER)
+            t = ctk.CTkFrame(grid_frame, width=SLOT_W, height=SLOT_H, corner_radius=0,
+                             fg_color=CARD, border_width=1, border_color=BORDER)
             t.grid(row=i // 3, column=i % 3, padx=GAP // 2, pady=GAP // 2)
             t.grid_propagate(False)
             tiles.append(t)
@@ -4499,19 +4500,19 @@ class App(ctk.CTk):
             overlay = ctk.CTkFrame(tile, fg_color="transparent")
             btn_kw = dict(
                 width=20, height=18, corner_radius=0,
-                fg_color="transparent", hover_color=BG,
-                border_width=1, border_color=BORDER,
+                fg_color="transparent", hover_color=CARD,
+                border_width=0,
                 text_color=MUTED, font=ctk.CTkFont(size=9),
             )
             ctk.CTkButton(overlay, text="o", command=lambda i=idx: _rename_slot(i),
-                          **btn_kw).pack(side="left", padx=1)
-            ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
-                          **btn_kw).pack(side="left", padx=1)
+                          **btn_kw).pack(side="left", padx=4)
             ctk.CTkButton(overlay, text="-", command=lambda i=idx: _flip_face(i),
-                          **btn_kw).pack(side="left", padx=1)
+                          **btn_kw).pack(side="left", padx=4)
+            ctk.CTkButton(overlay, text="x", command=lambda i=idx: _delete_slot(i),
+                          **btn_kw).pack(side="left", padx=4)
 
             def _show(_e=None):
-                overlay.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+                overlay.place(relx=0.5, rely=1.0, anchor="s", y=-6)
 
             def _maybe_hide():
                 if not _pointer_inside(tile):
@@ -4551,22 +4552,22 @@ class App(ctk.CTk):
                 total_h = slot.get("total_seconds", 0.0) / 3600
                 plays = slot.get("play_count", 0)
                 mk_label(tile, f"{total_h:.1f}h played", size=10, color=MUTED).place(
-                    relx=0.5, rely=0.42, anchor="center")
+                    relx=0.5, rely=0.38, anchor="center")
                 mk_label(tile, f"{plays}x listened", size=10, color=MUTED).place(
-                    relx=0.5, rely=0.58, anchor="center")
+                    relx=0.5, rely=0.56, anchor="center")
             else:
                 is_playing = amb_state["playing_idx"] == idx
                 play_btn = ctk.CTkButton(
                     tile, text=("⏹" if is_playing else "▶"),
-                    width=56, height=56, corner_radius=0,
+                    width=48, height=48, corner_radius=0,
                     fg_color="transparent", hover_color=PANEL, text_color=DARK,
                     border_width=1, border_color=DARK2,
-                    font=ctk.CTkFont(size=18),
+                    font=ctk.CTkFont(size=16),
                     command=lambda i=idx: _toggle_slot_play(i),
                 )
-                play_btn.place(relx=0.5, rely=0.4, anchor="center")
+                play_btn.place(relx=0.5, rely=0.36, anchor="center")
                 mk_label(tile, _slot_display_name(slot), size=10, color=MUTED).place(
-                    relx=0.5, rely=0.82, anchor="center")
+                    relx=0.5, rely=0.66, anchor="center")
 
             _attach_hover_overlay(tile, idx)
 
