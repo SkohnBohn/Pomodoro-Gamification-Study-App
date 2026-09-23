@@ -4308,8 +4308,10 @@ class App(ctk.CTk):
     def _build_ambience_view(self) -> ctk.CTkFrame:
         view = ctk.CTkFrame(self.content, fg_color=BG)
 
+        # Anchored to a fixed top point (not "center") so revealing the
+        # controls below never shifts the play button/name upward.
         center = ctk.CTkFrame(view, fg_color="transparent")
-        center.place(relx=0.5, rely=0.5, anchor="center")
+        center.place(relx=0.5, rely=0.38, anchor="n")
 
         state = {"playing": False}
 
@@ -4367,7 +4369,13 @@ class App(ctk.CTk):
         reveal_btn = icon_btn(toggle_row, "⚙", lambda: _toggle_reveal(), size=13)
         reveal_btn.pack()
 
-        controls = ctk.CTkFrame(center, fg_color="transparent")
+        # Reserved, fixed-size slot for the controls — always occupies the
+        # same space so nothing above it ever moves when toggled.
+        controls_slot = ctk.CTkFrame(center, fg_color="transparent", height=76, width=140)
+        controls_slot.pack(pady=(10, 0))
+        controls_slot.pack_propagate(False)
+
+        controls = ctk.CTkFrame(controls_slot, fg_color="transparent")
 
         def _browse():
             path = filedialog.askopenfilename(
@@ -4409,14 +4417,20 @@ class App(ctk.CTk):
             e.bind("<Escape>", lambda _: rd.destroy())
             mk_btn(rd, "OK", _ok, primary=True, height=34).pack(fill="x", padx=20)
 
-        mk_btn(controls, "Browse…", _browse, width=140, height=30).pack(pady=(4, 6))
-        mk_btn(controls, "Rename", _rename, width=140, height=30).pack()
+        _flat_kw = dict(
+            width=140, height=30, corner_radius=0,
+            fg_color="transparent", hover_color=BG,
+            border_width=1, border_color=BORDER,
+            text_color=MUTED, font=ctk.CTkFont(size=11),
+        )
+        ctk.CTkButton(controls, text="BROWSE", command=_browse, **_flat_kw).pack(pady=(0, 6))
+        ctk.CTkButton(controls, text="RENAME", command=_rename, **_flat_kw).pack()
 
         def _toggle_reveal():
             if controls.winfo_ismapped():
                 controls.pack_forget()
             else:
-                controls.pack(pady=(10, 0))
+                controls.pack()
 
         _refresh_play_state()
         return view
