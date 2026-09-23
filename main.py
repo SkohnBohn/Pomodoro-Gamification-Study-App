@@ -4543,6 +4543,16 @@ class App(ctk.CTk):
             tile = tiles[idx]
             for w in tile.winfo_children():
                 w.destroy()
+            # Bindings/drop-registration are on the tile frame itself, which
+            # survives across re-renders (only its children get destroyed
+            # above) — clear them each time so a loaded slot can't still
+            # accept a click/drop meant for the empty state.
+            tile.unbind("<Button-1>")
+            if self._dnd_ready:
+                try:
+                    tile.drop_target_unregister()
+                except Exception:
+                    pass
             slot = slots[idx]
 
             if slot is None:
