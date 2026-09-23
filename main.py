@@ -4313,7 +4313,7 @@ class App(ctk.CTk):
         center = ctk.CTkFrame(view, fg_color="transparent")
         center.place(relx=0.5, rely=0.38, anchor="n")
 
-        state = {"playing": False}
+        state = {"playing": False, "busy": False}
 
         def _current_label():
             lbl = load_settings().get("bg_sound_label", "").strip()
@@ -4345,21 +4345,38 @@ class App(ctk.CTk):
             name_lbl.configure(text=_current_label())
 
         def _toggle_play():
+            if state["busy"]:
+                return
             path = load_settings().get("bg_sound_path", "")
             if not path:
                 return
+            state["busy"] = True
+            play_btn.configure(text="…")
+
             if state["playing"]:
-                _audio.stop_bg_sound()
-                state["playing"] = False
-                play_btn.configure(text="▶")
+                def _go_stop():
+                    _audio.stop_bg_sound()
+                    def _done():
+                        state["playing"] = False
+                        state["busy"] = False
+                        play_btn.configure(text="▶")
+                    self.after(0, _done)
+                threading.Thread(target=_go_stop, daemon=True).start()
             else:
-                ok = _audio.play_bg_sound(path)
-                if ok:
-                    state["playing"] = True
-                    play_btn.configure(text="⏹")
-                    error_lbl.configure(text="")
-                else:
-                    error_lbl.configure(text="couldn't play this file")
+                def _go_play():
+                    ok = _audio.play_bg_sound(path)
+                    def _done():
+                        state["busy"] = False
+                        if ok:
+                            state["playing"] = True
+                            play_btn.configure(text="⏹")
+                            error_lbl.configure(text="")
+                        else:
+                            state["playing"] = False
+                            play_btn.configure(text="▶")
+                            error_lbl.configure(text="couldn't play this file")
+                    self.after(0, _done)
+                threading.Thread(target=_go_play, daemon=True).start()
 
         play_btn.configure(command=_toggle_play)
 

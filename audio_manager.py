@@ -12,15 +12,31 @@ sound_click_enabled   = True
 sound_levelup_enabled = True
 sound_finish_enabled  = True
 
+_mixer_ready = False
+
+
+def _ensure_mixer():
+    """Init the mixer once, with a buffer sized to avoid crackle on long streams."""
+    global _mixer_ready
+    if _mixer_ready:
+        return
+    if not pygame.mixer.get_init():
+        pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=4096)
+        pygame.mixer.init()
+    _mixer_ready = True
+
+
 # ── Alarm ─────────────────────────────────────────────────────────────────────
+# Uses Sound (fully decoded), not mixer.music — the alarm clip is short, and
+# mixer.music (the only streaming channel SDL_mixer offers) is reserved for
+# the background ambience track below so the two never fight over it.
 
 def play_sound():
     if not sound_finish_enabled:
         return
     try:
-        pygame.mixer.init()
-        pygame.mixer.music.load(ALARM_SOUND)
-        pygame.mixer.music.play()
+        _ensure_mixer()
+        pygame.mixer.Sound(ALARM_SOUND).play()
     except Exception as e:
         print("Sound playback error:", e)
 
@@ -30,8 +46,7 @@ def play_click():
         return
     def _go():
         try:
-            if not pygame.mixer.get_init():
-                pygame.mixer.init()
+            _ensure_mixer()
             pygame.mixer.Sound(SOUND_CLICK).play()
         except Exception as e:
             print("Click sound error:", e)
@@ -39,32 +54,27 @@ def play_click():
 
 
 # ── Background ambience (looping, user-picked file) ────────────────────────────
-# Uses a reserved channel so it never collides with the finish alarm
-# (pygame.mixer.music) or the click/reward one-shots (auto-allocated channels).
-_BG_CHANNEL_ID = 7
-_bg_sound = None
-
+# Uses pygame.mixer.music, which streams+decodes from disk instead of loading
+# the whole file into memory — critical for long tracks (an hour+ mp3 fully
+# decoded to PCM would be ~1GB of RAM and take real time to decode up front).
+# Callers should invoke these off the UI thread since .load() still touches
+# disk and parses headers.
 
 def play_bg_sound(path: str) -> bool:
-    global _bg_sound
     try:
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
-        stop_bg_sound()
-        _bg_sound = pygame.mixer.Sound(path)
-        ch = pygame.mixer.Channel(_BG_CHANNEL_ID)
-        ch.play(_bg_sound, loops=-1)
+        _ensure_mixer()
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.play(loops=-1, fade_ms=250)
         return True
     except Exception as e:
         print("Background sound error:", e)
-        _bg_sound = None
         return False
 
 
 def stop_bg_sound():
     try:
         if pygame.mixer.get_init():
-            pygame.mixer.Channel(_BG_CHANNEL_ID).stop()
+            pygame.mixer.music.stop()
     except Exception as e:
         print("Background sound stop error:", e)
 
@@ -153,8 +163,7 @@ def _ensure():
 def _play(wav_bytes: bytes):
     def _go():
         try:
-            if not pygame.mixer.get_init():
-                pygame.mixer.init(frequency=_SR, size=-16, channels=2)
+            _ensure_mixer()
             pygame.mixer.Sound(io.BytesIO(wav_bytes)).play()
         except Exception as e:
             print("Sound error:", e)
