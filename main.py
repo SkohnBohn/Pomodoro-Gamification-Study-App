@@ -3643,9 +3643,16 @@ class App(ctk.CTk):
                 txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days  ·  >{pct_above:.1f}%" if cnt > 0
                        else f"{lo:.2f}–{hi:.2f}h  ·  —  ·  >{pct_above:.1f}%")
                 x_ctr = LM + (idx + 0.5) * bucket_w
-                tip_x = max(105, min(x_ctr, canvas_w - 105))
-                canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
-                                   font=("Helvetica", 10), anchor="s", tags="tip")
+                tip_x = max(50, min(x_ctr, canvas_w - 50))
+                tip_id = canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
+                                            font=("Helvetica", 10), anchor="s", tags="tip")
+                bbox = canvas.bbox(tip_id)
+                if bbox:
+                    x0, _, x1, _ = bbox
+                    if x0 < 2:
+                        canvas.move(tip_id, 2 - x0, 0)
+                    elif x1 > canvas_w - 2:
+                        canvas.move(tip_id, canvas_w - 2 - x1, 0)
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
