@@ -2926,7 +2926,7 @@ class App(ctk.CTk):
 
         canvas = tk.Canvas(parent, width=canvas_w, height=canvas_h,
                            bg=PANEL, highlightthickness=0)
-        canvas.pack(padx=14, pady=(20, 14))
+        canvas.pack(padx=14, pady=(20, 6))
 
         # Day labels (Mon/Mi/Fr/So)
         for r, label in enumerate(["Mo", "", "Mi", "", "Fr", "", "So"]):
@@ -3643,7 +3643,7 @@ class App(ctk.CTk):
                 txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days  ·  >{pct_above:.1f}%" if cnt > 0
                        else f"{lo:.2f}–{hi:.2f}h  ·  —  ·  >{pct_above:.1f}%")
                 x_ctr = LM + (idx + 0.5) * bucket_w
-                tip_x = max(50, min(x_ctr, canvas_w - 50))
+                tip_x = max(105, min(x_ctr, canvas_w - 105))
                 canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
                                    font=("Helvetica", 10), anchor="s", tags="tip")
 
