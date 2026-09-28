@@ -421,9 +421,10 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
 # Adding a new stats element only needs an entry here plus the matching
 # `if key not in hidden:` block in `_refresh_stats`.
 STATS_ELEMENTS = [
-    ("heatmap",    "Activity"),
-    ("bar_chart",  "Bar Chart"),
-    ("line_chart", "Progress Chart"),
+    ("heatmap",      "Activity"),
+    ("bar_chart",    "Bar Chart"),
+    ("line_chart",   "Progress Chart"),
+    ("distribution", "Distribution"),
 ]
 
 # Tabs that expose a per-element customize screen from Settings → App.
@@ -3195,6 +3196,12 @@ class App(ctk.CTk):
             line_card.pack(fill="x", pady=5, padx=6)
             self._draw_line_graph(line_card)
 
+        # ── Distribution (sorted daily hours) ───────────────────────────────────
+        if "distribution" not in hidden:
+            dist_card = mk_card(self._stats_scroll)
+            dist_card.pack(fill="x", pady=5, padx=6)
+            self._draw_distribution_chart(dist_card)
+
         if len(hidden) >= len(STATS_ELEMENTS):
             mk_label(self._stats_scroll, "no elements enabled",
                      size=12, color=MUTED).pack(pady=40)
@@ -3525,6 +3532,100 @@ class App(ctk.CTk):
             else:
                 lines = [date_str] + [f"{lbl}  {cum[idx]:.1f}h" for lbl, cum, _ in series]
                 txt = "\n".join(lines)
+            tip_x = max(50, min(event.x, canvas_w - 50))
+            canvas.create_text(tip_x, canvas_h - 1, text=txt, fill=TEXT,
+                               font=("Helvetica", 10), anchor="s", tags="tip")
+
+        canvas.bind("<Motion>", _hover)
+        canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
+
+    # ── Distribution (sorted daily hours) ────────────────────────────────────
+    def _draw_distribution_chart(self, parent):
+        canvas = tk.Canvas(parent, height=155, bg=PANEL, highlightthickness=0)
+
+        def _redraw(*_):
+            w = canvas.winfo_width()
+            if w < 50:
+                return
+            self._draw_distribution(canvas, w)
+
+        _dist_pending = [None]
+        def _redraw_debounced_dist(*_):
+            if _dist_pending[0]:
+                canvas.after_cancel(_dist_pending[0])
+            _dist_pending[0] = canvas.after(80, _redraw)
+        canvas.bind("<Configure>", _redraw_debounced_dist)
+
+        canvas.pack(fill="x", padx=16, pady=(14, 14))
+
+    def _draw_distribution(self, canvas, canvas_w: int):
+        canvas.delete("all")
+        canvas_h = 155
+        LM, BM, TM, RM = 44, 32, 10, 10
+        draw_w = canvas_w - LM - RM
+        draw_h = canvas_h - TM - BM
+
+        values = sorted(get_chart_data(None).values())
+        n = len(values)
+        if n < 2:
+            canvas.create_text(canvas_w // 2, canvas_h // 2,
+                               text="no data", fill=MUTED,
+                               font=("Helvetica", 13))
+            return
+
+        max_h = values[-1]
+        if max_h <= 1:    nice_max = 1
+        elif max_h <= 2:  nice_max = 2
+        elif max_h <= 5:  nice_max = 5
+        elif max_h <= 10: nice_max = 10
+        else:             nice_max = math.ceil(max_h / 5) * 5
+
+        # Axes
+        canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
+        canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h,
+                          fill=BORDER, width=1)
+
+        # Y-axis ticks
+        for frac in [0.0, 0.5, 1.0]:
+            y = TM + draw_h - frac * draw_h
+            canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
+            canvas.create_text(LM - 5, y, text=f"{nice_max * frac:.0f}h",
+                               anchor="e", fill=MUTED, font=("Helvetica", 8))
+
+        def _x(i):
+            return LM + i * draw_w / (n - 1)
+
+        def _y(v):
+            return TM + draw_h - (v / nice_max) * draw_h
+
+        # Sorted line
+        coords = []
+        for i, v in enumerate(values):
+            coords.extend([_x(i), _y(v)])
+        canvas.create_line(*coords, fill=DARK2, width=1.5, smooth=False)
+
+        # X-axis rank labels
+        tick_count = min(5, n)
+        for k in range(tick_count):
+            idx = round(k * (n - 1) / (tick_count - 1)) if tick_count > 1 else 0
+            canvas.create_text(_x(idx), TM + draw_h + 6, text=str(idx + 1),
+                              fill=MUTED, font=("Helvetica", 8), anchor="n")
+
+        def _ordinal(k: int) -> str:
+            if 10 <= k % 100 <= 20:
+                suffix = "th"
+            else:
+                suffix = {1: "st", 2: "nd", 3: "rd"}.get(k % 10, "th")
+            return f"{k}{suffix}"
+
+        # Hover — rank position under cursor -> hours + percentile
+        def _hover(event):
+            canvas.delete("tip")
+            frac = (event.x - LM) / draw_w
+            idx = max(0, min(n - 1, round(frac * (n - 1))))
+            v = values[idx]
+            pct = round(idx / (n - 1) * 100)
+            txt = f"{v:.1f}h  ·  {_ordinal(pct)} percentile"
             tip_x = max(50, min(event.x, canvas_w - 50))
             canvas.create_text(tip_x, canvas_h - 1, text=txt, fill=TEXT,
                                font=("Helvetica", 10), anchor="s", tags="tip")
