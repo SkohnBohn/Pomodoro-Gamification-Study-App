@@ -2926,7 +2926,7 @@ class App(ctk.CTk):
 
         canvas = tk.Canvas(parent, width=canvas_w, height=canvas_h,
                            bg=PANEL, highlightthickness=0)
-        canvas.pack(padx=14, pady=(14, 6))
+        canvas.pack(padx=14, pady=(20, 14))
 
         # Day labels (Mon/Mi/Fr/So)
         for r, label in enumerate(["Mo", "", "Mi", "", "Fr", "", "So"]):
