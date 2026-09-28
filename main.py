@@ -1367,8 +1367,13 @@ class App(ctk.CTk):
                 lbl.bind("<Button-1>", _toggle_tab)
 
                 if key in CUSTOMIZABLE_TABS:
-                    icon_btn(row, "⚙", lambda k=key: _open_customize(k),
-                             size=12).pack(side="left", padx=(2, 0))
+                    ctk.CTkButton(
+                        row, text="⚙", command=lambda k=key: _open_customize(k),
+                        width=22, height=22, corner_radius=8,
+                        fg_color="transparent", hover_color=BG,
+                        text_color=MUTED, border_width=0,
+                        font=ctk.CTkFont(size=12),
+                    ).pack(side="left", padx=(2, 0))
             return f
 
         def _build_customize(parent, tab_key):
@@ -2920,7 +2925,7 @@ class App(ctk.CTk):
 
         canvas = tk.Canvas(parent, width=canvas_w, height=canvas_h,
                            bg=PANEL, highlightthickness=0)
-        canvas.pack(padx=14, pady=(0, 6))
+        canvas.pack(padx=14, pady=(14, 6))
 
         # Day labels (Mon/Mi/Fr/So)
         for r, label in enumerate(["Mo", "", "Mi", "", "Fr", "", "So"]):
@@ -3176,8 +3181,6 @@ class App(ctk.CTk):
         if "heatmap" not in hidden:
             hm_card = mk_card(self._stats_scroll)
             hm_card.pack(fill="x", pady=5, padx=6)
-            mk_label(hm_card, "Activity", size=13, weight="bold",
-                     color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
             self._draw_heatmap(hm_card)
 
         # ── Bar chart (last 60 days) ───────────────────────────────────────────
