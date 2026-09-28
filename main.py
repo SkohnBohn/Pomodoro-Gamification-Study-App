@@ -3565,70 +3565,80 @@ class App(ctk.CTk):
         draw_w = canvas_w - LM - RM
         draw_h = canvas_h - TM - BM
 
-        values = sorted(get_chart_data(None).values())
-        n = len(values)
-        if n < 2:
+        values = list(get_chart_data(None).values())
+        if not values:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
                                text="no data", fill=MUTED,
                                font=("Helvetica", 13))
             return
 
-        max_h = values[-1]
-        if max_h <= 1:    nice_max = 1
-        elif max_h <= 2:  nice_max = 2
-        elif max_h <= 5:  nice_max = 5
-        elif max_h <= 10: nice_max = 10
-        else:             nice_max = math.ceil(max_h / 5) * 5
+        BUCKET = 0.25
+        n_buckets = max(1, math.ceil(max(values) / BUCKET))
+        counts = [0] * n_buckets
+        for v in values:
+            idx = min(n_buckets - 1, int(v / BUCKET))
+            counts[idx] += 1
+
+        max_count = max(counts)
+        if max_count <= 1:    nice_max = 1
+        elif max_count <= 2:  nice_max = 2
+        elif max_count <= 5:  nice_max = 5
+        elif max_count <= 10: nice_max = 10
+        else:                 nice_max = math.ceil(max_count / 5) * 5
 
         # Axes
         canvas.create_line(LM, TM, LM, TM + draw_h, fill=BORDER, width=1)
         canvas.create_line(LM, TM + draw_h, LM + draw_w, TM + draw_h,
                           fill=BORDER, width=1)
 
-        # Y-axis ticks
+        # Y-axis ticks — day counts
         for frac in [0.0, 0.5, 1.0]:
             y = TM + draw_h - frac * draw_h
             canvas.create_line(LM - 3, y, LM, y, fill=MUTED, width=1)
-            canvas.create_text(LM - 5, y, text=f"{nice_max * frac:.0f}h",
+            canvas.create_text(LM - 5, y, text=f"{nice_max * frac:.0f}",
                                anchor="e", fill=MUTED, font=("Helvetica", 8))
 
-        def _x(i):
-            return LM + i * draw_w / (n - 1)
+        # Bars — one per 0.25h bucket
+        bucket_w = draw_w / n_buckets
+        bar_w = max(1.5, bucket_w * 0.8)
 
-        def _y(v):
-            return TM + draw_h - (v / nice_max) * draw_h
+        for i, cnt in enumerate(counts):
+            if cnt <= 0:
+                continue
+            x_center = LM + (i + 0.5) * bucket_w
+            bar_h = (cnt / nice_max) * draw_h
+            x0 = x_center - bar_w / 2
+            y1 = TM + draw_h
+            y0 = max(TM + 1.0, y1 - bar_h)
+            ratio = cnt / max_count
+            fill = DARK if ratio >= 0.75 else (DARK2 if ratio >= 0.4 else BORDER)
+            canvas.create_rectangle(x0, y0, x0 + bar_w, y1, fill=fill, outline="")
 
-        # Sorted line
-        coords = []
-        for i, v in enumerate(values):
-            coords.extend([_x(i), _y(v)])
-        canvas.create_line(*coords, fill=DARK2, width=1.5, smooth=False)
-
-        # X-axis rank labels
-        tick_count = min(5, n)
-        for k in range(tick_count):
-            idx = round(k * (n - 1) / (tick_count - 1)) if tick_count > 1 else 0
-            canvas.create_text(_x(idx), TM + draw_h + 6, text=str(idx + 1),
+        # X-axis hour labels — nice round hour step, ~6-8 labels across the range
+        max_h_range = n_buckets * BUCKET
+        if max_h_range <= 2:    label_step_h = 0.5
+        elif max_h_range <= 4:  label_step_h = 1
+        elif max_h_range <= 10: label_step_h = 2
+        else:                   label_step_h = math.ceil(max_h_range / 6)
+        label_every = max(1, round(label_step_h / BUCKET))
+        for i in range(0, n_buckets + 1, label_every):
+            x = LM + i * bucket_w
+            canvas.create_text(x, TM + draw_h + 6, text=f"{i * BUCKET:g}h",
                               fill=MUTED, font=("Helvetica", 8), anchor="n")
 
-        def _ordinal(k: int) -> str:
-            if 10 <= k % 100 <= 20:
-                suffix = "th"
-            else:
-                suffix = {1: "st", 2: "nd", 3: "rd"}.get(k % 10, "th")
-            return f"{k}{suffix}"
-
-        # Hover — rank position under cursor -> hours + percentile
+        # Hover — bucket under cursor -> range + day count
         def _hover(event):
             canvas.delete("tip")
-            frac = (event.x - LM) / draw_w
-            idx = max(0, min(n - 1, round(frac * (n - 1))))
-            v = values[idx]
-            pct = round(idx / (n - 1) * 100)
-            txt = f"{v:.1f}h  ·  {_ordinal(pct)} percentile"
-            tip_x = max(50, min(event.x, canvas_w - 50))
-            canvas.create_text(tip_x, canvas_h - 1, text=txt, fill=TEXT,
-                               font=("Helvetica", 10), anchor="s", tags="tip")
+            idx = int((event.x - LM) / bucket_w)
+            if 0 <= idx < n_buckets:
+                lo, hi = idx * BUCKET, (idx + 1) * BUCKET
+                cnt = counts[idx]
+                txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days" if cnt > 0
+                       else f"{lo:.2f}–{hi:.2f}h  ·  —")
+                x_ctr = LM + (idx + 0.5) * bucket_w
+                tip_x = max(50, min(x_ctr, canvas_w - 50))
+                canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
+                                   font=("Helvetica", 10), anchor="s", tags="tip")
 
         canvas.bind("<Motion>", _hover)
         canvas.bind("<Leave>", lambda _: canvas.delete("tip"))
