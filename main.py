@@ -417,6 +417,19 @@ def icon_btn(parent, icon: str, command, size=14, **kw) -> ctk.CTkButton:
     )
 
 
+# Registry of individually toggleable Stats-tab elements (key, label).
+# Adding a new stats element only needs an entry here plus the matching
+# `if key not in hidden:` block in `_refresh_stats`.
+STATS_ELEMENTS = [
+    ("heatmap",    "Activity"),
+    ("bar_chart",  "Bar Chart"),
+    ("line_chart", "Progress Chart"),
+]
+
+# Tabs that expose a per-element customize screen from Settings → App.
+CUSTOMIZABLE_TABS = {"stats": STATS_ELEMENTS}
+
+
 _ARROW_FG       = "#8a7340"
 _ARROW_FG_HOVER = "#3d3000"
 
@@ -1352,6 +1365,43 @@ class App(ctk.CTk):
 
                 sq.bind("<Button-1>", _toggle_tab)
                 lbl.bind("<Button-1>", _toggle_tab)
+
+                if key in CUSTOMIZABLE_TABS:
+                    icon_btn(row, "⚙", lambda k=key: _open_customize(k),
+                             size=12).pack(side="left", padx=(2, 0))
+            return f
+
+        def _build_customize(parent, tab_key):
+            f = ctk.CTkFrame(parent, fg_color="transparent")
+            icon_btn(f, "‹", lambda: _switch_sub("app"),
+                     size=13).pack(anchor="w", pady=(0, 10))
+
+            def _redraw_elem_sq(c, key):
+                c.delete("all")
+                _h = set(load_settings().get("hidden_stats_elements", []))
+                c.create_rectangle(0, 0, 13, 13,
+                                   fill=BG if key in _h else DARK,
+                                   outline=MUTED, width=1)
+
+            for elem_key, elem_label in CUSTOMIZABLE_TABS[tab_key]:
+                row = ctk.CTkFrame(f, fg_color="transparent")
+                row.pack(anchor="w", pady=5)
+                sq = tk.Canvas(row, width=13, height=13, highlightthickness=0, bg=BG)
+                sq.pack(side="left", padx=(0, 10))
+                lbl = mk_label(row, elem_label, size=13, color=TEXT)
+                lbl.pack(side="left")
+                _redraw_elem_sq(sq, elem_key)
+
+                def _toggle_elem(_, k=elem_key, c=sq):
+                    cur = set(load_settings().get("hidden_stats_elements", []))
+                    cur.discard(k) if k in cur else cur.add(k)
+                    save_settings("hidden_stats_elements", list(cur))
+                    _redraw_elem_sq(c, k)
+                    if hasattr(self, "_stats_scroll"):
+                        self._refresh_stats()
+
+                sq.bind("<Button-1>", _toggle_elem)
+                lbl.bind("<Button-1>", _toggle_elem)
             return f
 
         _builders = {
@@ -1375,6 +1425,21 @@ class App(ctk.CTk):
             if key not in _built:
                 _built[key] = _builders[key](scroll)
             _built[key].pack(fill="x", padx=28, pady=(6, 20))
+
+        def _open_customize(tab_key):
+            prev = _active_sub["key"]
+            if prev and prev in _built:
+                _built[prev].pack_forget()
+            cache_key = ("customize", tab_key)
+            _active_sub["key"] = cache_key
+            for k, b in sub_btns.items():
+                b.configure(
+                    fg_color=CARD   if k == "app" else "transparent",
+                    text_color=DARK if k == "app" else MUTED,
+                )
+            if cache_key not in _built:
+                _built[cache_key] = _build_customize(scroll, tab_key)
+            _built[cache_key].pack(fill="x", padx=28, pady=(6, 20))
 
         for label, key in _subtabs:
             b = ctk.CTkButton(
@@ -3105,22 +3170,31 @@ class App(ctk.CTk):
         for w in self._stats_scroll.winfo_children():
             w.destroy()
 
+        hidden = set(load_settings().get("hidden_stats_elements", []))
+
         # ── Heatmap ───────────────────────────────────────────────────────────
-        hm_card = mk_card(self._stats_scroll)
-        hm_card.pack(fill="x", pady=5, padx=6)
-        mk_label(hm_card, "Activity", size=13, weight="bold",
-                 color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
-        self._draw_heatmap(hm_card)
+        if "heatmap" not in hidden:
+            hm_card = mk_card(self._stats_scroll)
+            hm_card.pack(fill="x", pady=5, padx=6)
+            mk_label(hm_card, "Activity", size=13, weight="bold",
+                     color=TEXT).pack(anchor="w", padx=16, pady=(14, 6))
+            self._draw_heatmap(hm_card)
 
         # ── Bar chart (last 60 days) ───────────────────────────────────────────
-        bar_card = mk_card(self._stats_scroll)
-        bar_card.pack(fill="x", pady=5, padx=6)
-        self._draw_bar_chart(bar_card)
+        if "bar_chart" not in hidden:
+            bar_card = mk_card(self._stats_scroll)
+            bar_card.pack(fill="x", pady=5, padx=6)
+            self._draw_bar_chart(bar_card)
 
         # ── Line graph (all time) ──────────────────────────────────────────────
-        line_card = mk_card(self._stats_scroll)
-        line_card.pack(fill="x", pady=5, padx=6)
-        self._draw_line_graph(line_card)
+        if "line_chart" not in hidden:
+            line_card = mk_card(self._stats_scroll)
+            line_card.pack(fill="x", pady=5, padx=6)
+            self._draw_line_graph(line_card)
+
+        if len(hidden) >= len(STATS_ELEMENTS):
+            mk_label(self._stats_scroll, "no elements enabled",
+                     size=12, color=MUTED).pack(pady=40)
 
     # ── Line graph ────────────────────────────────────────────────────────────
     def _make_flat_dropdown(self, parent, ctrl, canvas, btn_width, options,

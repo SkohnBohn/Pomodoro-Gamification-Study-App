@@ -17,6 +17,7 @@ _SETTINGS_DEFAULTS = {
     "day_end_hour":   3,
     "hidden_tabs":    [],
     "known_tabs":     [],
+    "hidden_stats_elements": [],
     "ambience_slots": [None] * 9,
 }
 
