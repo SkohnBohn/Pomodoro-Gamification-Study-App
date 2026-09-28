@@ -3626,15 +3626,22 @@ class App(ctk.CTk):
             canvas.create_text(x, TM + draw_h + 6, text=f"{i * BUCKET:g}h",
                               fill=MUTED, font=("Helvetica", 8), anchor="n")
 
-        # Hover — bucket under cursor -> range + day count
+        # Suffix counts so hover can show "% of days beyond this bucket"
+        total = len(values)
+        suffix_counts = [0] * (n_buckets + 1)
+        for i in range(n_buckets - 1, -1, -1):
+            suffix_counts[i] = suffix_counts[i + 1] + counts[i]
+
+        # Hover — bucket under cursor -> range + day count + % of days above it
         def _hover(event):
             canvas.delete("tip")
             idx = int((event.x - LM) / bucket_w)
             if 0 <= idx < n_buckets:
                 lo, hi = idx * BUCKET, (idx + 1) * BUCKET
                 cnt = counts[idx]
-                txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days" if cnt > 0
-                       else f"{lo:.2f}–{hi:.2f}h  ·  —")
+                pct_above = (suffix_counts[idx + 1] / total * 100) if total else 0.0
+                txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days  ·  >{pct_above:.1f}%" if cnt > 0
+                       else f"{lo:.2f}–{hi:.2f}h  ·  —  ·  >{pct_above:.1f}%")
                 x_ctr = LM + (idx + 0.5) * bucket_w
                 tip_x = max(50, min(x_ctr, canvas_w - 50))
                 canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
