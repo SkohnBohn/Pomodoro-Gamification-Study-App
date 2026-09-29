@@ -3565,7 +3565,8 @@ class App(ctk.CTk):
         draw_w = canvas_w - LM - RM
         draw_h = canvas_h - TM - BM
 
-        values = list(get_chart_data(None).values())
+        data_dict = get_chart_data(None)
+        values = list(data_dict.values())
         if not values:
             canvas.create_text(canvas_w // 2, canvas_h // 2,
                                text="no data", fill=MUTED,
@@ -3614,6 +3615,19 @@ class App(ctk.CTk):
             fill = DARK if ratio >= 0.75 else (DARK2 if ratio >= 0.4 else BORDER)
             canvas.create_rectangle(x0, y0, x0 + bar_w, y1, fill=fill, outline="")
 
+        # Minimal dot marking today's bar
+        today_str = study_date().strftime("%Y-%m-%d")
+        today_val = data_dict.get(today_str)
+        if today_val is not None:
+            today_idx = min(n_buckets - 1, int(today_val / BUCKET))
+            today_cnt = counts[today_idx]
+            dot_x = LM + (today_idx + 0.5) * bucket_w
+            dot_bar_h = (today_cnt / nice_max) * draw_h
+            dot_y0 = max(TM + 1.0, (TM + draw_h) - dot_bar_h)
+            dot_y = dot_y0 - 6
+            canvas.create_oval(dot_x - 3, dot_y - 3, dot_x + 3, dot_y + 3,
+                              fill=DARK, outline="")
+
         # X-axis hour labels — nice round hour step, ~6-8 labels across the range
         max_h_range = n_buckets * BUCKET
         if max_h_range <= 2:    label_step_h = 0.5
@@ -3639,9 +3653,10 @@ class App(ctk.CTk):
             if 0 <= idx < n_buckets:
                 lo, hi = idx * BUCKET, (idx + 1) * BUCKET
                 cnt = counts[idx]
-                pct_above = (suffix_counts[idx + 1] / total * 100) if total else 0.0
-                txt = (f"{lo:.2f}–{hi:.2f}h  ·  {cnt} days  ·  >{pct_above:.1f}%" if cnt > 0
-                       else f"{lo:.2f}–{hi:.2f}h  ·  —  ·  >{pct_above:.1f}%")
+                above_cnt = suffix_counts[idx + 1]
+                incl_cnt = cnt + above_cnt
+                pct_above = (above_cnt / total * 100) if total else 0.0
+                txt = f"{lo:.1f}-{hi:.1f}h  ·  {cnt}d  ·  >{pct_above:.1f}% ({incl_cnt}d)"
                 x_ctr = LM + (idx + 0.5) * bucket_w
                 tip_x = max(50, min(x_ctr, canvas_w - 50))
                 tip_id = canvas.create_text(tip_x, canvas_h - 4, text=txt, fill=TEXT,
