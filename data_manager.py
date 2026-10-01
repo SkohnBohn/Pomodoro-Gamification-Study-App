@@ -646,7 +646,6 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
     analogue of get_today_stats, summed over a date range instead of a
     single day."""
     from datetime import date as _date, timedelta as _td
-    import bisect
 
     today = study_date()
     end_h = load_settings().get("day_end_hour", 3)
@@ -696,13 +695,11 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
         return d.isoformat()
 
     period_totals: dict = {}
-    valid_day_rows = []
     for ds, tot in all_day_rows:
         try:
             d = _date.fromisoformat(ds)
         except (ValueError, TypeError):
             continue
-        valid_day_rows.append((d, tot or 0))
         key = _period_key(d)
         period_totals[key] = period_totals.get(key, 0) + (tot or 0)
 
@@ -739,42 +736,34 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
     else:
         days_in_period = (end_date - start_date).days + 1
 
-    # Longest "unbeaten" streak (days) reached by any day inside this
-    # period: for each worked day D in the period, count consecutive
-    # PRECEDING calendar days (globally, not period-bounded) with
-    # strictly less total than D's — same formula as the single-day
-    # version in get_today_stats, just taken as a max over the period.
-    valid_day_rows.sort(key=lambda x: x[0])
-    date_list = [d for d, _ in valid_day_rows]
-    total_by_date = {d: t for d, t in valid_day_rows}
+    # Period-level "unbeaten" streak: how many consecutive PRECEDING periods
+    # (of this same unit, in chronological order — gaps with no data are
+    # simply skipped over, same convention as the single-day version) had
+    # strictly less total than this period's — i.e. how long this period's
+    # total has stood unbeaten.
+    period_unbeaten = 0
+    if total_min > 0:
+        sorted_keys = sorted(period_totals.keys())
+        if this_key in sorted_keys:
+            idx = sorted_keys.index(this_key)
+            j = idx - 1
+            while j >= 0:
+                if period_totals[sorted_keys[j]] < total_min:
+                    period_unbeaten += 1
+                    j -= 1
+                else:
+                    break
 
-    max_unbeaten = 0
-    for ds, tot in day_totals.items():
-        if tot <= 0:
-            continue
-        d = _date.fromisoformat(ds)
-        idx = bisect.bisect_left(date_list, d)
-        run = 0
-        j = idx - 1
-        while j >= 0:
-            prev_d = date_list[j]
-            if (d - prev_d).days != (idx - j):
-                break
-            if total_by_date[prev_d] < tot:
-                run += 1
-                j -= 1
-            else:
-                break
-        max_unbeaten = max(max_unbeaten, run)
-
-    # Best streak of consecutive worked days using only days inside this
-    # period (study-date normalized, same as get_today_stats' streak calc).
+    # Best streak HELD AT ANY POINT during this period: the global,
+    # not-period-bounded running streak (same definition as get_today_stats'
+    # single-day streak, extending backward past the period's start if that
+    # streak was already running), evaluated as of each day in the period,
+    # then taken as a max — "what was the highest streak you were holding
+    # while inside this time frame," not a streak confined to the window.
     c.execute(
-        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL"
-        " AND date BETWEEN ? AND ?",
-        (start_str, (end_date + _td(days=1)).isoformat()),
+        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date, time"
     )
-    _study_dates_seen = set()
+    _study_dates_all = set()
     for _ds, _ts in c.fetchall():
         try:
             _d = _date.fromisoformat(_ds)
@@ -782,16 +771,19 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
             continue
         if end_h and _ts and _ts < f"{end_h:02d}:00:00":
             _d -= _td(days=1)
-        if start_date <= _d <= end_date:
-            _study_dates_seen.add(_d)
-    worked_sorted = sorted(_study_dates_seen)
-    best_streak_in_period = 0
+        _study_dates_all.add(_d)
+    all_worked_sorted = sorted(_study_dates_all)
+    run_at: dict = {}
     run = 0
     prev = None
-    for d in worked_sorted:
+    for d in all_worked_sorted:
         run = run + 1 if (prev is not None and (d - prev).days == 1) else 1
-        best_streak_in_period = max(best_streak_in_period, run)
+        run_at[d] = run
         prev = d
+    best_streak_in_period = max(
+        (run_at[d] for d in all_worked_sorted if start_date <= d <= end_date),
+        default=0,
+    )
 
     conn.close()
 
@@ -816,9 +808,10 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
         "total_periods":               total_periods,
         "thresholds":                  thresholds,
         "best_streak_in_period":       best_streak_in_period,
-        "max_days_unbeaten_in_period": max_unbeaten,
+        "period_unbeaten":             period_unbeaten,
         "days_worked":                 days_worked,
         "days_in_period":              days_in_period,
+        "days_in_period_full":         (end_date - start_date).days + 1,
         "daily_series":                daily_series,
     }
 

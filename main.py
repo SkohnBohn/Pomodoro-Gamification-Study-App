@@ -5832,7 +5832,7 @@ class App(ctk.CTk):
         mk_label(_s_row, str(d["best_streak_in_period"]), size=24, weight="bold", color=DARK).pack(side="left")
         mk_label(s_in, "best streak", size=11, color=MUTED).pack(pady=(4, 0))
 
-        ub = d.get("max_days_unbeaten_in_period", 0)
+        ub = d.get("period_unbeaten", 0)
         ub_card = mk_card(row2)
         ub_card.grid(row=0, column=1, sticky="nsew", padx=(5, 5))
         ub_in = ctk.CTkFrame(ub_card, fg_color="transparent")
@@ -5876,9 +5876,15 @@ class App(ctk.CTk):
             ]
             series.sort(key=lambda x: x[0])
             label_fmt = lambda dt: dt.strftime("%d %b")
+            total_slots = max(len(series), date(start_date.year, 12, 31).isocalendar()[1])
         else:
             series = d["daily_series"]
             label_fmt = (lambda dt: dt.strftime("%a")) if unit == "W" else (lambda dt: str(dt.day))
+            # Full calendar length of the period, not just the elapsed days
+            # in `series` — keeps bars sized consistently even early in an
+            # in-progress week/month instead of stretching a handful of
+            # bars across the whole width.
+            total_slots = max(len(series), d.get("days_in_period_full", len(series)))
 
         bars_canvas = tk.Canvas(bar_card, height=140, bg=PANEL, highlightthickness=0)
         bars_canvas.pack(fill="x", padx=16, pady=(0, 14))
@@ -5895,14 +5901,13 @@ class App(ctk.CTk):
             LM, RM, TM, BM = 6, 6, 8, 18
             draw_w = W - LM - RM
             draw_h = canvas_h - TM - BM
-            n = len(series)
-            slot_w = draw_w / n
-            bar_w = max(2, slot_w * 0.6)
+            slot_w = draw_w / total_slots
+            bar_w = max(2, min(slot_w * 0.6, 28))
             max_val = max((v for _, v, _ in series), default=0) or 1
 
             bars_canvas.create_line(LM, TM + draw_h, W - RM, TM + draw_h, fill=BORDER, width=1)
 
-            show_every = max(1, n // 10)
+            show_every = max(1, total_slots // 10)
             for i, (lbl_dt, mins, skills) in enumerate(series):
                 xc = LM + (i + 0.5) * slot_w
                 bar_h = (mins / max_val) * draw_h if max_val else 0
@@ -5910,6 +5915,7 @@ class App(ctk.CTk):
                 y1 = TM + draw_h
                 y0 = max(TM + 1.0, y1 - bar_h)
 
+                seg_list = []
                 if mins > 0:
                     segs_sorted = sorted(skills.items(), key=lambda kv: -kv[1]) if skills else []
                     if segs_sorted:
@@ -5919,25 +5925,34 @@ class App(ctk.CTk):
                             seg_y0 = max(TM + 1.0, y_cursor - seg_h)
                             bars_canvas.create_rectangle(x0, seg_y0, x1, y_cursor,
                                                          fill=_skill_color(sk), outline="")
+                            seg_list.append((seg_y0, y_cursor, sk, m))
                             y_cursor = seg_y0
                     else:
                         bars_canvas.create_rectangle(x0, y0, x1, y1, fill=DARK2, outline="")
+                        seg_list.append((y0, y1, "", mins))
                 else:
                     bars_canvas.create_rectangle(x0, y1 - 1, x1, y1, fill=BORDER, outline="")
 
-                if i % show_every == 0 or i == n - 1:
+                if i % show_every == 0 or i == len(series) - 1:
                     bars_canvas.create_text(xc, TM + draw_h + 4, text=label_fmt(lbl_dt),
                                             fill=MUTED, font=("Helvetica", 8), anchor="n")
-                bar_hits.append((x0, TM, x1, y1, lbl_dt, mins, skills))
+                bar_hits.append((x0, TM, x1, y1, lbl_dt, mins, seg_list))
 
         def _bars_motion(e):
             bars_canvas.delete("bars_tip")
-            hit = next(((lbl_dt, mins, skills) for x0, y0, x1, y1, lbl_dt, mins, skills in bar_hits
+            hit = next(((x0, y0, x1, y1, lbl_dt, mins, seg_list) for x0, y0, x1, y1, lbl_dt, mins, seg_list in bar_hits
                         if x0 <= e.x <= x1 and y0 <= e.y <= y1 + 20), None)
             if hit:
-                lbl_dt, mins, skills = hit
-                top_sk = max(skills.items(), key=lambda kv: kv[1])[0] if skills else ""
-                line1 = f"{mins/60:.1f}h" + (f"  {top_sk}" if top_sk else "")
+                _x0, _y0, _x1, _y1, lbl_dt, mins, seg_list = hit
+                # Which skill segment (vertical layer) is the cursor over?
+                seg_hit = next(((sk, m) for seg_y0, seg_y1, sk, m in seg_list
+                                if seg_y0 <= e.y <= seg_y1), None)
+                if seg_hit and seg_hit[0]:
+                    sk, m = seg_hit
+                    pct = (m / mins * 100) if mins else 0
+                    line1 = f"{sk}  {pct:.0f}%  {m/60:.1f}h"
+                else:
+                    line1 = f"{mins/60:.1f}h" if mins else "—"
                 line2 = lbl_dt.strftime("%d-%m-%y")
                 tip_x = min(max(e.x, 40), bars_canvas.winfo_width() - 40)
                 bars_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
@@ -5989,7 +6004,20 @@ class App(ctk.CTk):
         thresholds = d.get("thresholds", {})
         avg_min = d["avg_period_min"]
         if thresholds:
-            thr_items = list(thresholds.items())
+            # With few historical periods (e.g. only one prior month/year),
+            # several percentile thresholds can collapse onto the exact same
+            # minute value — drawing a tick+label for each separately stacks
+            # overlapping text on top of itself. Merge same-value thresholds
+            # into one tick with a combined label instead.
+            _by_val: dict = {}
+            for top_pct, need_min in thresholds.items():
+                _by_val.setdefault(need_min, []).append(top_pct)
+            thr_items = []
+            for need_min, pcts in _by_val.items():
+                pcts_sorted = sorted(pcts, reverse=True)
+                label = f"{pcts_sorted[0]}" if len(pcts_sorted) == 1 else f"{pcts_sorted[0]}-{pcts_sorted[-1]}"
+                thr_items.append((label, need_min))
+            thr_items.sort(key=lambda x: x[1])
             total_min = d["total_min"]
             scale_max = max(thr_items[-1][1], total_min, avg_min) * 1.08
 
