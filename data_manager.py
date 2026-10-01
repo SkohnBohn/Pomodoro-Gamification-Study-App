@@ -615,6 +615,214 @@ def get_today_stats(target_date=None) -> dict:
     }
 
 
+def get_period_bounds(unit: str, offset: int, today=None):
+    """Calendar start/end dates for the week/month/year containing `today`,
+    shifted by `offset` units (0 = current, -1 = previous, ...)."""
+    from datetime import date as _date, timedelta as _td
+    import calendar as _cal
+    if today is None:
+        today = study_date()
+    if unit == "W":
+        this_monday = today - _td(days=today.weekday())
+        start = this_monday + _td(weeks=offset)
+        end = start + _td(days=6)
+    elif unit == "M":
+        total = (today.year * 12 + (today.month - 1)) + offset
+        y, m = divmod(total, 12)
+        m += 1
+        start = _date(y, m, 1)
+        end = _date(y, m, _cal.monthrange(y, m)[1])
+    elif unit == "Y":
+        y = today.year + offset
+        start = _date(y, 1, 1)
+        end = _date(y, 12, 31)
+    else:
+        start = end = today + _td(days=offset)
+    return start, end
+
+
+def get_period_stats(unit: str, start_date, end_date) -> dict:
+    """Aggregated stats for a week/month/year window — the period-level
+    analogue of get_today_stats, summed over a date range instead of a
+    single day."""
+    from datetime import date as _date, timedelta as _td
+    import bisect
+
+    today = study_date()
+    end_h = load_settings().get("day_end_hour", 3)
+    start_str, end_str = start_date.isoformat(), end_date.isoformat()
+
+    conn = sqlite3.connect(config.DB_FILE)
+    c = conn.cursor()
+
+    # Sessions within [start, end] by raw calendar date (mirrors how
+    # get_today_stats treats "other_days" for percentile/avg/thresholds).
+    c.execute(
+        "SELECT date, duration, skill FROM pomodoro_session"
+        " WHERE date BETWEEN ? AND ? AND date IS NOT NULL",
+        (start_str, end_str),
+    )
+    rows = c.fetchall()
+    total_min = sum(r[1] for r in rows if r[1])
+    sessions = len(rows)
+    skill_breakdown: dict = {}
+    day_totals: dict = {}
+    day_skill_totals: dict = {}
+    for ds, dur, sk in rows:
+        if not dur:
+            continue
+        day_totals[ds] = day_totals.get(ds, 0) + dur
+        if sk:
+            skill_breakdown[sk] = skill_breakdown.get(sk, 0) + dur
+            day_skill_totals.setdefault(ds, {})
+            day_skill_totals[ds][sk] = day_skill_totals[ds].get(sk, 0) + dur
+
+    # All historical days, bucketed into periods of this unit, for
+    # percentile / average / thresholds / best-period comparisons.
+    c.execute(
+        "SELECT date, SUM(duration) FROM pomodoro_session"
+        " WHERE date IS NOT NULL GROUP BY date"
+    )
+    all_day_rows = c.fetchall()
+
+    def _period_key(d):
+        if unit == "W":
+            monday = d - _td(days=d.weekday())
+            return monday.isoformat()
+        elif unit == "M":
+            return f"{d.year:04d}-{d.month:02d}"
+        elif unit == "Y":
+            return str(d.year)
+        return d.isoformat()
+
+    period_totals: dict = {}
+    valid_day_rows = []
+    for ds, tot in all_day_rows:
+        try:
+            d = _date.fromisoformat(ds)
+        except (ValueError, TypeError):
+            continue
+        valid_day_rows.append((d, tot or 0))
+        key = _period_key(d)
+        period_totals[key] = period_totals.get(key, 0) + (tot or 0)
+
+    this_key = _period_key(start_date)
+    other_totals = [v for k, v in period_totals.items() if k != this_key]
+    all_totals = sorted(other_totals + ([total_min] if total_min > 0 else []), reverse=True)
+    avg_period_min = (sum(other_totals) / len(other_totals)) if other_totals else 0
+    best_period_min = max(period_totals.values()) if period_totals else 0
+
+    if total_min > 0 and all_totals:
+        rank = sum(1 for v in all_totals if v <= total_min)
+        percentile = round(rank / len(all_totals) * 100, 2)
+        period_rank = sum(1 for v in all_totals if v > total_min) + 1
+        total_periods = len(all_totals)
+    else:
+        percentile = None
+        period_rank = None
+        total_periods = len(all_totals) if all_totals else 0
+
+    thresholds: dict = {}
+    if other_totals:
+        asc = sorted(other_totals)
+        n = len(asc)
+        for top_pct in [50, 20, 10, 5, 2, 1]:
+            idx = min(int((100 - top_pct) / 100 * n), n - 1)
+            thresholds[top_pct] = asc[idx]
+
+    # Days worked vs. days in period (elapsed-so-far for the current,
+    # still-in-progress period; full calendar length for past periods).
+    days_worked = sum(1 for ds in day_totals if day_totals[ds] > 0)
+    is_current = start_date <= today <= end_date
+    if is_current:
+        days_in_period = (min(end_date, today) - start_date).days + 1
+    else:
+        days_in_period = (end_date - start_date).days + 1
+
+    # Longest "unbeaten" streak (days) reached by any day inside this
+    # period: for each worked day D in the period, count consecutive
+    # PRECEDING calendar days (globally, not period-bounded) with
+    # strictly less total than D's — same formula as the single-day
+    # version in get_today_stats, just taken as a max over the period.
+    valid_day_rows.sort(key=lambda x: x[0])
+    date_list = [d for d, _ in valid_day_rows]
+    total_by_date = {d: t for d, t in valid_day_rows}
+
+    max_unbeaten = 0
+    for ds, tot in day_totals.items():
+        if tot <= 0:
+            continue
+        d = _date.fromisoformat(ds)
+        idx = bisect.bisect_left(date_list, d)
+        run = 0
+        j = idx - 1
+        while j >= 0:
+            prev_d = date_list[j]
+            if (d - prev_d).days != (idx - j):
+                break
+            if total_by_date[prev_d] < tot:
+                run += 1
+                j -= 1
+            else:
+                break
+        max_unbeaten = max(max_unbeaten, run)
+
+    # Best streak of consecutive worked days using only days inside this
+    # period (study-date normalized, same as get_today_stats' streak calc).
+    c.execute(
+        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL"
+        " AND date BETWEEN ? AND ?",
+        (start_str, (end_date + _td(days=1)).isoformat()),
+    )
+    _study_dates_seen = set()
+    for _ds, _ts in c.fetchall():
+        try:
+            _d = _date.fromisoformat(_ds)
+        except (ValueError, TypeError):
+            continue
+        if end_h and _ts and _ts < f"{end_h:02d}:00:00":
+            _d -= _td(days=1)
+        if start_date <= _d <= end_date:
+            _study_dates_seen.add(_d)
+    worked_sorted = sorted(_study_dates_seen)
+    best_streak_in_period = 0
+    run = 0
+    prev = None
+    for d in worked_sorted:
+        run = run + 1 if (prev is not None and (d - prev).days == 1) else 1
+        best_streak_in_period = max(best_streak_in_period, run)
+        prev = d
+
+    conn.close()
+
+    # Per-day series (date, total_min, skill_breakdown) for the bar chart —
+    # callers bucket this into weeks themselves for the Y granularity.
+    daily_series = []
+    last = min(end_date, today) if is_current else end_date
+    d = start_date
+    while d <= last:
+        ds = d.isoformat()
+        daily_series.append((d, day_totals.get(ds, 0), day_skill_totals.get(ds, {})))
+        d += _td(days=1)
+
+    return {
+        "total_min":                   total_min,
+        "sessions":                    sessions,
+        "skill_breakdown":             skill_breakdown,
+        "best_period_min":             best_period_min,
+        "avg_period_min":              avg_period_min,
+        "percentile":                  percentile,
+        "period_rank":                 period_rank,
+        "total_periods":               total_periods,
+        "thresholds":                  thresholds,
+        "best_streak_in_period":       best_streak_in_period,
+        "max_days_unbeaten_in_period": max_unbeaten,
+        "days_worked":                 days_worked,
+        "days_in_period":              days_in_period,
+        "daily_series":                daily_series,
+    }
+
+
 def get_last_session_duration() -> float | None:
     """Return duration (minutes) of the most recent session, or None."""
     conn = sqlite3.connect(config.DB_FILE)

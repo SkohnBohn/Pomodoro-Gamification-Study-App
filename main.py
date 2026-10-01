@@ -39,6 +39,7 @@ from data_manager import (
     get_best_periods, get_all_streaks, get_best_days_for_skill,
     get_last_session_duration,
     get_today_stats,
+    get_period_stats, get_period_bounds,
     load_settings, save_settings, study_date,
 )
 from utils import calculate_level, format_hours
@@ -4925,6 +4926,7 @@ class App(ctk.CTk):
     # ── Today tab ─────────────────────────────────────────────────────────────
     def _build_today_view(self) -> ctk.CTkFrame:
         self._today_offset = 0
+        self._today_unit = "D"
         view = ctk.CTkFrame(self.content, fg_color=BG)
         self._today_scroll = ctk.CTkScrollableFrame(
             view, fg_color=BG,
@@ -4939,19 +4941,29 @@ class App(ctk.CTk):
             return
         if not hasattr(self, "_today_offset"):
             self._today_offset = 0
+        if not hasattr(self, "_today_unit"):
+            self._today_unit = "D"
         for w in self._today_scroll.winfo_children():
             w.destroy()
         sc = self._today_scroll
+        unit = self._today_unit
 
-        target_date = study_date() + timedelta(days=self._today_offset)
-        if target_date > study_date():
-            self._today_offset = 0
-            target_date = study_date()
+        if unit == "D":
+            target_date = study_date() + timedelta(days=self._today_offset)
+            if target_date > study_date():
+                self._today_offset = 0
+                target_date = study_date()
+            start_date = end_date = target_date
+        else:
+            start_date, end_date = get_period_bounds(unit, self._today_offset)
+            if start_date > study_date():
+                self._today_offset = 0
+                start_date, end_date = get_period_bounds(unit, 0)
+            target_date = start_date
 
-        d = get_today_stats(target_date)
-        streak = d["streak"]
+        is_current = (self._today_offset == 0)
 
-        # ── Day navigation row ────────────────────────────────────────────────
+        # ── Navigation row ────────────────────────────────────────────────────
         nav = ctk.CTkFrame(sc, fg_color="transparent")
         nav.pack(fill="x", padx=16, pady=(12, 0))
         nav.columnconfigure(0, weight=0)
@@ -4974,51 +4986,60 @@ class App(ctk.CTk):
             command=_go_prev,
         ).grid(row=0, column=0, sticky="w")
 
-        is_today = (self._today_offset == 0)
-        nav_label = "today" if is_today else target_date.strftime("%d-%m-%y")
+        if unit == "D":
+            nav_label = "today" if is_current else target_date.strftime("%d-%m-%y")
+        elif unit == "W":
+            nav_label = ("this week" if is_current else
+                         f"{start_date.strftime('%d-%m')} – {end_date.strftime('%d-%m-%y')}")
+        elif unit == "M":
+            nav_label = "this month" if is_current else start_date.strftime("%B %Y")
+        else:
+            nav_label = "this year" if is_current else start_date.strftime("%Y")
+
         date_lbl = mk_label(nav, nav_label, size=12, color=MUTED)
         date_lbl.grid(row=0, column=1)
 
-        def _start_date_edit(_event=None):
-            date_lbl.grid_remove()
-            entry = ctk.CTkEntry(
-                nav, width=90, height=26, corner_radius=8,
-                fg_color=CARD, border_color=BORDER, text_color=TEXT,
-                font=ctk.CTkFont(size=12), justify="center",
-            )
-            entry.grid(row=0, column=1)
-            entry.insert(0, target_date.strftime("%d-%m-%y"))
-            entry.focus_set()
-            def _deselect():
-                try:
-                    entry._entry.selection_clear()
-                    entry._entry.icursor("end")
-                except Exception:
-                    pass
-            entry.after(50, _deselect)
+        if unit == "D":
+            def _start_date_edit(_event=None):
+                date_lbl.grid_remove()
+                entry = ctk.CTkEntry(
+                    nav, width=90, height=26, corner_radius=8,
+                    fg_color=CARD, border_color=BORDER, text_color=TEXT,
+                    font=ctk.CTkFont(size=12), justify="center",
+                )
+                entry.grid(row=0, column=1)
+                entry.insert(0, target_date.strftime("%d-%m-%y"))
+                entry.focus_set()
+                def _deselect():
+                    try:
+                        entry._entry.selection_clear()
+                        entry._entry.icursor("end")
+                    except Exception:
+                        pass
+                entry.after(50, _deselect)
 
-            def _confirm(_event=None):
-                val = entry.get().strip()
-                try:
-                    from datetime import datetime as _dt
-                    picked = _dt.strptime(val, "%d-%m-%y").date()
-                    if picked > study_date():
-                        raise ValueError("future")
-                    self._today_offset = (picked - study_date()).days
+                def _confirm(_event=None):
+                    val = entry.get().strip()
+                    try:
+                        from datetime import datetime as _dt
+                        picked = _dt.strptime(val, "%d-%m-%y").date()
+                        if picked > study_date():
+                            raise ValueError("future")
+                        self._today_offset = (picked - study_date()).days
+                        self._refresh_today()
+                    except ValueError:
+                        entry.configure(border_color=DANGER)
+                        entry.after(600, lambda: entry.configure(border_color=BORDER))
+
+                def _cancel(_event=None):
                     self._refresh_today()
-                except ValueError:
-                    entry.configure(border_color=DANGER)
-                    entry.after(600, lambda: entry.configure(border_color=BORDER))
 
-            def _cancel(_event=None):
-                self._refresh_today()
+                entry.bind("<Return>", _confirm)
+                entry.bind("<Escape>", _cancel)
 
-            entry.bind("<Return>", _confirm)
-            entry.bind("<Escape>", _cancel)
-
-        date_lbl.bind("<Button-1>", _start_date_edit)
-        date_lbl.bind("<Enter>", lambda _: date_lbl.configure(text_color=DARK))
-        date_lbl.bind("<Leave>", lambda _: date_lbl.configure(text_color=MUTED))
+            date_lbl.bind("<Button-1>", _start_date_edit)
+            date_lbl.bind("<Enter>", lambda _: date_lbl.configure(text_color=DARK))
+            date_lbl.bind("<Leave>", lambda _: date_lbl.configure(text_color=MUTED))
 
         next_btn = ctk.CTkButton(
             nav, text="›", width=28, height=28, corner_radius=8,
@@ -5027,9 +5048,40 @@ class App(ctk.CTk):
             command=_go_next,
         )
         next_btn.grid(row=0, column=2, sticky="e")
-        if is_today:
+        if is_current:
             next_btn.configure(state="disabled", text_color=BORDER)
 
+        if unit == "D":
+            d = get_today_stats(target_date)
+            self._refresh_today_day(sc, d, d["streak"], target_date)
+        else:
+            d = get_period_stats(unit, start_date, end_date)
+            self._refresh_today_period(sc, unit, d, start_date, end_date)
+
+        # ── D/W/M/Y unit selector (bottom) ───────────────────────────────────
+        self._build_today_unit_selector(sc)
+
+    def _build_today_unit_selector(self, sc):
+        row = ctk.CTkFrame(sc, fg_color="transparent")
+        row.pack(pady=(4, 20))
+        for label in ("D", "W", "M", "Y"):
+            active = (self._today_unit == label)
+            ctk.CTkButton(
+                row, text=label, width=36, height=28, corner_radius=0,
+                fg_color="transparent", hover_color=CARD,
+                border_width=1, border_color=(DARK if active else BORDER),
+                text_color=(DARK if active else MUTED),
+                font=ctk.CTkFont(size=12),
+                command=lambda k=label: self._set_today_unit(k),
+            ).pack(side="left", padx=2)
+
+    def _set_today_unit(self, unit):
+        if unit != self._today_unit:
+            self._today_unit = unit
+            self._today_offset = 0
+            self._refresh_today()
+
+    def _refresh_today_day(self, sc, d, streak, target_date):
         # ── Hero card ─────────────────────────────────────────────────────────
         hero = mk_card(sc)
         hero.pack(fill="x", padx=16, pady=(8, 8))
@@ -5624,6 +5676,421 @@ class App(ctk.CTk):
                             fill=DARK, font=("Helvetica", 10),
                             anchor="center", tags="ruler_tip",
                         )
+                        break
+
+            def _ruler_leave(_e=None):
+                ruler_canvas.delete("ruler_tip")
+
+            _ruler_pending = [None]
+            def _draw_ruler_debounced(event=None):
+                if _ruler_pending[0]:
+                    ruler_canvas.after_cancel(_ruler_pending[0])
+                _ruler_pending[0] = ruler_canvas.after(80, _draw_ruler)
+            ruler_canvas.bind("<Configure>", _draw_ruler_debounced)
+            ruler_canvas.bind("<Motion>", _ruler_motion)
+            ruler_canvas.bind("<Leave>", _ruler_leave)
+            ruler_canvas.after(80, _draw_ruler)
+
+    # ── Today tab: Week/Month/Year period view ─────────────────────────────────
+    def _refresh_today_period(self, sc, unit, d, start_date, end_date):
+        UNIT_NOUN = {"W": "week", "M": "month", "Y": "year"}[unit]
+
+        # ── Hero card ─────────────────────────────────────────────────────────
+        hero = mk_card(sc)
+        hero.pack(fill="x", padx=16, pady=(8, 8))
+        inner = ctk.CTkFrame(hero, fg_color="transparent")
+        inner.pack(fill="x", padx=20, pady=18)
+        inner.columnconfigure(0, weight=1)
+        inner.columnconfigure(1, weight=0)
+
+        left = ctk.CTkFrame(inner, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="ew")
+        total_h = d["total_min"] / 60
+        mk_label(left, f"{total_h:.1f}h", size=42, weight="bold", color=DARK).pack(anchor="w")
+        rank_detail = None
+        if d["best_period_min"] > 0:
+            BAR_H, DOT_R = 4, 5
+            BAR_YC = DOT_R + 2
+            breakdown = d.get("skill_breakdown") or {}
+            total_period = d["total_min"]
+            best_min = d["best_period_min"]
+            fill_ratio = min(total_period / best_min, 1.0) if best_min else 0
+            CR = BAR_H // 2
+
+            bar_host = ctk.CTkFrame(left, fg_color="transparent", height=DOT_R * 2 + 4)
+            bar_host.pack(fill="x", pady=(8, 4))
+            bar_host.pack_propagate(False)
+            bar_cv = tk.Canvas(bar_host, bg=PANEL, highlightthickness=0, bd=0)
+            bar_cv.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+            skills_sorted = sorted(breakdown.items(), key=lambda x: -x[1])
+
+            def _cap(cv, cx, yc, r, fill):
+                cv.create_oval(cx - r, yc - r, cx + r, yc + r, fill=fill, outline="")
+
+            def _draw_hero_bar(event=None, cv=bar_cv, sr=skills_sorted,
+                               tot=total_period, fr=fill_ratio, h=BAR_H, dr=DOT_R, cr=CR,
+                               yc=BAR_YC):
+                cv.delete("all")
+                W = cv.winfo_width()
+                if W < 2:
+                    return
+                y0, y1 = yc - h // 2, yc + h // 2
+                filled_w = int(W * fr)
+
+                cv.create_rectangle(cr, y0, W - cr, y1, fill=CARD, outline="")
+                _cap(cv, cr, yc, cr, CARD)
+                _cap(cv, W - cr, yc, cr, CARD)
+
+                segments = []
+                x = 0
+                for sk, mins in sr:
+                    if mins <= 0 or tot <= 0:
+                        continue
+                    seg_w = max(1, int(filled_w * mins / tot))
+                    x1_seg = min(x + seg_w, filled_w)
+                    col = _skill_color(sk)
+                    cv.create_rectangle(x, y0, x1_seg, y1, fill=col, outline="")
+                    segments.append((sk, mins, x, x1_seg))
+                    x = x1_seg
+                    if x >= filled_w:
+                        break
+                if segments and x < filled_w:
+                    cv.create_rectangle(x, y0, filled_w, y1,
+                                        fill=_skill_color(segments[-1][0]), outline="")
+                if segments:
+                    _cap(cv, 0, yc, cr, _skill_color(segments[0][0]))
+                if filled_w > 0:
+                    dx = max(dr, min(filled_w, W - dr))
+                    _cap(cv, dx, yc, dr, DARK)
+                _cap(cv, W - dr, yc, dr, MUTED)
+
+                _rec_txt = f"record {best_min/60:.1f}h  ({total_period/best_min*100:.2f}%)" if best_min else ""
+
+                def _on_move(e, segs=segments, ftot=tot, rec=_rec_txt, wr=W, ddr=dr):
+                    if abs(e.x - (wr - ddr)) <= ddr + 4:
+                        skill_lbl.configure(text=rec)
+                        return
+                    hit = next(((sk, m) for sk, m, xa, xb in segs if xa <= e.x <= xb), None)
+                    if hit:
+                        pct = hit[1] / ftot * 100
+                        hval = hit[1] / 60
+                        skill_lbl.configure(text=f"{hit[0]}  {pct:.0f}%  {hval:.1f}h")
+                    else:
+                        skill_lbl.configure(text="")
+
+                cv.bind("<Motion>", _on_move)
+                cv.bind("<Leave>", lambda e: skill_lbl.configure(text=""))
+
+            _hero_bar_pending = [None]
+            def _hero_bar_debounced(event=None, cv=bar_cv, _pend=_hero_bar_pending):
+                if _pend[0]:
+                    cv.after_cancel(_pend[0])
+                _pend[0] = cv.after(60, _draw_hero_bar)
+            bar_cv.bind("<Configure>", _hero_bar_debounced)
+            bar_cv.after(60, _draw_hero_bar)
+
+            bottom_row = ctk.CTkFrame(inner, fg_color="transparent")
+            bottom_row.grid(row=1, column=0, columnspan=2, sticky="ew")
+            skill_lbl = mk_label(bottom_row, "", size=10, color=DIM)
+            skill_lbl.pack(side="left")
+            rank_detail = mk_label(bottom_row, "", size=10, color=DIM)
+            rank_detail.pack(side="right")
+
+        if d["percentile"] is not None:
+            top_pct = max(0.01, 100 - d["percentile"])
+            right = ctk.CTkFrame(inner, fg_color="transparent")
+            right.grid(row=0, column=1, sticky="ne", padx=(16, 0))
+            mk_label(right, f"top {top_pct:.2f}%", size=20, weight="bold", color="#4ade80").pack(anchor="e")
+            if d.get("period_rank") is not None:
+                rank_lbl = mk_label(right, f"#{d['period_rank']}", size=11, color=DIM)
+                rank_lbl.pack(anchor="e", pady=(2, 0))
+                if rank_detail is not None:
+                    _pr, _tp = d["period_rank"], d.get("total_periods", "?")
+                    def _show(_e, lbl=rank_detail, pr=_pr, tp=_tp, noun=UNIT_NOUN):
+                        lbl.configure(text=f"top {pr} of {tp} {noun}s")
+                    def _hide(_e, lbl=rank_detail):
+                        lbl.configure(text="")
+                    for _w in (rank_lbl, getattr(rank_lbl, "_label", None)):
+                        if _w:
+                            _w.bind("<Enter>", _show)
+                            _w.bind("<Leave>", _hide)
+
+        # ── Streak / unbeaten / sessions / days-worked row ──────────────────────
+        row2 = ctk.CTkFrame(sc, fg_color="transparent")
+        row2.pack(fill="x", padx=16, pady=(0, 8))
+        for col in range(4):
+            row2.columnconfigure(col, weight=1, uniform="stat")
+
+        s_card = mk_card(row2)
+        s_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        s_in = ctk.CTkFrame(s_card, fg_color="transparent")
+        s_in.pack(expand=True, fill="both", padx=10, pady=18)
+        _s_row = ctk.CTkFrame(s_in, fg_color="transparent")
+        _s_row.pack()
+        mk_label(_s_row, "🔥", size=24).pack(side="left", padx=(0, 4))
+        mk_label(_s_row, str(d["best_streak_in_period"]), size=24, weight="bold", color=DARK).pack(side="left")
+        mk_label(s_in, "best streak", size=11, color=MUTED).pack(pady=(4, 0))
+
+        ub = d.get("max_days_unbeaten_in_period", 0)
+        ub_card = mk_card(row2)
+        ub_card.grid(row=0, column=1, sticky="nsew", padx=(5, 5))
+        ub_in = ctk.CTkFrame(ub_card, fg_color="transparent")
+        ub_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ub_in, str(ub) if ub else "—", size=24, weight="bold", color=DARK).pack()
+        mk_label(ub_in, "longest unbeaten", size=11, color=MUTED).pack(pady=(4, 0))
+
+        ss_card = mk_card(row2)
+        ss_card.grid(row=0, column=2, sticky="nsew", padx=(5, 5))
+        ss_in = ctk.CTkFrame(ss_card, fg_color="transparent")
+        ss_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(ss_in, str(d["sessions"]), size=24, weight="bold", color=DARK).pack()
+        mk_label(ss_in, "sessions", size=11, color=MUTED).pack(pady=(4, 0))
+
+        dw_card = mk_card(row2)
+        dw_card.grid(row=0, column=3, sticky="nsew", padx=(5, 0))
+        dw_in = ctk.CTkFrame(dw_card, fg_color="transparent")
+        dw_in.pack(expand=True, fill="both", padx=10, pady=18)
+        mk_label(dw_in, f"{d['days_worked']}/{d['days_in_period']}", size=24, weight="bold", color=DARK).pack()
+        mk_label(dw_in, "days worked", size=11, color=MUTED).pack(pady=(4, 0))
+
+        # ── Bar chart (day-by-day, or week-by-week for Year) ────────────────────
+        bar_card = mk_card(sc)
+        bar_card.pack(fill="x", padx=16, pady=(0, 8))
+        hdr = ctk.CTkFrame(bar_card, fg_color="transparent")
+        hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(hdr, "TIMELINE", size=10, color=MUTED).pack(side="left")
+
+        if unit == "Y":
+            from collections import defaultdict
+            weekly = defaultdict(lambda: [0.0, {}])
+            for day_date, mins, skills in d["daily_series"]:
+                iy, iw, _ = day_date.isocalendar()
+                key = (iy, iw)
+                weekly[key][0] += mins
+                for sk, m in skills.items():
+                    weekly[key][1][sk] = weekly[key][1].get(sk, 0) + m
+            series = [
+                (date.fromisocalendar(iy, iw, 1), tot, skills)
+                for (iy, iw), (tot, skills) in weekly.items()
+            ]
+            series.sort(key=lambda x: x[0])
+            label_fmt = lambda dt: dt.strftime("%d %b")
+        else:
+            series = d["daily_series"]
+            label_fmt = (lambda dt: dt.strftime("%a")) if unit == "W" else (lambda dt: str(dt.day))
+
+        bars_canvas = tk.Canvas(bar_card, height=140, bg=PANEL, highlightthickness=0)
+        bars_canvas.pack(fill="x", padx=16, pady=(0, 14))
+
+        bar_hits: list = []
+
+        def _draw_bars(event=None):
+            bars_canvas.delete("all")
+            bar_hits.clear()
+            W = bars_canvas.winfo_width()
+            if W < 4 or not series:
+                return
+            canvas_h = 140
+            LM, RM, TM, BM = 6, 6, 8, 18
+            draw_w = W - LM - RM
+            draw_h = canvas_h - TM - BM
+            n = len(series)
+            slot_w = draw_w / n
+            bar_w = max(2, slot_w * 0.6)
+            max_val = max((v for _, v, _ in series), default=0) or 1
+
+            bars_canvas.create_line(LM, TM + draw_h, W - RM, TM + draw_h, fill=BORDER, width=1)
+
+            show_every = max(1, n // 10)
+            for i, (lbl_dt, mins, skills) in enumerate(series):
+                xc = LM + (i + 0.5) * slot_w
+                bar_h = (mins / max_val) * draw_h if max_val else 0
+                x0, x1 = xc - bar_w / 2, xc + bar_w / 2
+                y1 = TM + draw_h
+                y0 = max(TM + 1.0, y1 - bar_h)
+
+                if mins > 0:
+                    segs_sorted = sorted(skills.items(), key=lambda kv: -kv[1]) if skills else []
+                    if segs_sorted:
+                        y_cursor = y1
+                        for sk, m in segs_sorted:
+                            seg_h = bar_h * (m / mins)
+                            seg_y0 = max(TM + 1.0, y_cursor - seg_h)
+                            bars_canvas.create_rectangle(x0, seg_y0, x1, y_cursor,
+                                                         fill=_skill_color(sk), outline="")
+                            y_cursor = seg_y0
+                    else:
+                        bars_canvas.create_rectangle(x0, y0, x1, y1, fill=DARK2, outline="")
+                else:
+                    bars_canvas.create_rectangle(x0, y1 - 1, x1, y1, fill=BORDER, outline="")
+
+                if i % show_every == 0 or i == n - 1:
+                    bars_canvas.create_text(xc, TM + draw_h + 4, text=label_fmt(lbl_dt),
+                                            fill=MUTED, font=("Helvetica", 8), anchor="n")
+                bar_hits.append((x0, TM, x1, y1, lbl_dt, mins, skills))
+
+        def _bars_motion(e):
+            bars_canvas.delete("bars_tip")
+            hit = next(((lbl_dt, mins, skills) for x0, y0, x1, y1, lbl_dt, mins, skills in bar_hits
+                        if x0 <= e.x <= x1 and y0 <= e.y <= y1 + 20), None)
+            if hit:
+                lbl_dt, mins, skills = hit
+                top_sk = max(skills.items(), key=lambda kv: kv[1])[0] if skills else ""
+                line1 = f"{mins/60:.1f}h" + (f"  {top_sk}" if top_sk else "")
+                line2 = lbl_dt.strftime("%d-%m-%y")
+                tip_x = min(max(e.x, 40), bars_canvas.winfo_width() - 40)
+                bars_canvas.create_text(tip_x, 2, text=line1, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="bars_tip")
+                bars_canvas.create_text(tip_x, 15, text=line2, fill=TEXT,
+                                        font=("Helvetica", 10), anchor="n", tags="bars_tip")
+
+        def _bars_leave(_e=None):
+            bars_canvas.delete("bars_tip")
+
+        _bars_pending = [None]
+        def _draw_bars_debounced(event=None):
+            if _bars_pending[0]:
+                bars_canvas.after_cancel(_bars_pending[0])
+            _bars_pending[0] = bars_canvas.after(80, _draw_bars)
+        bars_canvas.bind("<Configure>", _draw_bars_debounced)
+        bars_canvas.bind("<Motion>", _bars_motion)
+        bars_canvas.bind("<Leave>", _bars_leave)
+        bars_canvas.after(80, _draw_bars)
+
+        # ── Skill pills ───────────────────────────────────────────────────────
+        if d["skill_breakdown"]:
+            sk_card = mk_card(sc)
+            sk_card.pack(fill="x", padx=16, pady=(0, 8))
+            sec_title(sk_card, "Skills")
+            pills = ctk.CTkFrame(sk_card, fg_color="transparent")
+            pills.pack(fill="x", padx=14, pady=(0, 14))
+            for sk, mins in sorted(d["skill_breakdown"].items(), key=lambda x: -x[1]):
+                pill = ctk.CTkFrame(pills, fg_color=CARD, corner_radius=12)
+                pill.pack(side="left", padx=(0, 6), pady=2)
+                ctk.CTkLabel(
+                    pill,
+                    text=f"{sk}  {mins/60:.1f}h",
+                    text_color=_skill_color(sk),
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                ).pack(padx=10, pady=5)
+
+        # ── Period average + percentile ruler ────────────────────────────────
+        avg_card = mk_card(sc)
+        avg_card.pack(fill="x", padx=16, pady=(0, 16))
+
+        avg_hdr = ctk.CTkFrame(avg_card, fg_color="transparent")
+        avg_hdr.pack(fill="x", padx=16, pady=(14, 6))
+        mk_label(avg_hdr, f"{UNIT_NOUN.upper()}LY AVERAGE", size=10, color=MUTED).pack(side="left")
+
+        body = ctk.CTkFrame(avg_card, fg_color="transparent")
+        body.pack(fill="x", padx=18, pady=(0, 8))
+
+        thresholds = d.get("thresholds", {})
+        avg_min = d["avg_period_min"]
+        if thresholds:
+            thr_items = list(thresholds.items())
+            total_min = d["total_min"]
+            scale_max = max(thr_items[-1][1], total_min, avg_min) * 1.08
+
+            RULER_H = 62
+            ruler_canvas = tk.Canvas(body, height=RULER_H, bg=PANEL, highlightthickness=0)
+            ruler_canvas.pack(fill="x", pady=(4, 2))
+
+            _tick_zones: list = []
+            _avg_zone: list = []
+
+            def _draw_ruler(event=None):
+                ruler_canvas.delete("all")
+                _tick_zones.clear()
+                _avg_zone.clear()
+                W = ruler_canvas.winfo_width()
+                if W < 4:
+                    return
+                LINE_Y = 38
+                PAD_L, PAD_R = 12, 12
+                rule_w = W - PAD_L - PAD_R
+
+                def _x(minutes):
+                    return PAD_L + rule_w * min(minutes / scale_max, 1.0)
+
+                ruler_canvas.create_line(PAD_L, LINE_Y, W - PAD_R, LINE_Y, fill=BORDER, width=1)
+
+                today_x = _x(total_min)
+                ruler_canvas.create_line(PAD_L, LINE_Y, today_x, LINE_Y, fill=DARK, width=3)
+
+                for top_pct, need_min in thr_items:
+                    tx = _x(need_min)
+                    achieved = total_min >= need_min
+                    if achieved:
+                        def _blend(c1, c2, t):
+                            r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+                            r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
+                            return f"#{int(r1*(1-t)+r2*t):02x}{int(g1*(1-t)+g2*t):02x}{int(b1*(1-t)+b2*t):02x}"
+                        tick_color = _blend(BORDER, DIM, 0.3)
+                    else:
+                        tick_color = DIM
+                    ruler_canvas.create_line(tx, LINE_Y - 6, tx, LINE_Y + 6, fill=tick_color, width=1)
+                    ruler_canvas.create_text(tx, LINE_Y + 14, text=f"{top_pct}%",
+                                             fill=tick_color, font=("Helvetica", 9), anchor="center")
+                    _tick_zones.append((tx, need_min, top_pct))
+
+                if avg_min > 0:
+                    ax = _x(avg_min)
+                    ruler_canvas.create_oval(ax - 5, LINE_Y - 5, ax + 5, LINE_Y + 5,
+                                             fill=DARK, outline=PANEL, width=2)
+                    _avg_zone.append((ax, avg_min))
+
+                ruler_canvas.create_oval(today_x - 5, LINE_Y - 5, today_x + 5, LINE_Y + 5,
+                                         fill=DARK, outline=PANEL, width=2)
+
+            OVERLAP_PX = 12
+
+            def _ruler_motion(e):
+                ruler_canvas.delete("ruler_tip")
+                RADIUS = 18
+                W = ruler_canvas.winfo_width()
+
+                today_x_now = None
+                avg_x_now = _avg_zone[0][0] if _avg_zone else None
+                rule_w_now = W - 24
+                if scale_max > 0:
+                    today_x_now = 12 + rule_w_now * min(total_min / scale_max, 1.0)
+
+                if today_x_now is not None and abs(e.x - today_x_now) <= RADIUS:
+                    tip_x = min(max(today_x_now, 24), W - 24)
+                    ruler_canvas.create_text(tip_x, 8, text=f"{total_min / 60:.1f}h",
+                                             fill=DARK, font=("Helvetica", 10),
+                                             anchor="center", tags="ruler_tip")
+                    if d.get("percentile") is not None:
+                        top_pct = max(0.01, 100 - d["percentile"])
+                        ruler_canvas.create_text(tip_x, 21, text=f"{top_pct:.2f}%",
+                                                 fill=DIM, font=("Helvetica", 8),
+                                                 anchor="center", tags="ruler_tip")
+                    return
+
+                if avg_x_now is not None and abs(e.x - avg_x_now) <= RADIUS:
+                    overlapping = (today_x_now is not None and
+                                   abs(today_x_now - avg_x_now) < OVERLAP_PX)
+                    if not overlapping:
+                        tip = f"{avg_min / 60:.1f}h ⌀"
+                        tip_x = min(max(avg_x_now, 30), W - 30)
+                        ruler_canvas.create_text(tip_x, 6, text=tip, fill=DARK,
+                                                 font=("Helvetica", 10),
+                                                 anchor="center", tags="ruler_tip")
+                        return
+
+                for tx, need_min, top_pct in _tick_zones:
+                    if abs(e.x - tx) <= RADIUS:
+                        if total_min >= need_min:
+                            tip = f"{need_min / 60:.1f}h"
+                        else:
+                            gap_h = (need_min - total_min) / 60
+                            tip = f"+{gap_h:.1f}h"
+                        tip_x = min(max(tx, 24), W - 24)
+                        ruler_canvas.create_text(tip_x, 6, text=tip, fill=DARK,
+                                                 font=("Helvetica", 10),
+                                                 anchor="center", tags="ruler_tip")
                         break
 
             def _ruler_leave(_e=None):
