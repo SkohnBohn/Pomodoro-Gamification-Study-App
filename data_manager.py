@@ -383,6 +383,44 @@ def confirm_stat_level(stat: str, level: int):
 
 # ── Chart data ─────────────────────────────────────────────────────────────────
 
+def _normalized_sessions(skill: str = None, conn=None) -> list:
+    """All sessions as (study_date_iso, duration, skill) — the stored
+    wall-clock date shifted back a day for sessions before day_end_hour,
+    so every date-bucketed stat in the app agrees on where a day starts.
+    This is the one place that logic lives; every function that groups
+    sessions by day/week/month/year should go through this."""
+    from datetime import date as _date, timedelta as _td
+    end_h = load_settings().get("day_end_hour", 3)
+    own_conn = conn is None
+    if own_conn:
+        conn = sqlite3.connect(config.DB_FILE)
+    c = conn.cursor()
+    if skill and skill != "Alle":
+        c.execute(
+            "SELECT date, time, duration, skill FROM pomodoro_session"
+            " WHERE skill=? AND date IS NOT NULL",
+            (skill,),
+        )
+    else:
+        c.execute(
+            "SELECT date, time, duration, skill FROM pomodoro_session"
+            " WHERE date IS NOT NULL"
+        )
+    rows = c.fetchall()
+    if own_conn:
+        conn.close()
+    out = []
+    for ds, ts, dur, sk in rows:
+        try:
+            d = _date.fromisoformat(ds)
+        except (ValueError, TypeError):
+            continue
+        if end_h and ts and ts < f"{end_h:02d}:00:00":
+            d -= _td(days=1)
+        out.append((d.isoformat(), dur or 0, sk))
+    return out
+
+
 def get_chart_data(skill: str = None) -> dict:
     """Return {date_str: hours} keyed by study date, optionally filtered by skill."""
     from datetime import date as _date, timedelta as _td
@@ -504,23 +542,20 @@ def get_today_stats(target_date=None) -> dict:
                      "pauses": _parse_pauses(_r[3])}
                 )
 
-    # All days for percentile + average
-    c.execute(
-        "SELECT SUM(duration) FROM pomodoro_session"
-        " WHERE date != ? AND date IS NOT NULL GROUP BY date",
-        (day_str,),
-    )
-    other_days = [r[0] for r in c.fetchall() if r[0]]
+    # Study-date-normalized totals per day across all history — percentile,
+    # average, best-day-ever and days-unbeaten are all derived from this so
+    # they use the exact same day boundaries as the target day's own total.
+    _sessions_all = _normalized_sessions(conn=conn)
+    _day_totals_all: dict = {}
+    for _ds, _dur, _sk in _sessions_all:
+        _day_totals_all[_ds] = _day_totals_all.get(_ds, 0) + _dur
+
+    other_days = [v for k, v in _day_totals_all.items() if k != day_str]
     all_days   = sorted(other_days + ([total_min] if total_min > 0 else []), reverse=True)
     avg_min    = (sum(other_days) / len(other_days)) if other_days else 0
 
     # Best day ever
-    c.execute(
-        "SELECT MAX(daily) FROM"
-        " (SELECT SUM(duration) as daily FROM pomodoro_session"
-        "  WHERE date IS NOT NULL GROUP BY date)"
-    )
-    best_day_min = c.fetchone()[0] or 0
+    best_day_min = max(_day_totals_all.values()) if _day_totals_all else 0
 
     # Percentile + rank: what % of days were worse, and ordinal position from top
     if total_min > 0 and all_days:
@@ -533,35 +568,18 @@ def get_today_stats(target_date=None) -> dict:
         day_rank = None
         total_days = len(all_days) if all_days else 0
 
-    # Days unbeaten: consecutive past days (most recent first) with less total than today
+    # Days unbeaten: consecutive past study-days (most recent first) with less total than today
     days_unbeaten = 0
     if total_min > 0:
-        c2 = conn.cursor()
-        c2.execute(
-            "SELECT SUM(duration) FROM pomodoro_session"
-            " WHERE date < ? AND date IS NOT NULL GROUP BY date ORDER BY date DESC",
-            (day_str,)
-        )
-        for (past_total,) in c2.fetchall():
-            if (past_total or 0) < total_min:
+        for k in sorted((k for k in _day_totals_all if k < day_str), reverse=True):
+            if _day_totals_all[k] < total_min:
                 days_unbeaten += 1
             else:
                 break
 
     # Streak: normalize stored dates to study dates before counting
     from datetime import timedelta as _td
-    c.execute(
-        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date DESC, time DESC"
-    )
-    _study_dates_seen: set = set()
-    for _ds, _ts in c.fetchall():
-        try:
-            _d = _date.fromisoformat(_ds)
-            if end_h and _ts and _ts < f"{end_h:02d}:00:00":
-                _d -= _td(days=1)
-            _study_dates_seen.add(_d)
-        except (ValueError, TypeError):
-            continue
+    _study_dates_seen: set = {_date.fromisoformat(ds) for ds, _dur, _sk in _sessions_all}
     _sd_rows = sorted(_study_dates_seen, reverse=True)
 
     streak = 0
@@ -648,28 +666,28 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
     from datetime import date as _date, timedelta as _td
 
     today = study_date()
-    end_h = load_settings().get("day_end_hour", 3)
     start_str, end_str = start_date.isoformat(), end_date.isoformat()
 
     conn = sqlite3.connect(config.DB_FILE)
     c = conn.cursor()
 
-    # Sessions within [start, end] by raw calendar date (mirrors how
-    # get_today_stats treats "other_days" for percentile/avg/thresholds).
-    c.execute(
-        "SELECT date, duration, skill FROM pomodoro_session"
-        " WHERE date BETWEEN ? AND ? AND date IS NOT NULL",
-        (start_str, end_str),
-    )
-    rows = c.fetchall()
-    total_min = sum(r[1] for r in rows if r[1])
-    sessions = len(rows)
+    # All sessions, study-date normalized — both the in-range totals and the
+    # all-history period bucketing are derived from the same pass, so they
+    # agree on where a day starts (consistent with get_today_stats).
+    _sessions_all = _normalized_sessions(conn=conn)
+
+    total_min = 0
+    sessions = 0
     skill_breakdown: dict = {}
     day_totals: dict = {}
     day_skill_totals: dict = {}
-    for ds, dur, sk in rows:
+    for ds, dur, sk in _sessions_all:
+        if ds < start_str or ds > end_str:
+            continue
+        sessions += 1
         if not dur:
             continue
+        total_min += dur
         day_totals[ds] = day_totals.get(ds, 0) + dur
         if sk:
             skill_breakdown[sk] = skill_breakdown.get(sk, 0) + dur
@@ -678,12 +696,6 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
 
     # All historical days, bucketed into periods of this unit, for
     # percentile / average / thresholds / best-period comparisons.
-    c.execute(
-        "SELECT date, SUM(duration) FROM pomodoro_session"
-        " WHERE date IS NOT NULL GROUP BY date"
-    )
-    all_day_rows = c.fetchall()
-
     def _period_key(d):
         if unit == "W":
             monday = d - _td(days=d.weekday())
@@ -695,13 +707,13 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
         return d.isoformat()
 
     period_totals: dict = {}
-    for ds, tot in all_day_rows:
+    for ds, dur, _sk in _sessions_all:
         try:
             d = _date.fromisoformat(ds)
         except (ValueError, TypeError):
             continue
         key = _period_key(d)
-        period_totals[key] = period_totals.get(key, 0) + (tot or 0)
+        period_totals[key] = period_totals.get(key, 0) + dur
 
     this_key = _period_key(start_date)
     other_totals = [v for k, v in period_totals.items() if k != this_key]
@@ -760,18 +772,7 @@ def get_period_stats(unit: str, start_date, end_date) -> dict:
     # streak was already running), evaluated as of each day in the period,
     # then taken as a max — "what was the highest streak you were holding
     # while inside this time frame," not a streak confined to the window.
-    c.execute(
-        "SELECT date, time FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date, time"
-    )
-    _study_dates_all = set()
-    for _ds, _ts in c.fetchall():
-        try:
-            _d = _date.fromisoformat(_ds)
-        except (ValueError, TypeError):
-            continue
-        if end_h and _ts and _ts < f"{end_h:02d}:00:00":
-            _d -= _td(days=1)
-        _study_dates_all.add(_d)
+    _study_dates_all = {_date.fromisoformat(ds) for ds, _dur, _sk in _sessions_all}
     all_worked_sorted = sorted(_study_dates_all)
     run_at: dict = {}
     run = 0
@@ -914,110 +915,58 @@ def get_streak(target_date=None) -> int:
 
 # ── Records ────────────────────────────────────────────────────────────────────
 
-def _skill_breakdown(conn, dates: list) -> dict:
-    """Return {skill: minutes} for a list of date strings."""
-    if not dates:
-        return {}
-    placeholders = ",".join("?" * len(dates))
-    c = conn.cursor()
-    rows = c.execute(
-        f"SELECT skill, SUM(duration) FROM pomodoro_session"
-        f" WHERE date IN ({placeholders}) GROUP BY skill",
-        dates,
-    ).fetchall()
-    return {sk: (m or 0) for sk, m in rows}
-
-
 def get_best_periods(period: str = "day") -> list:
     """Return records sorted best-first.
 
     period: 'day' | 'week' | 'month'
     Each record: {label, total_min, breakdown: {skill: min}, dates: [date_str, ...]}
     """
-    conn = sqlite3.connect(config.DB_FILE)
-    c = conn.cursor()
+    from datetime import date as _date, timedelta as _td
+
+    sessions = _normalized_sessions()
+    if not sessions:
+        return []
 
     if period == "day":
-        c.execute(
-            "SELECT date, SUM(duration) FROM pomodoro_session"
-            " WHERE date IS NOT NULL GROUP BY date ORDER BY 2 DESC"
-        )
-        rows = c.fetchall()
-        result = []
-        for date_s, total in rows:
-            bd = _skill_breakdown(conn, [date_s])
-            cnt = c.execute(
-                "SELECT COUNT(*) FROM pomodoro_session WHERE date=?",
-                (date_s,)).fetchone()[0]
-            try:
-                from datetime import date as _date
-                d = _date.fromisoformat(date_s)
-                label = d.strftime("%a, %d %b %Y")
-            except Exception:
-                label = date_s
-            result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": [date_s],
-                           "session_count": cnt})
-
+        def key_fn(ds):
+            return ds
     elif period == "week":
-        c.execute(
-            "SELECT strftime('%Y-W%W', date) as wk, SUM(duration), MIN(date), MAX(date)"
-            " FROM pomodoro_session WHERE date IS NOT NULL GROUP BY wk ORDER BY 2 DESC"
-        )
-        rows = c.fetchall()
-        result = []
-        for wk, total, dmin, dmax in rows:
-            # collect all dates in that week
-            c2 = conn.cursor()
-            dates = [r[0] for r in c2.execute(
-                "SELECT DISTINCT date FROM pomodoro_session"
-                " WHERE strftime('%Y-W%W', date)=?", (wk,)
-            ).fetchall()]
-            bd = _skill_breakdown(conn, dates)
-            ph = ",".join("?" * len(dates))
-            cnt = c2.execute(
-                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
-                dates).fetchone()[0]
-            try:
-                from datetime import date as _date
-                d1 = _date.fromisoformat(dmin)
-                d2 = _date.fromisoformat(dmax)
-                label = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
-            except Exception:
-                label = wk
-            result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates,
-                           "session_count": cnt})
-
+        def key_fn(ds):
+            d = _date.fromisoformat(ds)
+            monday = d - _td(days=d.weekday())
+            return monday.isoformat()
     else:  # month
-        c.execute(
-            "SELECT strftime('%Y-%m', date) as mo, SUM(duration), MIN(date)"
-            " FROM pomodoro_session WHERE date IS NOT NULL GROUP BY mo ORDER BY 2 DESC"
-        )
-        rows = c.fetchall()
-        result = []
-        for mo, total, dmin in rows:
-            c2 = conn.cursor()
-            dates = [r[0] for r in c2.execute(
-                "SELECT DISTINCT date FROM pomodoro_session"
-                " WHERE strftime('%Y-%m', date)=?", (mo,)
-            ).fetchall()]
-            bd = _skill_breakdown(conn, dates)
-            ph = ",".join("?" * len(dates))
-            cnt = c2.execute(
-                f"SELECT COUNT(*) FROM pomodoro_session WHERE date IN ({ph})",
-                dates).fetchone()[0]
-            try:
-                from datetime import date as _date
-                d = _date.fromisoformat(dmin)
-                label = d.strftime("%B %Y")
-            except Exception:
-                label = mo
-            result.append({"label": label, "total_min": total or 0,
-                           "breakdown": bd, "dates": dates,
-                           "session_count": cnt})
+        def key_fn(ds):
+            return ds[:7]
 
-    conn.close()
+    groups: dict = {}
+    for ds, dur, sk in sessions:
+        key = key_fn(ds)
+        g = groups.setdefault(key, {"total": 0, "dates": set(), "breakdown": {}, "count": 0})
+        g["total"] += dur
+        g["dates"].add(ds)
+        g["count"] += 1
+        if sk:
+            g["breakdown"][sk] = g["breakdown"].get(sk, 0) + dur
+
+    result = []
+    for g in groups.values():
+        dates_sorted = sorted(g["dates"])
+        if period == "day":
+            d = _date.fromisoformat(dates_sorted[0])
+            label = d.strftime("%a, %d %b %Y")
+        elif period == "week":
+            d1 = _date.fromisoformat(dates_sorted[0])
+            d2 = _date.fromisoformat(dates_sorted[-1])
+            label = f"{d1.strftime('%d %b')} – {d2.strftime('%d %b %Y')}"
+        else:
+            d = _date.fromisoformat(dates_sorted[0])
+            label = d.strftime("%B %Y")
+        result.append({"label": label, "total_min": g["total"],
+                       "breakdown": g["breakdown"], "dates": dates_sorted,
+                       "session_count": g["count"]})
+
+    result.sort(key=lambda r: r["total_min"], reverse=True)
     return result
 
 
@@ -1026,20 +975,13 @@ def get_all_streaks() -> list:
     Each: {length, start_date, end_date}
     """
     from datetime import date as _date, timedelta
-    conn = sqlite3.connect(config.DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT DISTINCT date FROM pomodoro_session WHERE date IS NOT NULL ORDER BY date ASC")
-    raw = [r[0] for r in c.fetchall()]
-    conn.close()
 
+    sessions = _normalized_sessions()
     streaks = []
-    if not raw:
+    if not sessions:
         return streaks
 
-    try:
-        dates = sorted(_date.fromisoformat(d) for d in raw)
-    except Exception:
-        return streaks
+    dates = sorted({_date.fromisoformat(ds) for ds, _dur, _sk in sessions})
 
     start = dates[0]
     length = 1
@@ -1063,24 +1005,22 @@ def get_best_days_for_skill(skill: str) -> list:
     """Return best days for a specific skill, sorted best-first.
     Each: {label, total_min, date_s}
     """
-    conn = sqlite3.connect(config.DB_FILE)
-    c = conn.cursor()
-    c.execute(
-        "SELECT date, SUM(duration) FROM pomodoro_session"
-        " WHERE skill=? AND date IS NOT NULL GROUP BY date ORDER BY 2 DESC",
-        (skill,),
-    )
-    rows = c.fetchall()
-    conn.close()
+    from datetime import date as _date
+
+    sessions = _normalized_sessions(skill=skill)
+    day_totals: dict = {}
+    for ds, dur, _sk in sessions:
+        day_totals[ds] = day_totals.get(ds, 0) + dur
+
     result = []
-    for date_s, total in rows:
+    for date_s, total in day_totals.items():
         try:
-            from datetime import date as _date
             d = _date.fromisoformat(date_s)
             label = d.strftime("%a, %d %b %Y")
         except Exception:
             label = date_s
         result.append({"label": label, "total_min": total or 0, "date_s": date_s})
+    result.sort(key=lambda r: r["total_min"], reverse=True)
     return result
 
 

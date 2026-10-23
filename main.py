@@ -4419,11 +4419,10 @@ class App(ctk.CTk):
             _wall_today = _sd.isoformat()
             _next = (_sd + timedelta(days=1)).isoformat()
             date_filter = f"WHERE date = '{_wall_today}' OR date = '{_next}'"
-        elif period == "This Month":
-            date_filter = f"WHERE date LIKE '{_sd.strftime('%Y-%m')}%'"
-        elif period == "This Year":
-            date_filter = f"WHERE date LIKE '{_sd.strftime('%Y')}%'"
         else:
+            # Week/Month/Year need study-date normalization (a session before
+            # day_end_hour belongs to the previous day), which a raw SQL date
+            # prefilter can't express — filtered in Python below instead.
             date_filter = ""
 
         try:
@@ -4436,6 +4435,11 @@ class App(ctk.CTk):
             conn.close()
         except Exception:
             rows = []
+
+        def _study_d(stored_date, time_s):
+            if _end_time_str and time_s < _end_time_str:
+                return stored_date - timedelta(days=1)
+            return stored_date
 
         filtered = []
         for dur, date_s, time_s, skill, intention in rows:
@@ -4455,14 +4459,17 @@ class App(ctk.CTk):
                 elif stored_date != _sd:
                     continue
             elif period == "This Week":
-                # Normalize to study date before week comparison
-                from datetime import date as _dt_date, timedelta as _dt_td
-                if _end_time_str and time_s < _end_time_str:
-                    study_d = stored_date - timedelta(days=1)
-                else:
-                    study_d = stored_date
+                study_d = _study_d(stored_date, time_s)
                 _sd_iso = _sd.isocalendar()
                 if not (study_d.isocalendar()[1] == _sd_iso[1] and study_d.isocalendar()[0] == _sd_iso[0]):
+                    continue
+            elif period == "This Month":
+                study_d = _study_d(stored_date, time_s)
+                if not (study_d.year == _sd.year and study_d.month == _sd.month):
+                    continue
+            elif period == "This Year":
+                study_d = _study_d(stored_date, time_s)
+                if study_d.year != _sd.year:
                     continue
             filtered.append((dur, dt, skill or "", intention or ""))
 
