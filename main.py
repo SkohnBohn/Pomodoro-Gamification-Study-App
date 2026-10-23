@@ -5835,7 +5835,16 @@ class App(ctk.CTk):
         s_in.pack(expand=True, fill="both", padx=10, pady=18)
         _s_row = ctk.CTkFrame(s_in, fg_color="transparent")
         _s_row.pack()
-        mk_label(_s_row, "🔥", size=24).pack(side="left", padx=(0, 4))
+        _flame_path3 = os.path.join(os.path.dirname(__file__), "images", "flame.png")
+        if os.path.exists(_flame_path3):
+            try:
+                _fi3 = Image.open(_flame_path3).resize((24, 24), Image.Resampling.LANCZOS)
+                _flame_img3 = ctk.CTkImage(_fi3, size=(24, 24))
+                ctk.CTkLabel(_s_row, image=_flame_img3, text="").pack(side="left", padx=(0, 4))
+            except Exception:
+                mk_label(_s_row, "🔥", size=24).pack(side="left", padx=(0, 4))
+        else:
+            mk_label(_s_row, "🔥", size=24).pack(side="left", padx=(0, 4))
         mk_label(_s_row, str(d["best_streak_in_period"]), size=24, weight="bold", color=DARK).pack(side="left")
         mk_label(s_in, "best streak", size=11, color=MUTED).pack(pady=(4, 0))
 
